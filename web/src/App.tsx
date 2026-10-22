@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { LANGUAGE_NAMES, type BoardEvent } from "../../shared/types";
+import { greetingFor, LANGUAGE_NAMES, type BoardEvent } from "../../shared/types";
 import { Chalkboard, type BoardBlock } from "./components/Chalkboard";
 import { DevPanel } from "./components/DevPanel";
 import { Notebook, type NotebookStatus } from "./components/Notebook";
@@ -72,8 +72,10 @@ export function App() {
 
   const buildUserData = (s: StudentSetup): Record<string, unknown> => {
     const plan = s.plan;
+    const topic = s.topic || (plan?.title ?? "maths");
     return {
       session_code: sessionCode,
+      greeting: greetingFor(s.language, s.name, topic),
       student_name: s.name,
       grade: s.grade,
       language: s.language,

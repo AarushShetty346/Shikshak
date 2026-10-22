@@ -1,7 +1,7 @@
 import express from "express";
 import type { Server } from "node:http";
 import { WebSocketServer } from "ws";
-import type { ClientMessage, ServerMessage } from "../shared/types";
+import { VOICE_LANGUAGE, type ClientMessage, type Language, type ServerMessage } from "../shared/types";
 import { hasModel, modelName } from "./llm";
 import { makePlan } from "./plan";
 import { saveSample } from "./samples";
@@ -16,6 +16,12 @@ export function toE164(raw: unknown): string | null {
   if (digits.length === 10 && /^[6-9]/.test(digits)) return `+91${digits}`;
   if (digits.length === 12 && digits.startsWith("91")) return `+${digits}`;
   return null;
+}
+
+/** Starts the multilingual agent in the student's language: Hindi and Hinglish -> "hi", English -> "en". */
+export function agentLanguage(userData: Record<string, unknown>): { agent_data?: { language: string } } {
+  const lang = VOICE_LANGUAGE[userData.language as Language];
+  return lang ? { agent_data: { language: lang } } : {};
 }
 
 export function createApp(opts: { devTools?: boolean } = {}) {
@@ -52,7 +58,7 @@ export function createApp(opts: { devTools?: boolean } = {}) {
       const r = await fetch("https://api.bolna.ai/web-call/session", {
         method: "POST",
         headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ agent_id: agentId, user_data: userData }),
+        body: JSON.stringify({ agent_id: agentId, user_data: userData, ...agentLanguage(userData) }),
       });
       const text = await r.text();
       res.status(r.status).type("application/json").send(text);
@@ -82,7 +88,13 @@ export function createApp(opts: { devTools?: boolean } = {}) {
       const r = await fetch("https://api.bolna.ai/call", {
         method: "POST",
         headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ agent_id: agentId, recipient_phone_number: phone, user_data: userData, bypass_call_guardrails: true }),
+        body: JSON.stringify({
+          agent_id: agentId,
+          recipient_phone_number: phone,
+          user_data: userData,
+          bypass_call_guardrails: true,
+          ...agentLanguage(userData),
+        }),
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) {

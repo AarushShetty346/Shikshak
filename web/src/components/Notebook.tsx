@@ -29,8 +29,8 @@ export function Notebook({ problem, mark, status, snapshotTick, onSnapshot }: Pr
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [drewSinceMark, setDrewSinceMark] = useState(false);
   const drawing = useRef<Stroke | null>(null);
-  // Once a stylus has been used, ignore touch input so a resting palm doesn't draw.
-  const penSeen = useRef(false);
+  // While a stylus is in use, ignore finger touches for a moment so a resting palm doesn't draw.
+  const lastPenAt = useRef(0);
   const activePointer = useRef<number | null>(null);
   const strokesRef = useRef(strokes);
   strokesRef.current = strokes;
@@ -89,6 +89,20 @@ export function Notebook({ problem, mark, status, snapshotTick, onSnapshot }: Pr
 
   useEffect(() => setDrewSinceMark(false), [mark]);
 
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const block = (e: TouchEvent) => {
+      if (e.cancelable) e.preventDefault();
+    };
+    canvas.addEventListener("touchstart", block, { passive: false });
+    canvas.addEventListener("touchmove", block, { passive: false });
+    return () => {
+      canvas.removeEventListener("touchstart", block);
+      canvas.removeEventListener("touchmove", block);
+    };
+  }, []);
+
   const pointFrom = (e: React.PointerEvent): Point => {
     const rect = canvasRef.current!.getBoundingClientRect();
     return [Math.round((e.clientX - rect.left) * 10) / 10, Math.round((e.clientY - rect.top) * 10) / 10];
@@ -101,12 +115,28 @@ export function Notebook({ problem, mark, status, snapshotTick, onSnapshot }: Pr
     });
   };
 
+  /** Ends the stroke in progress. Saves it unless it was the eraser. */
+  const finishStroke = () => {
+    const stroke = drawing.current;
+    drawing.current = null;
+    activePointer.current = null;
+    if (!stroke || stroke.id === "eraser") return;
+    setStrokes((prev) => [...prev, stroke]);
+    setDrewSinceMark(true);
+  };
+
   const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (e.button !== 0 && e.pointerType === "mouse") return;
-    if (e.pointerType === "pen") penSeen.current = true;
-    if (e.pointerType === "touch" && penSeen.current) return;
-    if (drawing.current) return; // already drawing with another pointer
-    e.currentTarget.setPointerCapture(e.pointerId);
+    if (e.pointerType === "pen") lastPenAt.current = Date.now();
+    if (e.pointerType === "touch" && Date.now() - lastPenAt.current < 1500) return;
+    // Phones sometimes never send "finger lifted" (system gestures, notifications, a second finger).
+    // Never let a stuck stroke block the notebook: a new touch always finishes the old stroke first.
+    if (drawing.current) finishStroke();
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // Some browsers refuse capture for touch; drawing still works without it.
+    }
     activePointer.current = e.pointerId;
     const p = pointFrom(e);
     if (tool === "eraser") {
@@ -125,6 +155,7 @@ export function Notebook({ problem, mark, status, snapshotTick, onSnapshot }: Pr
   const onPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const stroke = drawing.current;
     if (!stroke || e.pointerId !== activePointer.current) return;
+    if (e.pointerType === "pen") lastPenAt.current = Date.now();
     const events = e.nativeEvent.getCoalescedEvents?.() ?? [e.nativeEvent];
     const rect = canvasRef.current!.getBoundingClientRect();
     for (const ev of events.length ? events : [e.nativeEvent]) {
@@ -149,12 +180,7 @@ export function Notebook({ problem, mark, status, snapshotTick, onSnapshot }: Pr
 
   const onPointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (e.pointerId !== activePointer.current) return;
-    activePointer.current = null;
-    const stroke = drawing.current;
-    drawing.current = null;
-    if (!stroke || stroke.id === "eraser") return;
-    setStrokes((prev) => [...prev, stroke]);
-    setDrewSinceMark(true);
+    finishStroke();
   };
 
   const markedLine = mark ? lines.find((l) => l.index === mark.line) : undefined;
@@ -187,6 +213,7 @@ export function Notebook({ problem, mark, status, snapshotTick, onSnapshot }: Pr
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
+          onLostPointerCapture={onPointerUp}
         />
         {markedLine && <MarkCircle line={markedLine} note={mark!.note} faded={drewSinceMark} />}
         {status === "checking" && (
