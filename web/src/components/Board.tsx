@@ -16,6 +16,7 @@ import { getDoc } from "../lib/docStore";
 import { renderPdfPage } from "../lib/files";
 import { DiagramView, diagramHeight } from "./DiagramView";
 import { MathText } from "./MathText";
+import { ArrowCounterClockwise, ArrowDown, BookOpenText, Check, CheckCircle, Eraser, HandGrabbing, PauseCircle, PencilSimple, Trash } from "@phosphor-icons/react";
 
 const PAD_L = 38; // room for the student's line numbers
 const PAD_R = 22;
@@ -628,7 +629,7 @@ export function Board(props: Props) {
   const busy = sub.state === "submitting" || sub.state === "reviewing";
   const canDone = response.length > 0 && responseKey !== lastDone && !busy;
   const doneLabel =
-    sub.state === "submitting" ? "Sending…" : sub.state === "reviewing" ? "Teacher reading…" : canDone ? "✓ Done" : sub.state === "done" && responseKey === lastDone ? "✓ Seen" : "✓ Done";
+    sub.state === "submitting" ? "Sending…" : sub.state === "reviewing" ? "Teacher reading…" : canDone ? "Done" : sub.state === "done" && responseKey === lastDone ? "Seen" : "Done";
 
   return (
     <div className="board" ref={wrapRef} data-tool={tool}>
@@ -671,7 +672,7 @@ export function Board(props: Props) {
           {markedLine && <MarkCircle box={markedLine.box} index={markedLine.index} note={mark!.note} scale={scale} faded={drewSinceMark} />}
           {correctAt && status === "correct" && (
             <div className="stamp" style={{ top: px(correctAt.y + correctAt.h + 10), left: px(Math.min(correctAt.x + correctAt.w, W - 200)) }}>
-              <span>✓</span> Shabash!
+              <Check weight="bold" /> Shabash!
             </div>
           )}
           {latestQuestion && response.length === 0 && (
@@ -698,7 +699,7 @@ export function Board(props: Props) {
       {status === "checking" && <div className="board-pill" role="status">Your teacher is looking at your work…</div>}
       {held.size > 0 && (
         <button className="board-pill board-pill-held" onClick={() => setHeld(new Set())}>
-          ⏸ Board paused for your doubt · continue
+          <PauseCircle /> Board paused for your doubt. Continue
         </button>
       )}
       {newBelow && (
@@ -710,7 +711,7 @@ export function Board(props: Props) {
             if (p) scrollRef.current?.scrollTo({ top: Math.max(0, (p.y - 40) * scale), behavior: "smooth" });
           }}
         >
-          New on the board ↓
+          New on the board <ArrowDown />
         </button>
       )}
       {toast && <div className="board-toast" role="status">{toast}</div>}
@@ -718,16 +719,16 @@ export function Board(props: Props) {
 
       <div className="board-tools" role="toolbar" aria-label="Board tools">
         <button className={tool === "pen" ? "on" : ""} onClick={() => setTool("pen")} aria-label="Pen" title="Pen">
-          <PenIcon />
+          <PencilSimple />
         </button>
         <button className={tool === "eraser" ? "on" : ""} onClick={() => setTool("eraser")} aria-label="Eraser" title="Eraser">
-          <EraserIcon />
+          <Eraser />
         </button>
         <button className={tool === "hand" ? "on" : ""} onClick={() => setTool("hand")} aria-label="Scroll" title="Scroll (or use two fingers)">
-          <HandIcon />
+          <HandGrabbing />
         </button>
         <button onClick={() => setStrokes((s) => s.slice(0, -1))} disabled={!strokes.length} aria-label="Undo" title="Undo">
-          <UndoIcon />
+          <ArrowCounterClockwise />
         </button>
         <button
           onClick={() => setStrokes((all) => all.filter((s) => !response.includes(s)))}
@@ -735,9 +736,10 @@ export function Board(props: Props) {
           aria-label="Clear my answer"
           title="Clear what I wrote below the question"
         >
-          <TrashIcon />
+          <Trash />
         </button>
         <button className="btn-done" data-ready={canDone} data-state={sub.state} onClick={done} disabled={!canDone} title="Send what I wrote to the teacher">
+          {sub.state === "submitting" || sub.state === "reviewing" ? <span className="spin" /> : <CheckCircle weight="fill" />}
           {doneLabel}
         </button>
         {toolbarExtra && <span className="tools-sep" aria-hidden="true" />}
@@ -926,41 +928,6 @@ function MarkCircle({ box, index, note, scale, faded }: { box: WrittenLine["box"
   );
 }
 
-const PenIcon = () => (
-  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 20h9" />
-    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
-  </svg>
-);
-const EraserIcon = () => (
-  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="m7 21-4.3-4.3a1 1 0 0 1 0-1.4l10-10a1 1 0 0 1 1.4 0l5.6 5.6a1 1 0 0 1 0 1.4L13 19" />
-    <path d="M22 21H7" />
-    <path d="m5 11 9 9" />
-  </svg>
-);
-const HandIcon = () => (
-  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M18 11V6a2 2 0 0 0-4 0v5" />
-    <path d="M14 10V4a2 2 0 0 0-4 0v6" />
-    <path d="M10 10.5V6a2 2 0 0 0-4 0v8" />
-    <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
-  </svg>
-);
-const UndoIcon = () => (
-  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M9 14 4 9l5-5" />
-    <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
-  </svg>
-);
-const TrashIcon = () => (
-  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M3 6h18" />
-    <path d="M8 6V4h8v2" />
-    <path d="m19 6-1 14H6L5 6" />
-  </svg>
-);
-
 /** A real page of the student's uploaded material on the board, with its source. */
 function SourcePage({ block, sessionCode }: { block: Extract<TutorBlock, { kind: "source" }>; sessionCode: string }) {
   const [src, setSrc] = useState<string | null>(null);
@@ -981,7 +948,7 @@ function SourcePage({ block, sessionCode }: { block: Extract<TutorBlock, { kind:
     <figure className="source-page" data-line={1}>
       {src ? <img className="hl-text" src={src} alt={`${block.docName}${block.page ? `, page ${block.page}` : ""}`} /> : <div className="source-wait">{error ?? "Opening the page…"}</div>}
       <figcaption>
-        📖 {block.docName}
+        <BookOpenText /> {block.docName}
         {block.page ? ` · page ${block.page}` : ""}
         {block.caption ? ` · ${block.caption}` : ""}
       </figcaption>
@@ -999,7 +966,7 @@ function SubmissionCard({ sub, onRetry, canRetry }: { sub: Submission; onRetry: 
         : sub.state === "failed"
           ? "Didn't reach your teacher"
           : sub.status === "correct"
-            ? "✓ Your teacher checked it"
+            ? "Your teacher checked it"
             : "Your teacher has read it";
   return (
     <div className="submission" data-state={sub.state} data-status={sub.status ?? ""} role="status" aria-live="polite">

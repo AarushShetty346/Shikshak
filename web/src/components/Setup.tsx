@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { DocMeta, Language } from "../../../shared/types";
 import { putDoc } from "../lib/docStore";
 import { prepareFile, type PreparedFile } from "../lib/files";
+import { ArrowLeft, Sparkle, UploadSimple } from "@phosphor-icons/react";
 import { MathText } from "./MathText";
 
 /** What /api/plan returns: the study plan (shown on the board section by section) and a short outline for the tutor. */
@@ -121,16 +122,17 @@ export function Setup({ sessionCode, onStart, onCancel }: { sessionCode: string;
   return (
     <main className="setup">
       <div className="setup-intro">
-        <p className="eyebrow">Your maths teacher, any time</p>
+        {onCancel && (
+          <button type="button" className="back-link" onClick={onCancel}>
+            <ArrowLeft /> Your classes
+          </button>
+        )}
         <h1>
           Learn it out loud.
-          <br />
           <span className="hand">Get stuck? I'll show you where.</span>
         </h1>
-        <p className="lede">
-          Shikshak talks you through a topic in your language on a shared blackboard. Write your working or draw your
-          doubt, press Done, and it points to the exact step that went wrong.
-        </p>
+        <p className="lede">A teacher who explains in your language on a shared board, then circles the exact step you got wrong.</p>
+        <BoardPreview />
       </div>
 
       <form className="setup-card" onSubmit={(e) => e.preventDefault()}>
@@ -197,7 +199,9 @@ export function Setup({ sessionCode, onStart, onCancel }: { sessionCode: string;
 
         <label className="upload">
           <input type="file" accept="image/*,application/pdf" multiple onChange={(e) => pickFiles(e.target.files)} />
-          <span className="upload-icon" aria-hidden="true">＋</span>
+          <span className="upload-icon" aria-hidden="true">
+            <UploadSimple />
+          </span>
           <span>
             {files.length === 0
               ? `Add photos (up to ${MAX_PHOTOS}) or a PDF of your notes (optional)`
@@ -230,12 +234,8 @@ export function Setup({ sessionCode, onStart, onCancel }: { sessionCode: string;
         <div className="actions">
           {!plan && (
             <button type="button" className="btn-secondary" disabled={!canPlan} onClick={makePlan}>
+              {planning ? <span className="spin" /> : <Sparkle />}
               {planning ? (files.length ? "Reading your notes…" : "Making your plan…") : "Make a plan"}
-            </button>
-          )}
-          {onCancel && (
-            <button type="button" className="btn-secondary" onClick={onCancel}>
-              Back
             </button>
           )}
           <button type="button" className="btn-primary" disabled={planning || saving} onClick={create}>
@@ -244,5 +244,28 @@ export function Setup({ sessionCode, onStart, onCancel }: { sessionCode: string;
         </div>
       </form>
     </main>
+  );
+}
+
+/** A small, real piece of the class board: the teacher's working, the student's line, the red circle. */
+function BoardPreview() {
+  return (
+    <figure className="board-preview" aria-label="Example: the teacher circles the step that went wrong">
+      <p className="bp-title">
+        <MathText text="x^2 - 5x + 6 = 0" />
+      </p>
+      <p>
+        <MathText text="(x - 2)(x - 3) = 0" />
+      </p>
+      <p className="bp-student">
+        <span className="bp-circled">
+          <MathText text="x = -2 or x = 3" />
+          <svg viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true">
+            <ellipse cx="50" cy="20" rx="48" ry="17" />
+          </svg>
+        </span>
+      </p>
+      <figcaption>Step 3: if x - 2 = 0, then x = 2, not -2.</figcaption>
+    </figure>
   );
 }
