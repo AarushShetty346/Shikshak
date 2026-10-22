@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { LANGUAGE_NAMES, type Language } from "../shared/types";
+import type { JsonRequest } from "./llm";
 
 export const MODEL = process.env.CLAUDE_MODEL || "claude-opus-5-5";
 
@@ -17,30 +18,29 @@ export function languageName(lang: string): string {
   return LANGUAGE_NAMES[lang as Language] ?? LANGUAGE_NAMES.hinglish;
 }
 
-type ContentBlock = Anthropic.Beta.BetaContentBlockParam;
-
 /**
  * One Claude call that must return JSON matching `schema`.
  * Uses the server-side refusal fallback so a rare safety decline still gets an answer.
  */
-export async function askJson<T>(opts: {
-  system: string;
-  content: ContentBlock[];
-  schema: Record<string, unknown>;
-  effort: "low" | "medium" | "high";
-  maxTokens?: number;
-}): Promise<T> {
+export async function askClaudeJson<T>(req: JsonRequest): Promise<T> {
+  const content: Anthropic.Beta.BetaContentBlockParam[] = req.attachments.map((a) =>
+    a.mediaType === "application/pdf"
+      ? { type: "document", source: { type: "base64", media_type: "application/pdf", data: a.data } }
+      : { type: "image", source: { type: "base64", media_type: a.mediaType as "image/png", data: a.data } },
+  );
+  content.push({ type: "text", text: req.text });
+
   const response = await getClient().beta.messages.create({
     model: MODEL,
-    max_tokens: opts.maxTokens ?? 8000,
+    max_tokens: 8000,
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
-    system: opts.system,
+    system: req.system,
     output_config: {
-      effort: opts.effort,
-      format: { type: "json_schema", schema: opts.schema },
+      effort: req.effort,
+      format: { type: "json_schema", schema: req.schema },
     },
-    messages: [{ role: "user", content: opts.content }],
+    messages: [{ role: "user", content }],
   });
 
   if (response.stop_reason === "refusal") {
@@ -51,13 +51,4 @@ export async function askJson<T>(opts: {
     .map((b) => (b as { text: string }).text)
     .join("");
   return JSON.parse(text) as T;
-}
-
-export function dataUrlToImage(dataUrl: string): ContentBlock {
-  const match = /^data:(image\/(?:png|jpeg|webp|gif));base64,(.+)$/.exec(dataUrl);
-  if (!match) throw new Error("Expected a base64 image data URL");
-  return {
-    type: "image",
-    source: { type: "base64", media_type: match[1] as "image/png", data: match[2] },
-  };
 }

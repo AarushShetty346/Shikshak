@@ -1,5 +1,5 @@
-import type Anthropic from "@anthropic-ai/sdk";
-import { askJson, languageName } from "./claude";
+import { languageName } from "./claude";
+import { askJson } from "./llm";
 
 export interface LessonPlan {
   title: string;
@@ -45,19 +45,11 @@ export interface PlanRequest {
 }
 
 export async function makePlan(req: PlanRequest): Promise<LessonPlan> {
-  const content: Anthropic.Beta.BetaContentBlockParam[] = [];
-  if (req.notes) {
-    if (req.notes.mediaType === "application/pdf") {
-      content.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: req.notes.data } });
-    } else {
-      content.push({ type: "image", source: { type: "base64", media_type: req.notes.mediaType as "image/png", data: req.notes.data } });
-    }
-  }
-  content.push({ type: "text", text: `Student is in class ${req.grade || "10"}. Topic: ${req.topic || "whatever the notes cover"}` });
   return askJson<LessonPlan>({
     system: SYSTEM.replace("{LANGUAGE}", languageName(req.language)),
     effort: "medium",
     schema: SCHEMA,
-    content,
+    attachments: req.notes ? [{ mediaType: req.notes.mediaType, data: req.notes.data }] : [],
+    text: `Student is in class ${req.grade || "10"}. Topic: ${req.topic || "whatever the notes cover"}`,
   });
 }

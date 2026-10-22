@@ -12,6 +12,8 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "22"
+      - key: GEMINI_API_KEY
+        sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
       - key: BOLNA_API_KEY
@@ -22,6 +24,6 @@ services:
         sync: false
       - key: TOOLS_TOKEN
         sync: false
-      # Set to 1 until ANTHROPIC_API_KEY is filled in, then delete it.
+      # Set to 1 until GEMINI_API_KEY is filled in, then delete it.
       - key: FAKE_CHECKER
         sync: false

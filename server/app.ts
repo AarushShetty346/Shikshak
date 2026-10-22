@@ -2,7 +2,7 @@ import express from "express";
 import type { Server } from "node:http";
 import { WebSocketServer } from "ws";
 import type { ClientMessage, ServerMessage } from "../shared/types";
-import { hasClaude } from "./claude";
+import { hasModel, modelName } from "./llm";
 import { makePlan } from "./plan";
 import { saveSample } from "./samples";
 import { getOrCreate, normalizeCode, resolve, touch } from "./sessions";
@@ -27,7 +27,8 @@ export function createApp(opts: { devTools?: boolean } = {}) {
   app.get("/api/health", (_req, res) => {
     res.json({
       ok: true,
-      claude: hasClaude(),
+      checker: hasModel(),
+      model: modelName(),
       bolna: Boolean(process.env.BOLNA_API_KEY && process.env.BOLNA_AGENT_ID),
       fakeChecker: process.env.FAKE_CHECKER === "1",
       publicUrl: Boolean(process.env.PUBLIC_URL && !process.env.PUBLIC_URL.includes("example.com")),
@@ -118,8 +119,8 @@ export function createApp(opts: { devTools?: boolean } = {}) {
   }
 
   app.post("/api/plan", async (req, res) => {
-    if (!hasClaude()) {
-      res.status(503).json({ error: "Planner is not set up (no ANTHROPIC_API_KEY)." });
+    if (!hasModel()) {
+      res.status(503).json({ error: "Planner is not set up (no GEMINI_API_KEY or ANTHROPIC_API_KEY)." });
       return;
     }
     try {

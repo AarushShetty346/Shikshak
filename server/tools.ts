@@ -6,7 +6,7 @@ import express, { type Request, type Response } from "express";
 import { randomUUID } from "node:crypto";
 import { splitSteps } from "../shared/mathText";
 import { checkWork, type CheckResult } from "./checkWork";
-import { hasClaude } from "./claude";
+import { hasModel } from "./llm";
 import { emit, resolve, touch, type Session } from "./sessions";
 
 type Params = Record<string, unknown>;
@@ -119,9 +119,9 @@ export function toolsRouter() {
       return void res.json({ ...result, note: "The notebook is empty. Encourage the student to start writing." });
     }
     const fake = process.env.FAKE_CHECKER === "1";
-    if (!hasClaude() && !fake) {
+    if (!hasModel() && !fake) {
       emit(s, { type: "unclear", note: "Checker isn't set up on the server" });
-      return void res.json({ ok: false, error: "The checker is not set up (no ANTHROPIC_API_KEY on the server)." });
+      return void res.json({ ok: false, error: "The checker is not set up (no GEMINI_API_KEY or ANTHROPIC_API_KEY on the server)." });
     }
 
     try {
