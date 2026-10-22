@@ -30,7 +30,7 @@ export function createApp(opts: { devTools?: boolean } = {}) {
       checker: hasModel(),
       model: modelName(),
       bolna: Boolean(process.env.BOLNA_API_KEY && process.env.BOLNA_AGENT_ID),
-      fakeChecker: process.env.FAKE_CHECKER === "1",
+      fakeChecker: !hasModel() && process.env.FAKE_CHECKER === "1",
       publicUrl: Boolean(process.env.PUBLIC_URL && !process.env.PUBLIC_URL.includes("example.com")),
     });
   });
