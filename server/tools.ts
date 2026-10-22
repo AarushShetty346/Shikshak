@@ -28,7 +28,7 @@ function readParams(req: Request): Params {
 
 const NO_SESSION = {
   ok: false,
-  error: "The student's screen is not connected. Ask them to keep the Kalam tab open, then try again.",
+  error: "The student's screen is not connected. Ask them to keep the Shikshak tab open, then try again.",
 };
 
 /** Waits briefly for the browser to upload a fresh notebook snapshot after we ask for one. */

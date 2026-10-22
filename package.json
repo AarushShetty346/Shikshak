@@ -1,9 +1,11 @@
 {
-  "name": "kalam",
+  "name": "shikshak",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "description": "Voice maths tutor that talks, writes on a board, and checks your handwritten work. Bolna Buildathon 2026.",
+  "author": "Aarush Shetty (https://github.com/AarushShetty346)",
+  "repository": "github:AarushShetty346/Shikshak",
   "scripts": {
     "dev": "tsx server/index.ts",
     "dev:watch": "tsx watch --ignore \"web/**\" server/index.ts",

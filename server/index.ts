@@ -28,5 +28,5 @@ if (production) {
 }
 
 server.listen(port, () => {
-  console.log(`Kalam running at http://localhost:${port}${production ? "" : "  (dev, add ?dev=1 for the tool simulator)"}`);
+  console.log(`Shikshak running at http://localhost:${port}${production ? "" : "  (dev, add ?dev=1 for the tool simulator)"}`);
 });

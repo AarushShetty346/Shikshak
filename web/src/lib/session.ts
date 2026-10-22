@@ -4,7 +4,7 @@
 const ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // no 0/O, 1/I/L
 
 export function getSessionCode(): string {
-  const key = "kalam.sessionCode";
+  const key = "shikshak.sessionCode";
   try {
     const saved = sessionStorage.getItem(key);
     if (saved) return saved;

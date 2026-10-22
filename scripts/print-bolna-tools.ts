@@ -63,7 +63,7 @@ const tools = [
     name: "check_work",
     description:
       "Look at what the student has written in their notebook and find the first wrong step. Use when the student says they are done, says 'check karo', 'ho gaya', 'dekho', asks if they are right, or seems stuck.",
-    pre_call_message: "Ek second, dekhti hoon.",
+    pre_call_message: "Ek second, dekhte hain.",
     properties: {},
     required: [],
   }),

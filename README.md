@@ -6,8 +6,6 @@ handwritten work, circling the exact step that went wrong.
 Built for the [Bolna Buildathon at Symphony 2026](https://www.bolna.ai/symphony/buildathon). Voice runs on
 [Bolna](https://www.bolna.ai) (web call SDK + custom function calls). Claude reads the student's handwriting.
 
-> The app's on-screen name is still the working name "Kalam" in a few places. Rename pending.
-
 ## How it works
 
 ```
@@ -63,3 +61,7 @@ same calls the voice agent makes, and the fake checker always flags line 2.
 Any host that runs a long-lived Node process with WebSockets (Render, Railway, Fly). Build with `npm run build`,
 start with `npm start`. Serverless hosts (Vercel) won't work as-is: tool calls and the browser socket must reach
 the same process.
+
+## Author
+
+[Aarush Shetty](https://github.com/AarushShetty346)

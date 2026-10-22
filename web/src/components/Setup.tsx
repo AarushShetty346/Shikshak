@@ -66,7 +66,7 @@ export function Setup({ onStart }: { onStart: (s: StudentSetup) => void }) {
           <span className="hand">Get stuck? I'll show you where.</span>
         </h1>
         <p className="lede">
-          Kalam talks you through a topic in your language, writes it on the board, then watches you solve a
+          Shikshak talks you through a topic in your language, writes it on the board, then watches you solve a
           problem and points to the exact step that went wrong.
         </p>
       </div>
