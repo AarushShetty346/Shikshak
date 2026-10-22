@@ -955,3 +955,102 @@ sup {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* ---------- Phone fallback ---------- */
+
+.call {
+  position: relative;
+}
+
+.phone-link {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 18px;
+  border: 0;
+  background: none;
+  padding: 2px 4px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.phone-link:hover {
+  color: var(--accent);
+}
+
+.phone-pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: min(340px, calc(100vw - 32px));
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow), 0 12px 40px rgba(40, 30, 10, 0.16);
+  padding: 16px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.phone-pop label {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+
+.phone-row {
+  display: flex;
+  gap: 8px;
+}
+
+.phone-row input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1.5px solid var(--line);
+}
+
+.phone-row input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.phone-row .btn-primary {
+  padding: 10px 16px;
+}
+
+.phone-error {
+  margin: 0;
+  color: var(--red);
+  font-size: 13px;
+}
+
+.phone-done {
+  margin: 0 24px 0 0;
+  font-size: 14px;
+}
+
+.phone-close {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  border: 0;
+  background: none;
+  font-size: 20px;
+  color: var(--ink-soft);
+}
+
+.dev-health {
+  margin: 0 0 8px;
+  color: #c9d4c5;
+  font-size: 12px;
+}
+
+.dev-buttons .dev-wide {
+  grid-column: 1 / -1;
+  background: #4a3a22;
+}

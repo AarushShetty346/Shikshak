@@ -3,6 +3,7 @@ import { LANGUAGE_NAMES, type BoardEvent } from "../../shared/types";
 import { Chalkboard, type BoardBlock } from "./components/Chalkboard";
 import { DevPanel } from "./components/DevPanel";
 import { Notebook, type NotebookStatus } from "./components/Notebook";
+import { PhoneFallback } from "./components/PhoneFallback";
 import { Setup, type StudentSetup } from "./components/Setup";
 import { TopBar } from "./components/TopBar";
 import { getSessionCode, isDev } from "./lib/session";
@@ -61,9 +62,9 @@ export function App() {
   const { connected, send } = useBoardSocket(sessionCode, onEvent);
   const onSnapshot = useCallback((png: string | null, lineCount: number) => send({ kind: "canvas", png, lineCount }), [send]);
 
-  const startCall = (s: StudentSetup) => {
+  const buildUserData = (s: StudentSetup): Record<string, unknown> => {
     const plan = s.plan;
-    voice.start({
+    return {
       session_code: sessionCode,
       student_name: s.name,
       grade: s.grade,
@@ -75,8 +76,10 @@ export function App() {
         : "No plan yet. Ask the student what they are stuck on, then make a short plan with them.",
       practice_problem: plan?.practice_problem ?? "",
       practice_answer: plan?.practice_answer ?? "",
-    });
+    };
   };
+
+  const startCall = (s: StudentSetup) => voice.start(buildUserData(s));
 
   if (!student) {
     return (
@@ -99,6 +102,7 @@ export function App() {
         sessionCode={sessionCode}
         onStart={() => startCall(student)}
         onStop={voice.stop}
+        phoneFallback={<PhoneFallback userData={() => buildUserData(student)} />}
       />
       <main className="desk">
         <Chalkboard blocks={blocks} wipeKey={wipeKey} />

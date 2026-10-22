@@ -140,3 +140,22 @@ describe("check_work without a checker", () => {
     tab.ws.close();
   });
 });
+
+describe("phone call fallback", () => {
+  it("explains what's missing when Bolna isn't configured", async () => {
+    const saved = { k: process.env.BOLNA_API_KEY, a: process.env.BOLNA_AGENT_ID };
+    delete process.env.BOLNA_API_KEY;
+    delete process.env.BOLNA_AGENT_ID;
+    const r = await fetch(`${base}/api/phone-call`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone: "9876543210" }) });
+    expect(r.status).toBe(503);
+    if (saved.k) process.env.BOLNA_API_KEY = saved.k;
+    if (saved.a) process.env.BOLNA_AGENT_ID = saved.a;
+  });
+
+  it("rejects a bad number before calling Bolna", async () => {
+    process.env.BOLNA_API_KEY ||= "test";
+    process.env.BOLNA_AGENT_ID ||= "test";
+    const r = await fetch(`${base}/api/phone-call`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone: "123" }) });
+    expect(r.status).toBe(400);
+  });
+});

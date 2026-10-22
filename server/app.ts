@@ -4,10 +4,21 @@ import { WebSocketServer } from "ws";
 import type { ClientMessage, ServerMessage } from "../shared/types";
 import { hasClaude } from "./claude";
 import { makePlan } from "./plan";
-import { getOrCreate, normalizeCode, touch } from "./sessions";
+import { saveSample } from "./samples";
+import { getOrCreate, normalizeCode, resolve, touch } from "./sessions";
 import { toolsRouter } from "./tools";
 
-export function createApp() {
+/** "98765 43210" -> "+919876543210". Accepts full international numbers starting with +. */
+export function toE164(raw: unknown): string | null {
+  const s = String(raw ?? "").trim();
+  const digits = s.replace(/\D/g, "");
+  if (s.startsWith("+")) return digits.length >= 8 && digits.length <= 15 ? `+${digits}` : null;
+  if (digits.length === 10 && /^[6-9]/.test(digits)) return `+91${digits}`;
+  if (digits.length === 12 && digits.startsWith("91")) return `+${digits}`;
+  return null;
+}
+
+export function createApp(opts: { devTools?: boolean } = {}) {
   const app = express();
 
   app.use("/tools", toolsRouter());
@@ -18,6 +29,8 @@ export function createApp() {
       ok: true,
       claude: hasClaude(),
       bolna: Boolean(process.env.BOLNA_API_KEY && process.env.BOLNA_AGENT_ID),
+      fakeChecker: process.env.FAKE_CHECKER === "1",
+      publicUrl: Boolean(process.env.PUBLIC_URL && !process.env.PUBLIC_URL.includes("example.com")),
     });
   });
 
@@ -47,6 +60,62 @@ export function createApp() {
       res.status(502).json({ error: "Could not reach Bolna" });
     }
   });
+
+  // Fallback when browser calls aren't available: Bolna phones the student, and the board in this tab
+  // still updates, because the call carries the same session code.
+  app.post("/api/phone-call", async (req, res) => {
+    const key = process.env.BOLNA_API_KEY;
+    const agentId = process.env.BOLNA_AGENT_ID;
+    if (!key || !agentId) {
+      res.status(503).json({ error: "Voice isn't set up yet: add BOLNA_API_KEY and BOLNA_AGENT_ID to .env" });
+      return;
+    }
+    const phone = toE164(req.body?.phone);
+    if (!phone) {
+      res.status(400).json({ error: "Enter a 10-digit Indian mobile number, or a full number starting with +" });
+      return;
+    }
+    const userData = req.body?.user_data ?? {};
+    if (userData.session_code) getOrCreate(userData.session_code);
+    try {
+      const r = await fetch("https://api.bolna.ai/call", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ agent_id: agentId, recipient_phone_number: phone, user_data: userData, bypass_call_guardrails: true }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        console.error("[phone-call] Bolna error", r.status, data);
+        res.status(502).json({ error: "Bolna couldn't place the call. Check that your account has a phone number." });
+        return;
+      }
+      res.json({ ok: true, execution_id: data.execution_id });
+    } catch (err) {
+      console.error("[phone-call] failed", err);
+      res.status(502).json({ error: "Could not reach Bolna" });
+    }
+  });
+
+  // Dev only: save the current notebook as a test case for the checker (see scripts/eval-checker.ts).
+  if (opts.devTools) {
+    app.post("/api/dev/save-sample", (req, res) => {
+      const s = resolve(req.body?.session_code);
+      if (!s?.canvas?.png) {
+        res.status(400).json({ error: "Write something in the notebook first." });
+        return;
+      }
+      const saved = saveSample({
+        png: s.canvas.png,
+        lineCount: s.canvas.lineCount,
+        problem: s.problem?.text ?? null,
+        answer: s.problem?.answer,
+        language: s.language,
+        expected_status: req.body?.expected_status,
+        expected_line: req.body?.expected_line ?? null,
+      });
+      res.json({ ok: true, ...saved });
+    });
+  }
 
   app.post("/api/plan", async (req, res) => {
     if (!hasClaude()) {

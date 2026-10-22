@@ -9,14 +9,14 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const production = process.argv.includes("--prod") || process.env.NODE_ENV === "production";
 const port = Number(process.env.PORT || 8787);
 
-const { app, attachWebSocket } = createApp();
+const { app, attachWebSocket } = createApp({ devTools: !production });
 const server = createServer(app);
 attachWebSocket(server);
 
 if (production) {
   const dist = path.join(root, "dist");
   app.use(express.static(dist));
-  app.use((_req, res) => res.sendFile(path.join(dist, "index.html")));
+  app.use((req, res, next) => (req.method === "GET" ? res.sendFile(path.join(dist, "index.html")) : next()));
 } else {
   const { createServer: createVite } = await import("vite");
   const vite = await createVite({
