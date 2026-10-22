@@ -18,10 +18,11 @@ services:
         sync: false
       - key: BOLNA_API_KEY
         sync: false
+      # Not secret: useless without BOLNA_API_KEY, which stays in Render's dashboard.
       - key: BOLNA_AGENT_ID
-        sync: false
+        value: "7438fadd-ad12-411c-9e31-fb9ad976ecbd"
       - key: PUBLIC_URL
-        sync: false
+        value: "https://shikshak-o0l8.onrender.com"
       - key: TOOLS_TOKEN
         sync: false
       # Set to 1 until GEMINI_API_KEY is filled in, then delete it.

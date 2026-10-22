@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { LANGUAGE_NAMES, type BoardEvent } from "../../shared/types";
 import { Chalkboard, type BoardBlock } from "./components/Chalkboard";
 import { DevPanel } from "./components/DevPanel";
@@ -60,6 +60,14 @@ export function App() {
   }, []);
 
   const { connected, send } = useBoardSocket(sessionCode, onEvent);
+
+  // Render's free plan sleeps after ~15 idle minutes. While a class is open, ping the server
+  // so it stays awake and the tutor's board actions don't hit a cold start mid-call.
+  useEffect(() => {
+    if (!student) return;
+    const id = setInterval(() => void fetch("/api/health").catch(() => {}), 4 * 60 * 1000);
+    return () => clearInterval(id);
+  }, [student]);
   const onSnapshot = useCallback((png: string | null, lineCount: number) => send({ kind: "canvas", png, lineCount }), [send]);
 
   const buildUserData = (s: StudentSetup): Record<string, unknown> => {
