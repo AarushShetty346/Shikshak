@@ -2,6 +2,7 @@
 // the prompt and welcome message (bolna/agent-prompt.md) and the four tool definitions.
 
 import { readFileSync } from "node:fs";
+import { DIAGRAM_EXAMPLES } from "../shared/diagram";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -50,26 +51,64 @@ export function buildTools(publicUrl: string, toolsToken?: string): ToolDef[] {
   const token = toolsToken ? `Bearer ${toolsToken}` : null;
   return [
     tool(base, token, {
-      name: "show_steps",
+      name: "write",
       description:
-        "Write worked steps on the student's chalkboard. Use whenever you explain a method, solve an example, or answer a doubt that needs maths written down. Call it, then talk through the lines as they appear.",
-      // Never leave this empty: Bolna then plays its own English filler ("Just give me a moment...").
+        "Write on the shared blackboard. Use it the way a teacher uses chalk: a heading when starting a topic, a short definition, an equation, or a worked solution built step by step. Lines appear one by one while you speak, so explain them in the same order. Keep it to what matters; never write whole paragraphs.",
       pre_call_message: { hi: "अच्छा।", en: "Okay." },
       properties: {
-        title: { type: "string", description: "Short heading for this block, e.g. 'Factorisation'." },
-        steps: {
+        kind: {
           type: "string",
-          description: "The lines to write, separated by ' || '. Plain text maths, no LaTeX. Example: 2x + 3 = 7 || 2x = 4 || x = 2",
+          description: "heading | text | equation | steps | your_turn. steps: a solution built line by line. your_turn: a question with space left for the student to work it out.",
         },
+        content: {
+          type: "string",
+          description: "The lines, separated by ' || '. Plain-text maths, no LaTeX: x^2, sqrt(x), a_n = a + (n-1)d. Each line short.",
+        },
+        place: { type: "string", description: "next (below the latest writing, default) or right (beside it, for a diagram or side note on wide screens)." },
+        replace: { type: "string", description: "Optional: a block label like B3 to rub out and write over in the same spot." },
       },
-      required: ["steps"],
+      required: ["kind", "content"],
+    }),
+    tool(base, token, {
+      name: "draw",
+      description:
+        "Draw a diagram on the board when a picture explains it better: an AP as a chain of terms, a number line, a graph, a triangle, or a table. It draws itself piece by piece as you talk, so describe the pieces in order. Formats: " +
+        DIAGRAM_EXAMPLES.join("  /  "),
+      pre_call_message: { hi: "चलो, इसे बना के देखते हैं।", en: "Let me draw this." },
+      properties: {
+        diagram: { type: "string", description: "One line in one of the formats, e.g. 'ap: 2, 5, 8, 11 | d = 3'." },
+        caption: { type: "string", description: "Optional short caption." },
+        place: { type: "string", description: "next or right (beside the explanation)." },
+        replace: { type: "string", description: "Optional block label to draw over." },
+      },
+      required: ["diagram"],
+    }),
+    tool(base, token, {
+      name: "highlight",
+      description:
+        "Point at something already on the board while you talk about it: underline, circle or box a block or one of its lines, tick it, or put an arrow by it. Use it when you refer back ('remember this formula?') or stress the key part.",
+      pre_call_message: { hi: "यह देखो।", en: "Look here." },
+      properties: {
+        target: { type: "string", description: "A block label from the board map, like 'B2', or a line in it, like 'B2 line 3'." },
+        style: { type: "string", description: "underline | circle | box | tick | arrow" },
+        note: { type: "string", description: "Optional 1-3 word chalk note beside it." },
+      },
+      required: ["target"],
+    }),
+    tool(base, token, {
+      name: "erase",
+      description:
+        "Rub out a block that is no longer needed or was wrong (its space can be reused with write's replace), or 'all' to start a fresh page for a new topic when the board is crowded.",
+      pre_call_message: { hi: "अच्छा।", en: "Okay." },
+      properties: { target: { type: "string", description: "A block label like 'B3', or 'all'." } },
+      required: ["target"],
     }),
     tool(base, token, {
       name: "give_problem",
-      description: "Put a practice problem in the student's notebook and clear their page. Use when it is the student's turn to solve something.",
-      pre_call_message: { hi: "अच्छा, एक सवाल देती हूँ।", en: "Okay, here is one for you." },
+      description: "Put a practice problem on the board with space below it for the student to solve. Use when it is the student's turn to solve something you made up.",
+      pre_call_message: { hi: "अच्छा, एक सवाल देती हूँ।", en: "Okay, here's one for you." },
       properties: {
-        problem: { type: "string", description: "The problem as plain text, e.g. 'Solve: x^2 - 7x + 12 = 0'." },
+        problem: { type: "string", description: "The problem as plain text, e.g. 'Find the 10th term of 2, 5, 8, ...'." },
         answer: { type: "string", description: "The correct final answer, for checking. Never read it aloud." },
       },
       required: ["problem", "answer"],
@@ -88,6 +127,14 @@ export function buildTools(publicUrl: string, toolsToken?: string): ToolDef[] {
       required: [],
     }),
     tool(base, token, {
+      name: "continue_lesson",
+      description:
+        "Call this right after you have answered a student's doubt or question that interrupted your explanation. It un-pauses the board and tells you exactly where the lesson was, so you can pick up from there.",
+      pre_call_message: { hi: "अच्छा।", en: "Alright." },
+      properties: {},
+      required: [],
+    }),
+    tool(base, token, {
       name: "show_section",
       description:
         "Write the next part of today's prepared study plan on the board (made from the student's own notes if they uploaded any). Pass 'next' to move on, or a section number to go back or jump. Returns a short line to say and a question to ask. Only when the lesson plan lists sections.",
@@ -102,13 +149,6 @@ export function buildTools(publicUrl: string, toolsToken?: string): ToolDef[] {
       pre_call_message: { hi: "अच्छा, एक सवाल देती हूँ।", en: "Okay, here is one for you." },
       properties: { number: { type: "string", description: "'next', or a practice number, e.g. '2'." } },
       required: ["number"],
-    }),
-    tool(base, token, {
-      name: "clear_board",
-      description: "Start a fresh page on the board. Only when moving to a completely new topic.",
-      pre_call_message: { hi: "अच्छा।", en: "Okay." },
-      properties: {},
-      required: [],
     }),
   ];
 }

@@ -1,8 +1,8 @@
 
-// ----- show_steps -----
+// ----- write -----
 {
-  "name": "show_steps",
-  "description": "Write worked steps on the student's chalkboard. Use whenever you explain a method, solve an example, or answer a doubt that needs maths written down. Call it, then talk through the lines as they appear.",
+  "name": "write",
+  "description": "Write on the shared blackboard. Use it the way a teacher uses chalk: a heading when starting a topic, a short definition, an equation, or a worked solution built step by step. Lines appear one by one while you speak, so explain them in the same order. Keep it to what matters; never write whole paragraphs.",
   "pre_call_message": {
     "hi": "अच्छा।",
     "en": "Okay."
@@ -14,18 +14,27 @@
         "type": "string",
         "description": "The session code from the prompt. Always pass it exactly."
       },
-      "title": {
+      "kind": {
         "type": "string",
-        "description": "Short heading for this block, e.g. 'Factorisation'."
+        "description": "heading | text | equation | steps | your_turn. steps: a solution built line by line. your_turn: a question with space left for the student to work it out."
       },
-      "steps": {
+      "content": {
         "type": "string",
-        "description": "The lines to write, separated by ' || '. Plain text maths, no LaTeX. Example: 2x + 3 = 7 || 2x = 4 || x = 2"
+        "description": "The lines, separated by ' || '. Plain-text maths, no LaTeX: x^2, sqrt(x), a_n = a + (n-1)d. Each line short."
+      },
+      "place": {
+        "type": "string",
+        "description": "next (below the latest writing, default) or right (beside it, for a diagram or side note on wide screens)."
+      },
+      "replace": {
+        "type": "string",
+        "description": "Optional: a block label like B3 to rub out and write over in the same spot."
       }
     },
     "required": [
       "session_code",
-      "steps"
+      "kind",
+      "content"
     ]
   },
   "key": "custom_task",
@@ -33,10 +42,157 @@
     "method": "POST",
     "param": {
       "session_code": "%(session_code)s",
-      "title": "%(title)s",
-      "steps": "%(steps)s"
+      "kind": "%(kind)s",
+      "content": "%(content)s",
+      "place": "%(place)s",
+      "replace": "%(replace)s"
     },
-    "url": "https://shikshak-o0l8.onrender.com/tools/show_steps",
+    "url": "https://shikshak-o0l8.onrender.com/tools/write",
+    "api_token": null,
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}
+
+// ----- draw -----
+{
+  "name": "draw",
+  "description": "Draw a diagram on the board when a picture explains it better: an AP as a chain of terms, a number line, a graph, a triangle, or a table. It draws itself piece by piece as you talk, so describe the pieces in order. Formats: ap: 2, 5, 8, 11 | d = 3  /  numberline: -5..5 | points: -2, 3 | labels: a, b  /  graph: y = x^2 - 4 ; y = 2x | points: (2,0), (-2,0) | x: -4..4  /  triangle: right | vertices: A, B, C | AB = 3, BC = 4, AC = 5 | angle: theta at A  /  table: n, a_n ; 1, 2 ; 2, 5 ; 3, 8",
+  "pre_call_message": {
+    "hi": "चलो, इसे बना के देखते हैं।",
+    "en": "Let me draw this."
+  },
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "session_code": {
+        "type": "string",
+        "description": "The session code from the prompt. Always pass it exactly."
+      },
+      "diagram": {
+        "type": "string",
+        "description": "One line in one of the formats, e.g. 'ap: 2, 5, 8, 11 | d = 3'."
+      },
+      "caption": {
+        "type": "string",
+        "description": "Optional short caption."
+      },
+      "place": {
+        "type": "string",
+        "description": "next or right (beside the explanation)."
+      },
+      "replace": {
+        "type": "string",
+        "description": "Optional block label to draw over."
+      }
+    },
+    "required": [
+      "session_code",
+      "diagram"
+    ]
+  },
+  "key": "custom_task",
+  "value": {
+    "method": "POST",
+    "param": {
+      "session_code": "%(session_code)s",
+      "diagram": "%(diagram)s",
+      "caption": "%(caption)s",
+      "place": "%(place)s",
+      "replace": "%(replace)s"
+    },
+    "url": "https://shikshak-o0l8.onrender.com/tools/draw",
+    "api_token": null,
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}
+
+// ----- highlight -----
+{
+  "name": "highlight",
+  "description": "Point at something already on the board while you talk about it: underline, circle or box a block or one of its lines, tick it, or put an arrow by it. Use it when you refer back ('remember this formula?') or stress the key part.",
+  "pre_call_message": {
+    "hi": "यह देखो।",
+    "en": "Look here."
+  },
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "session_code": {
+        "type": "string",
+        "description": "The session code from the prompt. Always pass it exactly."
+      },
+      "target": {
+        "type": "string",
+        "description": "A block label from the board map, like 'B2', or a line in it, like 'B2 line 3'."
+      },
+      "style": {
+        "type": "string",
+        "description": "underline | circle | box | tick | arrow"
+      },
+      "note": {
+        "type": "string",
+        "description": "Optional 1-3 word chalk note beside it."
+      }
+    },
+    "required": [
+      "session_code",
+      "target"
+    ]
+  },
+  "key": "custom_task",
+  "value": {
+    "method": "POST",
+    "param": {
+      "session_code": "%(session_code)s",
+      "target": "%(target)s",
+      "style": "%(style)s",
+      "note": "%(note)s"
+    },
+    "url": "https://shikshak-o0l8.onrender.com/tools/highlight",
+    "api_token": null,
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}
+
+// ----- erase -----
+{
+  "name": "erase",
+  "description": "Rub out a block that is no longer needed or was wrong (its space can be reused with write's replace), or 'all' to start a fresh page for a new topic when the board is crowded.",
+  "pre_call_message": {
+    "hi": "अच्छा।",
+    "en": "Okay."
+  },
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "session_code": {
+        "type": "string",
+        "description": "The session code from the prompt. Always pass it exactly."
+      },
+      "target": {
+        "type": "string",
+        "description": "A block label like 'B3', or 'all'."
+      }
+    },
+    "required": [
+      "session_code",
+      "target"
+    ]
+  },
+  "key": "custom_task",
+  "value": {
+    "method": "POST",
+    "param": {
+      "session_code": "%(session_code)s",
+      "target": "%(target)s"
+    },
+    "url": "https://shikshak-o0l8.onrender.com/tools/erase",
     "api_token": null,
     "headers": {
       "Content-Type": "application/json"
@@ -47,10 +203,10 @@
 // ----- give_problem -----
 {
   "name": "give_problem",
-  "description": "Put a practice problem in the student's notebook and clear their page. Use when it is the student's turn to solve something.",
+  "description": "Put a practice problem on the board with space below it for the student to solve. Use when it is the student's turn to solve something you made up.",
   "pre_call_message": {
     "hi": "अच्छा, एक सवाल देती हूँ।",
-    "en": "Okay, here is one for you."
+    "en": "Okay, here's one for you."
   },
   "parameters": {
     "type": "object",
@@ -61,7 +217,7 @@
       },
       "problem": {
         "type": "string",
-        "description": "The problem as plain text, e.g. 'Solve: x^2 - 7x + 12 = 0'."
+        "description": "The problem as plain text, e.g. 'Find the 10th term of 2, 5, 8, ...'."
       },
       "answer": {
         "type": "string",
@@ -122,6 +278,40 @@
       "student_said": "%(student_said)s"
     },
     "url": "https://shikshak-o0l8.onrender.com/tools/look_at_board",
+    "api_token": null,
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}
+
+// ----- continue_lesson -----
+{
+  "name": "continue_lesson",
+  "description": "Call this right after you have answered a student's doubt or question that interrupted your explanation. It un-pauses the board and tells you exactly where the lesson was, so you can pick up from there.",
+  "pre_call_message": {
+    "hi": "अच्छा।",
+    "en": "Alright."
+  },
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "session_code": {
+        "type": "string",
+        "description": "The session code from the prompt. Always pass it exactly."
+      }
+    },
+    "required": [
+      "session_code"
+    ]
+  },
+  "key": "custom_task",
+  "value": {
+    "method": "POST",
+    "param": {
+      "session_code": "%(session_code)s"
+    },
+    "url": "https://shikshak-o0l8.onrender.com/tools/continue_lesson",
     "api_token": null,
     "headers": {
       "Content-Type": "application/json"
@@ -202,40 +392,6 @@
       "number": "%(number)s"
     },
     "url": "https://shikshak-o0l8.onrender.com/tools/give_practice",
-    "api_token": null,
-    "headers": {
-      "Content-Type": "application/json"
-    }
-  }
-}
-
-// ----- clear_board -----
-{
-  "name": "clear_board",
-  "description": "Start a fresh page on the board. Only when moving to a completely new topic.",
-  "pre_call_message": {
-    "hi": "अच्छा।",
-    "en": "Okay."
-  },
-  "parameters": {
-    "type": "object",
-    "properties": {
-      "session_code": {
-        "type": "string",
-        "description": "The session code from the prompt. Always pass it exactly."
-      }
-    },
-    "required": [
-      "session_code"
-    ]
-  },
-  "key": "custom_task",
-  "value": {
-    "method": "POST",
-    "param": {
-      "session_code": "%(session_code)s"
-    },
-    "url": "https://shikshak-o0l8.onrender.com/tools/clear_board",
     "api_token": null,
     "headers": {
       "Content-Type": "application/json"

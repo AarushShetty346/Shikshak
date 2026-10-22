@@ -3,19 +3,16 @@ import { useEffect, useState } from "react";
 // Fires the same tool calls the Bolna agent makes, so the board can be built and demoed without voice.
 
 const SAMPLES: { label: string; tool: string; params: Record<string, string> }[] = [
-  {
-    label: "Teach",
-    tool: "show_steps",
-    params: {
-      title: "Solving by factorisation",
-      steps: "x^2 - 5x + 6 = 0 || x^2 - 2x - 3x + 6 = 0 || x(x - 2) - 3(x - 2) = 0 || (x - 2)(x - 3) = 0 || x = 2 or x = 3",
-    },
-  },
-  { label: "Give problem", tool: "give_problem", params: { problem: "Solve: x^2 - 7x + 12 = 0", answer: "x = 3 or x = 4" } },
+  { label: "Heading", tool: "write", params: { kind: "heading", content: "Arithmetic Progression (AP)" } },
+  { label: "Steps", tool: "write", params: { kind: "steps", content: "a, a + d, a + 2d, ... || a_n = a + (n - 1)d || a_4 = 2 + 3 * 3 = 11" } },
+  { label: "Draw AP", tool: "draw", params: { diagram: "ap: 2, 5, 8, 11 | d = 3", caption: "Har baar +3", place: "right" } },
+  { label: "Draw graph", tool: "draw", params: { diagram: "graph: y = x^2 - 4 | points: (2,0), (-2,0) | x: -4..4" } },
+  { label: "Highlight B2", tool: "highlight", params: { target: "B2 line 2", style: "box", note: "formula" } },
+  { label: "Erase B1", tool: "erase", params: { target: "B1" } },
+  { label: "Give problem", tool: "give_problem", params: { problem: "Find a_10 of 2, 5, 8, ...", answer: "29" } },
   { label: "Look at board", tool: "look_at_board", params: { student_said: "" } },
+  { label: "Continue", tool: "continue_lesson", params: {} },
   { label: "Next section", tool: "show_section", params: { section: "next" } },
-  { label: "Plan practice", tool: "give_practice", params: { number: "next" } },
-  { label: "New page", tool: "clear_board", params: {} },
 ];
 
 export function DevPanel({ sessionCode }: { sessionCode: string }) {

@@ -5,6 +5,7 @@
 export interface MathPart {
   text: string;
   sup?: boolean;
+  sub?: boolean;
 }
 
 const REPLACEMENTS: [RegExp, string][] = [
@@ -37,6 +38,23 @@ export function toMathParts(text: string): MathPart[] {
   let buf = "";
   let i = 0;
   while (i < s.length) {
+    // Subscripts: a_n, a_10, a_(n+1), x_1
+    if (s[i] === "_" && i + 1 < s.length && i > 0 && /[A-Za-z0-9)]/.test(s[i - 1])) {
+      if (buf) parts.push({ text: buf });
+      buf = "";
+      i++;
+      let sub = "";
+      if (s[i] === "(" || s[i] === "{") {
+        const close = s[i] === "(" ? ")" : "}";
+        i++;
+        while (i < s.length && s[i] !== close) sub += s[i++];
+        i++;
+      } else {
+        while (i < s.length && /[A-Za-z0-9]/.test(s[i]) && sub.length < 3) sub += s[i++];
+      }
+      parts.push({ text: sub, sub: true });
+      continue;
+    }
     if (s[i] === "^" && i + 1 < s.length) {
       if (buf) parts.push({ text: buf });
       buf = "";
