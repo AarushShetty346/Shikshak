@@ -4,6 +4,7 @@ import { WebSocketServer } from "ws";
 import { VOICE_LANGUAGE, type ClientMessage, type Language, type ServerMessage } from "../shared/types";
 import { hasModel, modelName } from "./llm";
 import { randomUUID } from "node:crypto";
+import { noteInterrupt } from "./board";
 import { analyze, canLook } from "./look";
 import { makePlan, outlineFor } from "./plan";
 import { saveSample } from "./samples";
@@ -178,6 +179,11 @@ export function createApp(opts: { devTools?: boolean } = {}) {
           try {
             msg = JSON.parse(String(raw));
           } catch {
+            return;
+          }
+          if (msg.kind === "interrupt") {
+            noteInterrupt(s);
+            touch(s);
             return;
           }
           if (msg.kind === "capture") {

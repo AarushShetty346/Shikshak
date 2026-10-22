@@ -5,8 +5,9 @@
 import express, { type Request, type Response } from "express";
 import { randomUUID } from "node:crypto";
 import { splitSteps } from "../shared/mathText";
+import { continueLesson, draw, erase, highlight, write } from "./board";
 import { analyze, canLook, EMPTY_LOOK } from "./look";
-import { emit, freshCapture, resolve, touch, type Session } from "./sessions";
+import { boardMap, emit, freshCapture, nextLabel, recordBlock, resolve, touch, type Session } from "./sessions";
 
 type Params = Record<string, unknown>;
 
@@ -102,16 +103,23 @@ function showSection(s: Session, pick: number | "next") {
   const already = n === study.section && Date.now() - study.lastSectionAt < 4000;
   study.section = n;
   study.lastSectionAt = Date.now();
-  if (!already) emit(s, { type: "steps", id: randomUUID(), title: sec.title, steps: sec.board, section: { n, of: total } });
+  let label = study.lastLabel;
+  if (!already) {
+    label = nextLabel(s);
+    recordBlock(s, { label, kind: `plan section ${n}`, summary: `${sec.title}: ${sec.board.join(" / ")}`.slice(0, 120), lines: sec.board.length });
+    study.lastLabel = label;
+    emit(s, { type: "steps", id: randomUUID(), label, title: sec.title, steps: sec.board, section: { n, of: total } });
+  }
   return {
     ok: true,
     section: n,
     of: total,
-    board: sec.board.join(" | "),
+    label,
+    written: sec.board.join(" | "),
     say: sec.say,
     ask: sec.ask,
     next: n < total ? `${n + 1}: ${study.plan.sections[n].title}` : "practice",
-    note: "It is being written on the board now. Give the idea in 1-2 sentences in your own words, ask the question, then stop and wait.",
+    note: "The lines appear one by one while you speak. Give the idea in your own words, line by line, ask the question, then stop and wait.",
   };
 }
 
@@ -134,8 +142,11 @@ export function toolsRouter() {
     if (!s) return void res.json(NO_SESSION);
     const steps = splitSteps(p.steps);
     if (steps.length === 0) return void res.json({ ok: false, error: "No steps given. Pass steps separated by ||." });
-    emit(s, { type: "steps", id: randomUUID(), title: String(p.title ?? "").trim(), steps });
-    res.json({ ok: true, shown: steps.length, note: "The steps are being written on the board now. Talk about them in one or two sentences." });
+    const label = nextLabel(s);
+    const title = String(p.title ?? "").trim();
+    recordBlock(s, { label, kind: "steps", summary: `${title ? title + ": " : ""}${steps.join(" / ")}`.slice(0, 120), lines: steps.length });
+    emit(s, { type: "steps", id: randomUUID(), label, title, steps });
+    res.json({ ok: true, label, note: "The lines appear one by one while you speak. Explain them in order.", board: boardMap(s) });
   });
 
   router.all("/give_problem", (req: Request, res: Response) => {
@@ -146,7 +157,9 @@ export function toolsRouter() {
     if (!problem) return void res.json({ ok: false, error: "No problem given." });
     const answer = String(p.answer ?? "").trim() || undefined;
     s.problem = { text: problem, answer };
-    emit(s, { type: "problem", id: randomUUID(), problem });
+    const label = nextLabel(s);
+    recordBlock(s, { label, kind: "problem", summary: problem.slice(0, 120), lines: 1 });
+    emit(s, { type: "problem", id: randomUUID(), label, problem });
     res.json({
       ok: true,
       note: "The problem is on the board. Ask them to solve it below it, one step per line, and to press Done or say when they finish.",
@@ -175,7 +188,9 @@ export function toolsRouter() {
     const item = list[n - 1];
     s.study.practice = n;
     s.problem = { text: item.problem, answer: item.answer, hint: item.hint };
-    emit(s, { type: "problem", id: randomUUID(), problem: item.problem });
+    const label = nextLabel(s);
+    recordBlock(s, { label, kind: "problem", summary: item.problem.slice(0, 120), lines: 1 });
+    emit(s, { type: "problem", id: randomUUID(), label, problem: item.problem });
     res.json({
       ok: true,
       practice: n,
@@ -189,11 +204,21 @@ export function toolsRouter() {
   router.all("/clear_board", (req: Request, res: Response) => {
     const s = resolve(readParams(req).session_code);
     if (!s) return void res.json(NO_SESSION);
-    emit(s, { type: "page", id: randomUUID() });
-    s.recentBoard = [];
-    s.problem = null;
-    res.json({ ok: true, note: "A fresh page is open on the board." });
+    res.json(erase(s, { target: "all" }));
   });
+
+  // The teacher's board actions. Each takes session_code plus its own params.
+  const boardAction = (fn: (s: Session, p: Params) => Record<string, unknown>) => (req: Request, res: Response) => {
+    const p = readParams(req);
+    const s = resolve(p.session_code);
+    if (!s) return void res.json(NO_SESSION);
+    res.json(fn(s, p));
+  };
+  router.all("/write", boardAction(write));
+  router.all("/draw", boardAction(draw));
+  router.all("/highlight", boardAction(highlight));
+  router.all("/erase", boardAction(erase));
+  router.all("/continue_lesson", boardAction((s) => continueLesson(s)));
 
   router.all("/look_at_board", lookAtBoard);
   // Older agents call it check_work.

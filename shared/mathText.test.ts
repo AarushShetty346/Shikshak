@@ -24,3 +24,12 @@ describe("splitSteps", () => {
     expect(splitSteps(undefined)).toEqual([]);
   });
 });
+
+describe("subscripts", () => {
+  it("renders a_n and a_(n+1) as subscripts, but leaves a lone underscore alone", () => {
+    expect(toMathParts("a_n = a + (n-1)d")[1]).toEqual({ text: "n", sub: true });
+    expect(toMathParts("a_(n+1)")[1]).toEqual({ text: "n+1", sub: true });
+    expect(toMathParts("a_10 = 29")[1]).toEqual({ text: "10", sub: true });
+    expect(toMathParts("_x")).toEqual([{ text: "_x" }]);
+  });
+});

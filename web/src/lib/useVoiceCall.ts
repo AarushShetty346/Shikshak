@@ -15,14 +15,35 @@ export function useVoiceCall() {
   const [state, setState] = useState<CallState>("idle");
   const [error, setError] = useState<string | null>(null);
   const [volume, setVolume] = useState(0);
+  // Our own audio element for the tutor's voice, so "Ask doubt" can silence her instantly.
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const ducked = useRef(false);
+  const quietSince = useRef(0);
 
   const start = useCallback(async (userData: Record<string, unknown>) => {
     setError(null);
     try {
       callRef.current?.stop();
-      const call = new BolnaWebCall({ sessionUrl: "/api/bolna-session", userData });
+      if (!audioRef.current) {
+        audioRef.current = new Audio();
+        audioRef.current.autoplay = true;
+      }
+      audioRef.current.volume = 1;
+      ducked.current = false;
+      const call = new BolnaWebCall({ sessionUrl: "/api/bolna-session", userData, audioElement: audioRef.current });
       call.on("state-change", (s) => setState(s as CallState));
-      call.on("volume-level", (v) => setVolume(v));
+      call.on("volume-level", (v) => {
+        setVolume(v);
+        // After "Ask doubt", stay silent until the tutor's current sentence has finished, then
+        // bring her voice back for her reply.
+        if (!ducked.current) return;
+        if (v > 0.02) quietSince.current = 0;
+        else if (!quietSince.current) quietSince.current = Date.now();
+        else if (Date.now() - quietSince.current > 700 && audioRef.current) {
+          ducked.current = false;
+          audioRef.current.volume = 1;
+        }
+      });
       call.on("call-end", () => setVolume(0));
       call.on("error", (e) => setError(friendlyError(e.code, e.message)));
       callRef.current = call;
@@ -35,21 +56,20 @@ export function useVoiceCall() {
   }, []);
 
   /**
-   * Tells the tutor the student pressed Done, as a keypad press (DTMF "1#") on the call.
-   * Bolna hands keypad digits to the tutor's LLM as "dtmf_number: 1" when the agent has
-   * dtmf_enabled. The SDK keeps its SIP.js session private, so we reach in carefully.
-   * Returns false if no call is live or the tones couldn't be sent.
+   * Sends keypad tones (DTMF) on the call. Bolna hands keypad digits to the tutor's LLM as
+   * "dtmf_number: <digits>" when the agent has dtmf_enabled. The SDK keeps its SIP.js session
+   * private, so we reach in carefully. Returns false if no call is live or tones couldn't be sent.
    */
-  const sendDone = useCallback((): boolean => {
+  const sendTones = useCallback((tones: string): boolean => {
     const inviter = (callRef.current as unknown as { inviter?: SipSession } | null)?.inviter;
     if (!inviter) return false;
     try {
-      if (inviter.sessionDescriptionHandler?.sendDtmf?.("1#")) return true;
+      if (inviter.sessionDescriptionHandler?.sendDtmf?.(tones)) return true;
     } catch {
       // fall through to SIP INFO
     }
     try {
-      for (const tone of ["1", "#"]) {
+      for (const tone of tones.split("")) {
         void inviter.info?.({
           requestOptions: {
             body: { contentDisposition: "render", contentType: "application/dtmf-relay", content: `Signal=${tone}\r\nDuration=160` },
@@ -62,13 +82,29 @@ export function useVoiceCall() {
     }
   }, []);
 
+  /** Student pressed Done: "dtmf_number: 1" reaches the tutor. */
+  const sendDone = useCallback(() => sendTones("1#"), [sendTones]);
+
+  /**
+   * Student pressed "Ask doubt": the tutor goes quiet at once on this screen, and
+   * "dtmf_number: 2" tells her to stop and listen.
+   */
+  const askDoubt = useCallback((): boolean => {
+    if (audioRef.current) {
+      audioRef.current.volume = 0;
+      ducked.current = true;
+      quietSince.current = 0;
+    }
+    return sendTones("2#");
+  }, [sendTones]);
+
   const stop = useCallback(() => {
     callRef.current?.stop();
   }, []);
 
   useEffect(() => () => void callRef.current?.stop(), []);
 
-  return { state, error, volume, start, stop, sendDone };
+  return { state, error, volume, start, stop, sendDone, askDoubt };
 }
 
 function friendlyError(code?: string, message?: string): string {

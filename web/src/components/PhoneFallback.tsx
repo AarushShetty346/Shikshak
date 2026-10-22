@@ -1,8 +1,8 @@
 import { useState } from "react";
 
 /** "Call my phone instead": Bolna rings the student's phone while this screen keeps working as the board. */
-export function PhoneFallback({ userData }: { userData: () => Record<string, unknown> }) {
-  const [open, setOpen] = useState(false);
+export function PhoneFallback({ userData, initiallyOpen = false }: { userData: () => Record<string, unknown>; initiallyOpen?: boolean }) {
+  const [open, setOpen] = useState(initiallyOpen);
   const [phone, setPhone] = useState("");
   const [state, setState] = useState<"idle" | "calling" | "placed">("idle");
   const [error, setError] = useState<string | null>(null);

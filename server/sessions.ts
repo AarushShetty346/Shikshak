@@ -26,14 +26,46 @@ export interface Session {
   problem: { text: string; answer?: string; hint?: string } | null;
   language: string;
   /** Prepared study plan (from notes or a topic), with where the tutor has got to. */
-  study: { plan: StudyPlan; section: number; practice: number; lastSectionAt: number } | null;
+  study: { plan: StudyPlan; section: number; practice: number; lastSectionAt: number; lastLabel?: string } | null;
   /** Tutor's recent board lines, as context for reading the student's work. */
   recentBoard: string[];
+  /** Every labelled tutor block, so the tutor can point back at them (B1, B2...). */
+  blocks: BoardBlock[];
+  /** Where the lesson was when the student last interrupted, to resume from. */
+  interrupt: { at: number; label: string | null; summary: string; section: number | null } | null;
   /** Board events, replayed when the tab reconnects. */
   history: BoardEvent[];
 }
 
+export interface BoardBlock {
+  label: string;
+  kind: string;
+  summary: string;
+  lines: number;
+  erased: boolean;
+}
+
 const sessions = new Map<string, Session>();
+
+export function nextLabel(s: Session): string {
+  return `B${s.blocks.length + 1}`;
+}
+
+export function recordBlock(s: Session, block: Omit<BoardBlock, "erased">) {
+  s.blocks.push({ ...block, erased: false });
+}
+
+export function findBlock(s: Session, label: string): BoardBlock | undefined {
+  const key = label.trim().toUpperCase();
+  return s.blocks.find((b) => b.label === key);
+}
+
+/** What is on the board now, compactly, for the tutor's LLM (it can't see the screen). */
+export function boardMap(s: Session, limit = 8): string {
+  const live = s.blocks.filter((b) => !b.erased).slice(-limit);
+  if (!live.length) return "The board is empty.";
+  return live.map((b) => `${b.label} (${b.kind}): ${b.summary}`).join(" | ");
+}
 
 export function normalizeCode(code: unknown): string {
   return String(code ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
@@ -53,6 +85,8 @@ export function getOrCreate(code: string): Session {
       language: "hinglish",
       study: null,
       recentBoard: [],
+      blocks: [],
+      interrupt: null,
       history: [],
     };
     sessions.set(key, s);

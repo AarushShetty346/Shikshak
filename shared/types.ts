@@ -1,5 +1,7 @@
 // Types shared by the browser and the server.
 
+import type { Diagram } from "./diagram";
+
 export type Point = [number, number];
 
 /** A pen stroke in board coordinates: x in 0..1000 (board width), y grows downward without limit. */
@@ -28,16 +30,28 @@ export interface SectionInfo {
   of: number;
 }
 
+export type WriteStyle = "heading" | "text" | "equation" | "steps" | "your_turn";
+export type Place = "next" | "right";
+export type MarkStyle = "underline" | "circle" | "box" | "tick" | "arrow";
+
 /**
  * Something the tutor puts on the shared board, or a change to it. The server sends these to the
- * browser; the board lays tutor blocks out one after another, below whatever is already written.
+ * browser. Tutor blocks carry a label (B1, B2...) so the tutor can point back at them later.
  */
 export type BoardEvent =
-  | { type: "steps"; id: string; title: string; steps: string[]; section?: SectionInfo }
-  | { type: "problem"; id: string; problem: string }
-  | { type: "plan"; id: string; title: string; items: string[] }
+  | { type: "write"; id: string; label: string; style: WriteStyle; lines: string[]; place: Place; replaces: string | null }
+  | { type: "draw"; id: string; label: string; diagram: Diagram; caption: string; place: Place; replaces: string | null }
+  | { type: "steps"; id: string; label?: string; title: string; steps: string[]; section?: SectionInfo }
+  | { type: "problem"; id: string; label?: string; problem: string }
+  | { type: "plan"; id: string; label?: string; title: string; items: string[] }
   /** Start a fresh page (new topic). Earlier pages stay above; the board scrolls to the new one. */
   | { type: "page"; id: string }
+  /** Point at something already on the board. line is 1-based within the block, or null for the whole block. */
+  | { type: "highlight"; id: string; target: string; line: number | null; style: MarkStyle; note: string }
+  /** Rub out a block (its space stays, so the student's writing never moves). */
+  | { type: "erase"; target: string }
+  /** The doubt is answered: continue writing what was paused. */
+  | { type: "resume" }
   /** The tutor is looking at the student's latest work; the browser replies with a capture. */
   | { type: "checking" }
   /** Circle a line of a capture the student sent. */
@@ -54,13 +68,16 @@ export type ServerMessage =
  * Browser -> server: the student's latest work, as a PNG with line numbers in the margin.
  * Sent when the student presses Done, and whenever the server asks (a check is starting).
  */
-export type ClientMessage = {
-  kind: "capture";
-  id: string;
-  reason: "done" | "request";
-  png: string | null;
-  lineCount: number;
-};
+export type ClientMessage =
+  | {
+      kind: "capture";
+      id: string;
+      reason: "done" | "request";
+      png: string | null;
+      lineCount: number;
+    }
+  /** The student interrupted (Ask Doubt button, or started talking over the tutor). */
+  | { kind: "interrupt"; reason: "doubt" | "speech" };
 
 export type Language = "hi" | "hinglish" | "en";
 
