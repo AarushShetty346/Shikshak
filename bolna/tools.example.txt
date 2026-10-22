@@ -1,0 +1,147 @@
+
+// ----- show_steps -----
+{
+  "name": "show_steps",
+  "description": "Write worked steps on the student's chalkboard. Use whenever you explain a method, solve an example, or answer a doubt that needs maths written down. Call it, then talk through the lines as they appear.",
+  "pre_call_message": "",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "session_code": {
+        "type": "string",
+        "description": "The session code from the prompt. Always pass it exactly."
+      },
+      "title": {
+        "type": "string",
+        "description": "Short heading for this block, e.g. 'Factorisation'."
+      },
+      "steps": {
+        "type": "string",
+        "description": "The lines to write, separated by ' || '. Plain text maths, no LaTeX. Example: 2x + 3 = 7 || 2x = 4 || x = 2"
+      }
+    },
+    "required": [
+      "session_code",
+      "steps"
+    ]
+  },
+  "key": "custom_task",
+  "value": {
+    "method": "POST",
+    "param": {
+      "session_code": "%(session_code)s",
+      "title": "%(title)s",
+      "steps": "%(steps)s"
+    },
+    "url": "https://YOUR-SERVER.example.com/tools/show_steps",
+    "api_token": null,
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}
+
+// ----- give_problem -----
+{
+  "name": "give_problem",
+  "description": "Put a practice problem in the student's notebook and clear their page. Use when it is the student's turn to solve something.",
+  "pre_call_message": "",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "session_code": {
+        "type": "string",
+        "description": "The session code from the prompt. Always pass it exactly."
+      },
+      "problem": {
+        "type": "string",
+        "description": "The problem as plain text, e.g. 'Solve: x^2 - 7x + 12 = 0'."
+      },
+      "answer": {
+        "type": "string",
+        "description": "The correct final answer, for checking. Never read it aloud."
+      }
+    },
+    "required": [
+      "session_code",
+      "problem",
+      "answer"
+    ]
+  },
+  "key": "custom_task",
+  "value": {
+    "method": "POST",
+    "param": {
+      "session_code": "%(session_code)s",
+      "problem": "%(problem)s",
+      "answer": "%(answer)s"
+    },
+    "url": "https://YOUR-SERVER.example.com/tools/give_problem",
+    "api_token": null,
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}
+
+// ----- check_work -----
+{
+  "name": "check_work",
+  "description": "Look at what the student has written in their notebook and find the first wrong step. Use when the student says they are done, says 'check karo', 'ho gaya', 'dekho', asks if they are right, or seems stuck.",
+  "pre_call_message": "Ek second, dekhti hoon.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "session_code": {
+        "type": "string",
+        "description": "The session code from the prompt. Always pass it exactly."
+      }
+    },
+    "required": [
+      "session_code"
+    ]
+  },
+  "key": "custom_task",
+  "value": {
+    "method": "POST",
+    "param": {
+      "session_code": "%(session_code)s"
+    },
+    "url": "https://YOUR-SERVER.example.com/tools/check_work",
+    "api_token": null,
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}
+
+// ----- clear_board -----
+{
+  "name": "clear_board",
+  "description": "Wipe the chalkboard. Only use when moving to a completely new topic.",
+  "pre_call_message": "",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "session_code": {
+        "type": "string",
+        "description": "The session code from the prompt. Always pass it exactly."
+      }
+    },
+    "required": [
+      "session_code"
+    ]
+  },
+  "key": "custom_task",
+  "value": {
+    "method": "POST",
+    "param": {
+      "session_code": "%(session_code)s"
+    },
+    "url": "https://YOUR-SERVER.example.com/tools/clear_board",
+    "api_token": null,
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

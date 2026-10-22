@@ -1,0 +1,41 @@
+{
+  "name": "kalam",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Voice maths tutor that talks, writes on a board, and checks your handwritten work. Bolna Buildathon 2026.",
+  "scripts": {
+    "dev": "tsx server/index.ts",
+    "dev:watch": "tsx watch --ignore \"web/**\" server/index.ts",
+    "build": "vite build",
+    "start": "tsx server/index.ts --prod",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "bolna:tools": "tsx scripts/print-bolna-tools.ts"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.1.0",
+    "@bolna/web-call": "^3.0.1",
+    "dotenv": "^18.0.8",
+    "express": "^5.3.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "tsx": "^4.23.15",
+    "ws": "^8.22.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@types/ws": "^8.18.2",
+    "@vitejs/plugin-react": "^6.1.2",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
+  }
+}
