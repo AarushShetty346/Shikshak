@@ -1,6 +1,6 @@
-# Kalam: build plan (Bolna Buildathon, submit by Oct 31, 2026)
+# Shikshak: build plan (Bolna Buildathon, submit by Oct 31, 2026)
 
-"Kalam" is a working name. Rename freely.
+The product name is Shikshak ("teacher" in Hindi). The board font is also called Kalam; that is just the font.
 
 ## What we're building (demo scope)
 

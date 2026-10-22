@@ -24,13 +24,13 @@ export function TopBar({ callState, volume, error, connected, sessionCode, onSta
   return (
     <header className="topbar">
       <div className="brand">
-        <span className="brand-mark" aria-hidden="true">क</span>
-        <span className="brand-name">Kalam</span>
+        <span className="brand-mark" aria-hidden="true">श</span>
+        <span className="brand-name">Shikshak</span>
       </div>
 
       <div className="call">
         <div className="tutor" data-speaking={speaking} data-live={callState === "active"} style={{ ["--vol" as string]: Math.min(1, volume * 3) }}>
-          <span aria-hidden="true">क</span>
+          <span aria-hidden="true">श</span>
         </div>
         <div className="call-text">
           <span className="call-status">{speaking ? "Teacher is speaking" : STATUS[callState]}</span>
