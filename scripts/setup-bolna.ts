@@ -4,7 +4,7 @@
 //   npm run bolna:setup             create or update
 //   npm run bolna:setup -- --dry    print the request body only
 import "dotenv/config";
-import { appendFileSync, existsSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { buildAgentPayload } from "./bolnaConfig";
 
 const dry = process.argv.includes("--dry");
@@ -51,6 +51,9 @@ if (agentId) {
   const current = existsSync(envFile) ? readFileSync(envFile, "utf8") : "";
   if (/^BOLNA_AGENT_ID=\S+/m.test(current)) {
     console.log(`Put BOLNA_AGENT_ID=${created.agent_id} in .env (it already has a different value, so I didn't change it).`);
+  } else if (/^BOLNA_AGENT_ID=\s*$/m.test(current)) {
+    writeFileSync(envFile, current.replace(/^BOLNA_AGENT_ID=[ \t]*$/m, `BOLNA_AGENT_ID=${created.agent_id}`));
+    console.log("Saved BOLNA_AGENT_ID to .env. Restart the server to use it.");
   } else {
     appendFileSync(envFile, `${current.endsWith("\n") || !current ? "" : "\n"}BOLNA_AGENT_ID=${created.agent_id}\n`);
     console.log("Saved BOLNA_AGENT_ID to .env. Restart the server to use it.");
