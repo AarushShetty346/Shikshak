@@ -57,7 +57,7 @@ export function DevPanel({ sessionCode }: { sessionCode: string }) {
       </header>
       {health && (
         <p className="dev-health">
-          Voice {health.bolna ? "✓" : "✗"} · Checker {health.claude ? "✓" : health.fakeChecker ? "fake" : "✗"} · Public URL{" "}
+          Voice {health.bolna ? "✓" : "✗"} · Checker {health.checker ? `✓ ${health.model}` : health.fakeChecker ? "fake" : "✗"} · Public URL{" "}
           {health.publicUrl ? "✓" : "✗"}
         </p>
       )}

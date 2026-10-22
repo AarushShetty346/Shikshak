@@ -1,4 +1,5 @@
-import { askJson, dataUrlToImage, languageName } from "./claude";
+import { languageName } from "./claude";
+import { askJson, dataUrlToAttachment } from "./llm";
 
 export interface CheckResult {
   status: "correct" | "mistake" | "incomplete" | "unreadable" | "empty";
@@ -16,7 +17,7 @@ const SCHEMA = {
   required: ["status", "line", "what_went_wrong", "say"],
   properties: {
     status: { type: "string", enum: ["correct", "mistake", "incomplete", "unreadable", "empty"] },
-    line: { type: ["integer", "null"] },
+    line: { anyOf: [{ type: "integer" }, { type: "null" }] },
     what_went_wrong: { type: "string" },
     say: { type: "string" },
   },
@@ -50,16 +51,11 @@ export async function checkWork(input: {
     system: SYSTEM.replace("{LANGUAGE}", lang),
     effort: "low",
     schema: SCHEMA,
-    content: [
-      dataUrlToImage(input.png),
-      {
-        type: "text",
-        text:
-          `Problem: ${problem}\n` +
-          (input.answer ? `Expected final answer: ${input.answer}\n` : "") +
-          `The student has written ${input.lineCount} line(s).`,
-      },
-    ],
+    attachments: [dataUrlToAttachment(input.png)],
+    text:
+      `Problem: ${problem}\n` +
+      (input.answer ? `Expected final answer: ${input.answer}\n` : "") +
+      `The student has written ${input.lineCount} line(s).`,
   });
   if (result.line !== null && (result.line < 1 || result.line > input.lineCount)) result.line = null;
   return result;

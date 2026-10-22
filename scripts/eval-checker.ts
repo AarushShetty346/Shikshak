@@ -4,11 +4,11 @@ import "dotenv/config";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { checkWork } from "../server/checkWork";
-import { hasClaude, MODEL } from "../server/claude";
+import { hasModel, modelName } from "../server/llm";
 import { loadCases, SAMPLES_DIR } from "../server/samples";
 
-if (!hasClaude()) {
-  console.error("Set ANTHROPIC_API_KEY in .env first.");
+if (!hasModel()) {
+  console.error("Set GEMINI_API_KEY (free) or ANTHROPIC_API_KEY in .env first.");
   process.exit(1);
 }
 const cases = loadCases();
@@ -17,7 +17,7 @@ if (cases.length === 0) {
   process.exit(1);
 }
 
-console.log(`Checking ${cases.length} samples with ${MODEL}…\n`);
+console.log(`Checking ${cases.length} samples with ${modelName()}…\n`);
 const rows: { file: string; ok: boolean; expected: string; got: string; ms: number }[] = [];
 const queue = [...cases];
 await Promise.all(

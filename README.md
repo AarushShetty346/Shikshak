@@ -4,7 +4,8 @@ A maths teacher that talks to you in your language, writes on a chalkboard while
 handwritten work, circling the exact step that went wrong.
 
 Built for the [Bolna Buildathon at Symphony 2026](https://www.bolna.ai/symphony/buildathon). Voice runs on
-[Bolna](https://www.bolna.ai) (web call SDK + custom function calls). Claude reads the student's handwriting.
+[Bolna](https://www.bolna.ai) (web call SDK + custom function calls). Gemini (free tier) or Claude reads the
+student's handwriting.
 
 ## How it works
 
@@ -14,14 +15,14 @@ Browser                               Server (Node, one process)                
  ├─ Problem card ◀── WebSocket ◀────── POST /tools/give_problem  ◀────────────── tool call
  ├─ Pen notebook ── snapshot ────────▶ stored per session
  ├─ Red circle   ◀── WebSocket ◀────── POST /tools/check_work    ◀────────────── tool call
- │                                      └─ Claude reads the numbered lines, names the wrong one
+ │                                      └─ Gemini or Claude reads the numbered lines, names the wrong one
  └─ Voice (Bolna Web Call SDK) ◀──────────────────────────────────────────────────▶ live audio
 ```
 
 - The browser makes a 6-character **session code** and passes it to Bolna as `userData`. Bolna fills it into
   every tool call, so the server knows which screen to update.
-- The student's strokes are grouped into **lines** in the browser. The snapshot sent to Claude has line numbers
-  in the margin, so Claude only answers "line 2 is wrong". We draw the circle from our own stroke geometry.
+- The student's strokes are grouped into **lines** in the browser. The snapshot sent to the model has line numbers
+  in the margin, so it only answers "line 2 is wrong". We draw the circle from our own stroke geometry.
 - See [PLAN.md](PLAN.md) for the full plan, schedule, and risks.
 
 ## Run it locally
@@ -38,11 +39,11 @@ same calls the voice agent makes, and the fake checker always flags line 2.
 
 ## Go live (about an hour once you have the keys)
 
-1. **Keys.** Bolna API key from [platform.bolna.ai](https://platform.bolna.ai), Anthropic API key from
-   [console.anthropic.com](https://console.anthropic.com). Ask in the Bolna Slack for **Web Call SDK access**
+1. **Keys.** Bolna API key from [platform.bolna.ai](https://platform.bolna.ai) (Developers → API Keys), and a free
+   Gemini API key from [aistudio.google.com](https://aistudio.google.com) (Get API key). Ask in the Bolna Slack for **Web Call SDK access**
    (it's enabled per account).
 2. **Deploy.** On [Render](https://render.com): New → Blueprint → this repo. It reads [render.yaml](render.yaml).
-   Fill in `ANTHROPIC_API_KEY` and `BOLNA_API_KEY`, and set `PUBLIC_URL` to the `https://….onrender.com` address
+   Fill in `GEMINI_API_KEY` and `BOLNA_API_KEY`, and set `PUBLIC_URL` to the `https://….onrender.com` address
    Render gives you.
 3. **Create the voice agent.** Locally, with the same keys and `PUBLIC_URL` in `.env`:
    ```bash
@@ -64,7 +65,7 @@ after 90 seconds.
 
 ## Measure the checker
 
-1. Run locally with `ANTHROPIC_API_KEY` set and open `/?dev=1`.
+1. Run locally with `GEMINI_API_KEY` (or `ANTHROPIC_API_KEY`) set and open `/?dev=1`.
 2. Press **Give problem**, write a solution by hand (best on a tablet), sometimes with a deliberate mistake.
 3. Press **Save sample for checker test** and say which line is wrong (0 if none). It's saved to `eval/`.
 4. After 15 to 20 samples:
@@ -82,7 +83,8 @@ if something breaks live.
 
 | Variable | What it's for |
 | --- | --- |
-| `ANTHROPIC_API_KEY` | Checking work and making lesson plans (model: `claude-opus-5-5`, override with `CLAUDE_MODEL`) |
+| `GEMINI_API_KEY` | Checking work and making lesson plans. Free tier. Model `gemini-flash-latest`, override with `GEMINI_MODEL` |
+| `ANTHROPIC_API_KEY` | Paid alternative, used only when `GEMINI_API_KEY` is empty (`claude-opus-5-5`, override with `CLAUDE_MODEL`) |
 | `BOLNA_API_KEY`, `BOLNA_AGENT_ID` | Starting web calls and phone calls |
 | `PUBLIC_URL` | Public HTTPS URL of the server; the agent's tools call it |
 | `TOOLS_TOKEN` | Optional. If set, tool calls must send `Authorization: Bearer <token>` (set before `bolna:setup`) |
