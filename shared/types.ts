@@ -44,11 +44,26 @@ export type ClientMessage = {
   lineCount: number;
 };
 
-export type Language = "hi" | "hinglish" | "ta" | "en";
+export type Language = "hi" | "hinglish" | "en";
 
 export const LANGUAGE_NAMES: Record<Language, string> = {
   hi: "Hindi",
   hinglish: "Hinglish (Hindi-English mix, Roman script)",
-  ta: "Tamil",
   en: "English",
 };
+
+/** The language code Bolna's voice runs in for each choice. Hinglish uses the Hindi voice. */
+export const VOICE_LANGUAGE: Record<Language, "hi" | "en"> = { hi: "hi", hinglish: "hi", en: "en" };
+
+/** The tutor's first sentence, already in the student's language (sent as {{greeting}}). */
+export function greetingFor(language: Language, name: string, topic: string): string {
+  const who = name && name !== "student" ? ` ${name}` : "";
+  switch (language) {
+    case "hi":
+      return `नमस्ते${who}! मैं आपकी मैथ्स टीचर हूँ। आज हम ${topic} पढ़ेंगे। शुरू करें?`;
+    case "en":
+      return `Hello${who}! I'm your maths teacher. Today we'll learn ${topic}. Shall we start?`;
+    default:
+      return `Namaste${who}! Main aapki maths teacher hoon. Aaj hum ${topic} padhenge. Shuru karein?`;
+  }
+}

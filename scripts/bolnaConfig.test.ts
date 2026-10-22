@@ -4,7 +4,7 @@ import { buildAgentPayload, buildTools, readPrompt } from "./bolnaConfig";
 describe("Bolna agent config", () => {
   it("reads the welcome message and prompt from bolna/agent-prompt.md", () => {
     const { welcome, prompt } = readPrompt();
-    expect(welcome).toContain("{{student_name}}");
+    expect(welcome).toBe("{{greeting}}");
     expect(prompt.startsWith("You are Shikshak")).toBe(true);
     expect(prompt).toContain("{{session_code}}");
   });
@@ -18,6 +18,24 @@ describe("Bolna agent config", () => {
       expect(t.parameters.required).toContain("session_code");
       expect(t.value.api_token).toBe("Bearer tok");
     }
+  });
+
+  it("never leaves a waiting line empty, and has Hindi and English versions", () => {
+    for (const t of buildTools("https://x.example.org")) {
+      expect(t.pre_call_message.hi.length).toBeGreaterThan(0);
+      expect(t.pre_call_message.en.length).toBeGreaterThan(0);
+      expect(t.pre_call_message.hi).toMatch(/[\u0900-\u097F]/); // Devanagari
+    }
+  });
+
+  it("is one agent that speaks Hindi and English, with Bolna's own lines in both", () => {
+    const task = buildAgentPayload({ publicUrl: "https://x.example.org" }).agent_config.tasks[0];
+    const ml = task.tools_config.multilingual_config;
+    expect(ml.enabled).toBe(true);
+    expect(Object.keys(ml.languages)).toEqual(["hi", "en"]);
+    expect(ml.languages.en.synthesizer.provider_config.language).toBe("en");
+    expect(task.task_config.check_user_online_message.hi).toMatch(/[\u0900-\u097F]/);
+    expect(task.task_config.trigger_user_online_message_after).toBeGreaterThanOrEqual(30);
   });
 
   it("builds an agent that won't hang up on a student who is writing", () => {

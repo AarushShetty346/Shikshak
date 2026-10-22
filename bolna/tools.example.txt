@@ -3,7 +3,10 @@
 {
   "name": "show_steps",
   "description": "Write worked steps on the student's chalkboard. Use whenever you explain a method, solve an example, or answer a doubt that needs maths written down. Call it, then talk through the lines as they appear.",
-  "pre_call_message": "",
+  "pre_call_message": {
+    "hi": "अच्छा।",
+    "en": "Okay."
+  },
   "parameters": {
     "type": "object",
     "properties": {
@@ -33,7 +36,7 @@
       "title": "%(title)s",
       "steps": "%(steps)s"
     },
-    "url": "https://YOUR-SERVER.example.com/tools/show_steps",
+    "url": "https://shikshak-o0l8.onrender.com/tools/show_steps",
     "api_token": null,
     "headers": {
       "Content-Type": "application/json"
@@ -45,7 +48,10 @@
 {
   "name": "give_problem",
   "description": "Put a practice problem in the student's notebook and clear their page. Use when it is the student's turn to solve something.",
-  "pre_call_message": "",
+  "pre_call_message": {
+    "hi": "अच्छा, एक सवाल देती हूँ।",
+    "en": "Okay, here is one for you."
+  },
   "parameters": {
     "type": "object",
     "properties": {
@@ -76,7 +82,7 @@
       "problem": "%(problem)s",
       "answer": "%(answer)s"
     },
-    "url": "https://YOUR-SERVER.example.com/tools/give_problem",
+    "url": "https://shikshak-o0l8.onrender.com/tools/give_problem",
     "api_token": null,
     "headers": {
       "Content-Type": "application/json"
@@ -88,7 +94,10 @@
 {
   "name": "check_work",
   "description": "Look at what the student has written in their notebook and find the first wrong step. Use when the student says they are done, says 'check karo', 'ho gaya', 'dekho', asks if they are right, or seems stuck.",
-  "pre_call_message": "Ek second, dekhti hoon.",
+  "pre_call_message": {
+    "hi": "एक सेकंड, देखती हूँ।",
+    "en": "One second, let me look."
+  },
   "parameters": {
     "type": "object",
     "properties": {
@@ -107,7 +116,7 @@
     "param": {
       "session_code": "%(session_code)s"
     },
-    "url": "https://YOUR-SERVER.example.com/tools/check_work",
+    "url": "https://shikshak-o0l8.onrender.com/tools/check_work",
     "api_token": null,
     "headers": {
       "Content-Type": "application/json"
@@ -119,7 +128,10 @@
 {
   "name": "clear_board",
   "description": "Wipe the chalkboard. Only use when moving to a completely new topic.",
-  "pre_call_message": "",
+  "pre_call_message": {
+    "hi": "अच्छा।",
+    "en": "Okay."
+  },
   "parameters": {
     "type": "object",
     "properties": {
@@ -138,7 +150,7 @@
     "param": {
       "session_code": "%(session_code)s"
     },
-    "url": "https://YOUR-SERVER.example.com/tools/clear_board",
+    "url": "https://shikshak-o0l8.onrender.com/tools/clear_board",
     "api_token": null,
     "headers": {
       "Content-Type": "application/json"

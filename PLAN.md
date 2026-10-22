@@ -71,7 +71,7 @@ Browser (React + Vite)                Server (Node + Express + WebSocket)       
 | Thu Oct 22 | Register. Ask for Web Call SDK access in Bolna Slack. Repo + scaffold, board, canvas, dev simulator. |
 | Fri Oct 23 | Bolna agent in dashboard: Hindi voice talking in the browser tab. Deploy server; tool calls reach it. |
 | Sat–Sun Oct 24–25 | `check_work` end to end with the red circle. Tune the prompt on 5–10 real handwritten attempts. |
-| Mon Oct 26 | Lesson plan from topic and notes upload. Language switch (Hindi / Hinglish / Tamil if time). |
+| Mon Oct 26 | Lesson plan from topic and notes upload. Languages: Hindi, Hinglish, English (Tamil dropped: no one on the team can check it). |
 | Tue Oct 27 | Polish: board animation, tutor voice pacing, loading states, error recovery. |
 | Wed Oct 28 | Lock the demo problem. Record the demo video. Write README with architecture diagram. |
 | Thu Oct 29 | Buffer for whatever broke. |

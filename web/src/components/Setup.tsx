@@ -21,7 +21,6 @@ export interface StudentSetup {
 const LANGS: { id: Language; label: string }[] = [
   { id: "hinglish", label: "Hinglish" },
   { id: "hi", label: "हिन्दी" },
-  { id: "ta", label: "தமிழ்" },
   { id: "en", label: "English" },
 ];
 
