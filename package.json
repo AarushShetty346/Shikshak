@@ -13,7 +13,9 @@
     "start": "tsx server/index.ts --prod",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "bolna:tools": "tsx scripts/print-bolna-tools.ts"
+    "bolna:tools": "tsx scripts/print-bolna-tools.ts",
+    "bolna:setup": "tsx scripts/setup-bolna.ts",
+    "eval:checker": "tsx scripts/eval-checker.ts"
   },
   "engines": {
     "node": ">=20"

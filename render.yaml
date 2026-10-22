@@ -1,0 +1,24 @@
+# One-click deploy on Render: New → Blueprint → pick this repo.
+# The free plan sleeps after ~15 idle minutes and takes about a minute to wake;
+# open the site once before a demo so it's warm.
+services:
+  - type: web
+    name: shikshak
+    runtime: node
+    plan: free
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: BOLNA_API_KEY
+        sync: false
+      - key: BOLNA_AGENT_ID
+        sync: false
+      - key: PUBLIC_URL
+        sync: false
+      - key: TOOLS_TOKEN
+        sync: false

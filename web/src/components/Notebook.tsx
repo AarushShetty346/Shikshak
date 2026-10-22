@@ -29,6 +29,9 @@ export function Notebook({ problem, mark, status, snapshotTick, onSnapshot }: Pr
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [drewSinceMark, setDrewSinceMark] = useState(false);
   const drawing = useRef<Stroke | null>(null);
+  // Once a stylus has been used, ignore touch input so a resting palm doesn't draw.
+  const penSeen = useRef(false);
+  const activePointer = useRef<number | null>(null);
   const strokesRef = useRef(strokes);
   strokesRef.current = strokes;
 
@@ -100,7 +103,11 @@ export function Notebook({ problem, mark, status, snapshotTick, onSnapshot }: Pr
 
   const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (e.button !== 0 && e.pointerType === "mouse") return;
+    if (e.pointerType === "pen") penSeen.current = true;
+    if (e.pointerType === "touch" && penSeen.current) return;
+    if (drawing.current) return; // already drawing with another pointer
     e.currentTarget.setPointerCapture(e.pointerId);
+    activePointer.current = e.pointerId;
     const p = pointFrom(e);
     if (tool === "eraser") {
       drawing.current = { id: "eraser", points: [p] };
@@ -117,7 +124,7 @@ export function Notebook({ problem, mark, status, snapshotTick, onSnapshot }: Pr
 
   const onPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const stroke = drawing.current;
-    if (!stroke) return;
+    if (!stroke || e.pointerId !== activePointer.current) return;
     const events = e.nativeEvent.getCoalescedEvents?.() ?? [e.nativeEvent];
     const rect = canvasRef.current!.getBoundingClientRect();
     for (const ev of events.length ? events : [e.nativeEvent]) {
@@ -140,7 +147,9 @@ export function Notebook({ problem, mark, status, snapshotTick, onSnapshot }: Pr
     }
   };
 
-  const onPointerUp = () => {
+  const onPointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (e.pointerId !== activePointer.current) return;
+    activePointer.current = null;
     const stroke = drawing.current;
     drawing.current = null;
     if (!stroke || stroke.id === "eraser") return;

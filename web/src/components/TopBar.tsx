@@ -8,6 +8,7 @@ interface Props {
   sessionCode: string;
   onStart: () => void;
   onStop: () => void;
+  phoneFallback?: React.ReactNode;
 }
 
 const STATUS: Record<CallState, string> = {
@@ -18,7 +19,7 @@ const STATUS: Record<CallState, string> = {
   ended: "Class ended",
 };
 
-export function TopBar({ callState, volume, error, connected, sessionCode, onStart, onStop }: Props) {
+export function TopBar({ callState, volume, error, connected, sessionCode, onStart, onStop, phoneFallback }: Props) {
   const live = callState === "connecting" || callState === "ringing" || callState === "active";
   const speaking = callState === "active" && volume > 0.04;
   return (
@@ -41,6 +42,7 @@ export function TopBar({ callState, volume, error, connected, sessionCode, onSta
         ) : (
           <button className="btn-primary btn-call" onClick={onStart}>Start</button>
         )}
+        {!live && phoneFallback}
       </div>
 
       <div className="session" title="Links this screen to the voice call">

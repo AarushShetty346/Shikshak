@@ -2,3 +2,6 @@ node_modules
 dist
 .env
 *.log
+
+# Saved handwriting samples are kept; uncomment to keep them out of git
+# eval/samples/
