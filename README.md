@@ -83,7 +83,7 @@ if something breaks live.
 
 | Variable | What it's for |
 | --- | --- |
-| `GEMINI_API_KEY` | Checking work and making lesson plans. Free tier. Model `gemini-flash-latest`, override with `GEMINI_MODEL` |
+| `GEMINI_API_KEY` | Checking work and making lesson plans. Free tier. Model `gemini-3-flash-preview`, with automatic fallback to other Flash models when Google says it's busy; override with `GEMINI_MODEL` |
 | `ANTHROPIC_API_KEY` | Paid alternative, used only when `GEMINI_API_KEY` is empty (`claude-opus-5-5`, override with `CLAUDE_MODEL`) |
 | `BOLNA_API_KEY`, `BOLNA_AGENT_ID` | Starting web calls and phone calls |
 | `PUBLIC_URL` | Public HTTPS URL of the server; the agent's tools call it |

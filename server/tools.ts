@@ -118,7 +118,8 @@ export function toolsRouter() {
       emit(s, { type: "unclear", note: "Notebook is empty" });
       return void res.json({ ...result, note: "The notebook is empty. Encourage the student to start writing." });
     }
-    const fake = process.env.FAKE_CHECKER === "1";
+    // The fake checker is only a stand-in: a real model always wins when one is configured.
+    const fake = !hasModel() && process.env.FAKE_CHECKER === "1";
     if (!hasModel() && !fake) {
       emit(s, { type: "unclear", note: "Checker isn't set up on the server" });
       return void res.json({ ok: false, error: "The checker is not set up (no GEMINI_API_KEY or ANTHROPIC_API_KEY on the server)." });
