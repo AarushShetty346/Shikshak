@@ -3,9 +3,11 @@ import type { Server } from "node:http";
 import { WebSocketServer } from "ws";
 import { VOICE_LANGUAGE, type ClientMessage, type Language, type ServerMessage } from "../shared/types";
 import { hasModel, modelName } from "./llm";
-import { makePlan } from "./plan";
+import { randomUUID } from "node:crypto";
+import { analyze, canLook } from "./look";
+import { makePlan, outlineFor } from "./plan";
 import { saveSample } from "./samples";
-import { getOrCreate, normalizeCode, resolve, touch } from "./sessions";
+import { emit, getOrCreate, hashPng, normalizeCode, resolve, touch } from "./sessions";
 import { toolsRouter } from "./tools";
 
 /** "98765 43210" -> "+919876543210". Accepts full international numbers starting with +. */
@@ -113,13 +115,13 @@ export function createApp(opts: { devTools?: boolean } = {}) {
   if (opts.devTools) {
     app.post("/api/dev/save-sample", (req, res) => {
       const s = resolve(req.body?.session_code);
-      if (!s?.canvas?.png) {
-        res.status(400).json({ error: "Write something in the notebook first." });
+      if (!s?.capture?.png) {
+        res.status(400).json({ error: "Write something on the board and press Done first." });
         return;
       }
       const saved = saveSample({
-        png: s.canvas.png,
-        lineCount: s.canvas.lineCount,
+        png: s.capture.png,
+        lineCount: s.capture.lineCount,
         problem: s.problem?.text ?? null,
         answer: s.problem?.answer,
         language: s.language,
@@ -136,7 +138,21 @@ export function createApp(opts: { devTools?: boolean } = {}) {
       return;
     }
     try {
-      res.json(await makePlan(req.body ?? {}));
+      const plan = await makePlan(req.body ?? {});
+      if (plan.readable === "no") {
+        res.status(422).json({ error: `Couldn't read these notes: ${plan.readable_note || "try a flat, bright photo"}` });
+        return;
+      }
+      const code = normalizeCode(req.body?.session_code);
+      if (code) {
+        const s = getOrCreate(code);
+        s.study = { plan, section: 0, practice: 0, lastSectionAt: 0 };
+        if (req.body?.language) s.language = String(req.body.language);
+        // The plan opens the board. A new plan (e.g. after changing language) replaces the old one.
+        s.history = s.history.filter((e) => e.type !== "plan");
+        emit(s, { type: "plan", id: randomUUID(), title: plan.title, items: plan.sections.map((x) => x.title) });
+      }
+      res.json({ plan, outline: outlineFor(plan) });
     } catch (err) {
       console.error("[plan] failed", err);
       res.status(500).json({ error: "Could not make a plan. Try again or start without one." });
@@ -164,9 +180,19 @@ export function createApp(opts: { devTools?: boolean } = {}) {
           } catch {
             return;
           }
-          if (msg.kind === "canvas") {
-            s.canvas = { png: msg.png, lineCount: msg.lineCount, at: Date.now() };
+          if (msg.kind === "capture") {
+            const capture = {
+              id: String(msg.id || randomUUID()),
+              reason: msg.reason === "done" ? ("done" as const) : ("request" as const),
+              png: msg.png,
+              lineCount: Number(msg.lineCount) || 0,
+              at: Date.now(),
+              hash: hashPng(msg.png),
+            };
+            s.capture = capture;
             touch(s);
+            // Start reading as soon as the student presses Done, so the tutor's look is instant.
+            if (capture.reason === "done" && canLook()) analyze(s, capture).catch((err) => console.error("[look] early analysis failed", err));
           }
         });
         ws.on("close", () => s.sockets.delete(ws));

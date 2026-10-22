@@ -12,8 +12,10 @@ const SAMPLES: { label: string; tool: string; params: Record<string, string> }[]
     },
   },
   { label: "Give problem", tool: "give_problem", params: { problem: "Solve: x^2 - 7x + 12 = 0", answer: "x = 3 or x = 4" } },
-  { label: "Check work", tool: "check_work", params: {} },
-  { label: "Clear board", tool: "clear_board", params: {} },
+  { label: "Look at board", tool: "look_at_board", params: { student_said: "" } },
+  { label: "Next section", tool: "show_section", params: { section: "next" } },
+  { label: "Plan practice", tool: "give_practice", params: { number: "next" } },
+  { label: "New page", tool: "clear_board", params: {} },
 ];
 
 export function DevPanel({ sessionCode }: { sessionCode: string }) {

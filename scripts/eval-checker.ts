@@ -3,7 +3,7 @@
 import "dotenv/config";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { checkWork } from "../server/checkWork";
+import { lookAtWork } from "../server/look";
 import { hasModel, modelName } from "../server/llm";
 import { loadCases, SAMPLES_DIR } from "../server/samples";
 
@@ -26,7 +26,7 @@ await Promise.all(
       const png = `data:image/png;base64,${readFileSync(path.join(SAMPLES_DIR, c.file)).toString("base64")}`;
       const t = Date.now();
       try {
-        const r = await checkWork({ png, lineCount: c.lineCount, problem: c.problem, answer: c.answer, language: c.language });
+        const r = await lookAtWork({ png, lineCount: c.lineCount, problem: c.problem, answer: c.answer, boardContext: [], language: c.language });
         const ok = r.status === c.expected_status && (c.expected_status !== "mistake" || r.line === c.expected_line);
         rows.push({ file: c.file, ok, expected: `${c.expected_status} ${c.expected_line ?? ""}`, got: `${r.status} ${r.line ?? ""} | ${r.what_went_wrong}`, ms: Date.now() - t });
       } catch (err) {
