@@ -72,11 +72,20 @@ describe("board tools", () => {
     tab.ws.close();
   });
 
-  it("falls back to the latest connected tab when the code is mangled", async () => {
-    const tab = await openTab("XYZ789");
-    const res = await post("give_problem", { session_code: "XYZ78", problem: "Solve: 2x + 3 = 7" });
-    expect(res.ok).toBe(true);
-    await vi.waitFor(() => expect(tab.events()[0]).toMatchObject({ type: "problem", problem: "Solve: 2x + 3 = 7" }));
+  it("never routes a tool call to another session (no fallback for a wrong code)", async () => {
+    const maths = await openTab("MATH01");
+    const res = await post("give_problem", { session_code: "PHYS01", problem: "Solve: 2x + 3 = 7" });
+    expect(res.ok).toBe(false);
+    await new Promise((r) => setTimeout(r, 150));
+    expect(maths.events()).toHaveLength(0);
+    maths.ws.close();
+  });
+
+  it("tags every board message with its session, so a browser can drop strays", async () => {
+    const tab = await openTab("TAG001");
+    await post("write", { session_code: "TAG001", kind: "text", content: "hi" });
+    await vi.waitFor(() => expect(tab.messages.some((m) => m.kind === "board")).toBe(true));
+    expect(tab.messages.filter((m) => m.kind === "board").every((m) => (m as { sessionCode: string }).sessionCode === "TAG001")).toBe(true);
     tab.ws.close();
   });
 
@@ -266,5 +275,89 @@ describe("phone call fallback", () => {
     process.env.BOLNA_AGENT_ID ||= "test";
     const r = await fetch(`${base}/api/phone-call`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone: "123" }) });
     expect(r.status).toBe(400);
+  });
+});
+
+describe("Done protocol", () => {
+  it("acknowledges at once, reads the work, circles the line and reports back", async () => {
+    const tab = await openTab("SUB001", { png: "data:image/png;base64,SSSS", lineCount: 2 });
+    askJson.mockResolvedValue(MISTAKE);
+    tab.done("work1");
+    await vi.waitFor(() => {
+      const types = tab.events().map((e) => e.type + ("state" in e ? `:${(e as { state: string }).state}` : ""));
+      expect(types).toEqual(["review:received", "mark", "review:done"]);
+    });
+    const done = tab.events().at(-1) as { summary: string; status: string; captureId: string };
+    expect(done).toMatchObject({ captureId: "work1", status: "mistake" });
+    expect(done.summary).toContain("Step 2");
+    tab.ws.close();
+  });
+
+  it("says clearly when the work couldn't be read", async () => {
+    const tab = await openTab("SUB002", { png: "data:image/png;base64,TTTT", lineCount: 1 });
+    askJson.mockRejectedValue(new Error("model down"));
+    tab.done("work2");
+    await vi.waitFor(() => expect(tab.events().at(-1)).toMatchObject({ type: "review", state: "failed" }));
+    tab.ws.close();
+  });
+});
+
+describe("sessions survive a server restart", () => {
+  it("adopts the board a browser saved when the server has nothing, but never overwrites a live one", async () => {
+    const tab = await openTab("HYD001");
+    const saved = [
+      { type: "write", id: "w1", label: "B1", style: "heading", lines: ["AP"], place: "next", replaces: null },
+      { type: "problem", id: "p1", label: "B2", problem: "Find a_10 of 2, 5, 8" },
+    ];
+    tab.ws.send(JSON.stringify({ kind: "hydrate", events: saved, study: null }));
+    await new Promise((r) => setTimeout(r, 100));
+    const r = await post("highlight", { session_code: "HYD001", target: "B2" });
+    expect(r.ok).toBe(true); // the restored board map knows B2
+    tab.ws.send(JSON.stringify({ kind: "hydrate", events: [{ type: "page", id: "x" }], study: null }));
+    await new Promise((r2) => setTimeout(r2, 100));
+    const again = await openTab("HYD001");
+    const welcome = again.messages[0] as Extract<ServerMessage, { kind: "welcome" }>;
+    expect(welcome.replay.map((e) => e.type)).toEqual(["write", "problem", "highlight"]);
+    tab.ws.close();
+    again.ws.close();
+  });
+});
+
+describe("uploaded material", () => {
+  const upload = (code: string, files: unknown[]) =>
+    fetch(`${base}/api/documents`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ session_code: code, files }) }).then(async (r) => ({ status: r.status, body: await r.json() }));
+
+  it("stores files per session and refuses other types", async () => {
+    const ok = await upload("DOC001", [{ id: "chap12", name: "Ch12 Electricity.pdf", mediaType: "application/pdf", data: "JVBERi0=", pages: 20 }]);
+    expect(ok.status).toBe(200);
+    expect(ok.body.docs).toEqual([expect.objectContaining({ id: "chap12", name: "Ch12 Electricity.pdf", pages: 20 })]);
+    expect(JSON.stringify(ok.body)).not.toContain("JVBERi0="); // contents never sent back
+    const bad = await upload("DOC001", [{ name: "virus.exe", mediaType: "application/x-msdownload", data: "AAAA" }]);
+    expect(bad.status).toBe(400);
+  });
+
+  it("answers from the material with pages, or says it isn't there", async () => {
+    await upload("DOC002", [{ id: "notes1", name: "notes.jpg", mediaType: "image/jpeg", data: "QUJD" }]);
+    askJson.mockResolvedValueOnce({ found: true, answer: "d = a2 - a1", pages: [3], doc: 1, figure_page: 4 });
+    const yes = await post("read_material", { session_code: "DOC002", question: "common difference" });
+    expect(yes).toMatchObject({ found: true, answer: "d = a2 - a1", source: "notes.jpg, page 3", figure_page: 4 });
+    const req = askJson.mock.calls.at(-1)![0] as { attachments: { mediaType: string }[] };
+    expect(req.attachments).toEqual([{ mediaType: "image/jpeg", data: "QUJD" }]);
+    askJson.mockResolvedValueOnce({ found: false, answer: "", pages: [], doc: 1, figure_page: null });
+    const no = await post("read_material", { session_code: "DOC002", question: "Ohm's law" });
+    expect(no).toMatchObject({ found: false });
+  });
+
+  it("puts a real page on the board, and other sessions can't read this one's files", async () => {
+    await upload("DOC003", [{ id: "book1", name: "Physics.pdf", mediaType: "application/pdf", data: "JVBE", pages: 30 }]);
+    const tab = await openTab("DOC003");
+    const r = await post("show_page", { session_code: "DOC003", page: "15", caption: "circuit" });
+    expect(r).toMatchObject({ ok: true, label: "B1" });
+    await vi.waitFor(() => expect(tab.events()[0]).toMatchObject({ type: "source", docId: "book1", page: 15, caption: "circuit" }));
+    expect((await post("show_page", { session_code: "DOC003", page: "99" })).ok).toBe(false);
+    const other = await openTab("DOC004");
+    expect((await post("read_material", { session_code: "DOC004", question: "x" })).ok).toBe(false);
+    tab.ws.close();
+    other.ws.close();
   });
 });

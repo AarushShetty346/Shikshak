@@ -1,5 +1,7 @@
 import { useState } from "react";
-import type { Language } from "../../../shared/types";
+import type { DocMeta, Language } from "../../../shared/types";
+import { putDoc } from "../lib/docStore";
+import { prepareFile, type PreparedFile } from "../lib/files";
 import { MathText } from "./MathText";
 
 /** What /api/plan returns: the study plan (shown on the board section by section) and a short outline for the tutor. */
@@ -22,6 +24,7 @@ export interface StudentSetup {
   language: Language;
   topic: string;
   plan: PlanResult | null;
+  docs: DocMeta[];
 }
 
 const LANGS: { id: Language; label: string }[] = [
@@ -33,7 +36,7 @@ const LANGS: { id: Language; label: string }[] = [
 const TOPICS = ["Quadratic equations", "Linear equations in two variables", "Arithmetic progressions", "Trigonometric ratios"];
 const MAX_PHOTOS = 6;
 
-export function Setup({ sessionCode, onStart }: { sessionCode: string; onStart: (s: StudentSetup) => void }) {
+export function Setup({ sessionCode, onStart, onCancel }: { sessionCode: string; onStart: (s: StudentSetup) => void; onCancel?: () => void }) {
   const [name, setName] = useState("");
   const [grade, setGrade] = useState("10");
   const [language, setLanguage] = useState<Language>("hinglish");
@@ -42,6 +45,43 @@ export function Setup({ sessionCode, onStart }: { sessionCode: string; onStart: 
   const [plan, setPlan] = useState<PlanResult | null>(null);
   const [planning, setPlanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [prepared, setPrepared] = useState<(PreparedFile & { id: string })[] | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  /** Shrinks photos / counts PDF pages once, and gives each file an id that stays with it. */
+  const prepare = async () => {
+    if (prepared) return prepared;
+    const out = await Promise.all(files.map(async (f) => ({ ...(await prepareFile(f)), id: crypto.randomUUID().slice(0, 8) })));
+    setPrepared(out);
+    return out;
+  };
+
+  /** Keeps the files with this session: on this device (to show pages) and on the server (for the tutor). */
+  const storeDocs = async (list: (PreparedFile & { id: string })[]): Promise<DocMeta[]> => {
+    if (!list.length) return [];
+    const r = await fetch("/api/documents", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_code: sessionCode, files: list }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || "Couldn't upload the files");
+    for (const f of list) await putDoc({ sessionId: sessionCode, docId: f.id, name: f.name, mediaType: f.mediaType, data: f.data, pages: f.pages });
+    return data.docs as DocMeta[];
+  };
+
+  const create = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const docs = await storeDocs(await prepare());
+      onStart({ name: name.trim() || "student", grade, language, topic: topic.trim(), plan, docs });
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const reset = () => {
     setPlan(null);
@@ -52,7 +92,7 @@ export function Setup({ sessionCode, onStart }: { sessionCode: string; onStart: 
     setPlanning(true);
     setError(null);
     try {
-      const attachments = await Promise.all(files.map(prepareFile));
+      const attachments = await prepare();
       const r = await fetch("/api/plan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -72,6 +112,7 @@ export function Setup({ sessionCode, onStart }: { sessionCode: string; onStart: 
     const picked = Array.from(list ?? []);
     const pdf = picked.find((f) => f.type === "application/pdf");
     setFiles(pdf ? [pdf] : picked.filter((f) => f.type.startsWith("image/")).slice(0, MAX_PHOTOS));
+    setPrepared(null);
     reset();
   };
 
@@ -192,41 +233,16 @@ export function Setup({ sessionCode, onStart }: { sessionCode: string; onStart: 
               {planning ? (files.length ? "Reading your notes…" : "Making your plan…") : "Make a plan"}
             </button>
           )}
-          <button
-            type="button"
-            className="btn-primary"
-            disabled={planning}
-            onClick={() => onStart({ name: name.trim() || "student", grade, language, topic: topic.trim(), plan })}
-          >
-            Start class
+          {onCancel && (
+            <button type="button" className="btn-secondary" onClick={onCancel}>
+              Back
+            </button>
+          )}
+          <button type="button" className="btn-primary" disabled={planning || saving} onClick={create}>
+            {saving ? "Saving…" : "Create session"}
           </button>
         </div>
       </form>
     </main>
   );
-}
-
-/** Photos are shrunk to 1600 px on the long side (JPEG) so uploads stay small; PDFs go as they are. */
-async function prepareFile(file: File): Promise<{ mediaType: string; data: string }> {
-  if (!file.type.startsWith("image/")) return { mediaType: file.type, data: await toBase64(file) };
-  try {
-    const bitmap = await createImageBitmap(file);
-    const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(bitmap.width * scale);
-    canvas.height = Math.round(bitmap.height * scale);
-    canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    return { mediaType: "image/jpeg", data: canvas.toDataURL("image/jpeg", 0.85).split(",")[1] ?? "" };
-  } catch {
-    return { mediaType: file.type, data: await toBase64(file) };
-  }
-}
-
-function toBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => resolve(String(r.result).split(",")[1] ?? "");
-    r.onerror = () => reject(r.error);
-    r.readAsDataURL(file);
-  });
 }

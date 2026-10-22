@@ -20,7 +20,21 @@ export function useVoiceCall() {
   const ducked = useRef(false);
   const quietSince = useRef(0);
 
-  const start = useCallback(async (userData: Record<string, unknown>) => {
+  const [talking, setTalking] = useState(false);
+  const handsFree = useRef(false);
+  const releaseTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  /** Silence the tutor on this screen now; her voice returns once her current sentence has ended. */
+  const duck = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = 0;
+      ducked.current = true;
+      quietSince.current = 0;
+    }
+  }, []);
+
+  const start = useCallback(async (userData: Record<string, unknown>, opts: { handsFree?: boolean } = {}) => {
+    handsFree.current = Boolean(opts.handsFree);
     setError(null);
     try {
       callRef.current?.stop();
@@ -46,8 +60,13 @@ export function useVoiceCall() {
       });
       call.on("call-end", () => setVolume(0));
       call.on("error", (e) => setError(friendlyError(e.code, e.message)));
+      call.on("call-start", () => {
+        // Push-to-talk: the mic stays off until the student holds Talk, so room noise never reaches the tutor.
+        if (!handsFree.current) call.setMuted(true);
+      });
       callRef.current = call;
       await call.start();
+      if (!handsFree.current) call.setMuted(true);
     } catch (err) {
       const e = err as { code?: string; message?: string };
       setError(friendlyError(e.code, e.message));
@@ -86,17 +105,39 @@ export function useVoiceCall() {
   const sendDone = useCallback(() => sendTones("1#"), [sendTones]);
 
   /**
-   * Student pressed "Ask doubt": the tutor goes quiet at once on this screen, and
-   * "dtmf_number: 2" tells her to stop and listen.
+   * Stop the teacher: she goes quiet at once on this screen, and "dtmf_number: 2" tells her to
+   * stop and listen.
    */
   const askDoubt = useCallback((): boolean => {
-    if (audioRef.current) {
-      audioRef.current.volume = 0;
-      ducked.current = true;
-      quietSince.current = 0;
-    }
+    duck();
     return sendTones("2#");
-  }, [sendTones]);
+  }, [duck, sendTones]);
+
+  /** Push-to-talk: open the mic while held (and silence the tutor), close it shortly after release. */
+  const talk = useCallback(
+    (on: boolean) => {
+      const call = callRef.current;
+      if (!call) return;
+      clearTimeout(releaseTimer.current);
+      if (on) {
+        duck();
+        call.setMuted(false);
+        setTalking(true);
+      } else {
+        setTalking(false);
+        // Keep the mic open a moment so the last word isn't cut off.
+        releaseTimer.current = setTimeout(() => {
+          if (!handsFree.current) call.setMuted(true);
+        }, 350);
+      }
+    },
+    [duck],
+  );
+
+  const setHandsFree = useCallback((on: boolean) => {
+    handsFree.current = on;
+    callRef.current?.setMuted(!on);
+  }, []);
 
   const stop = useCallback(() => {
     callRef.current?.stop();
@@ -104,7 +145,7 @@ export function useVoiceCall() {
 
   useEffect(() => () => void callRef.current?.stop(), []);
 
-  return { state, error, volume, start, stop, sendDone, askDoubt };
+  return { state, error, volume, talking, start, stop, sendDone, askDoubt, talk, setHandsFree, sendTones };
 }
 
 function friendlyError(code?: string, message?: string): string {

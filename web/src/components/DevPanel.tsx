@@ -62,7 +62,7 @@ export function DevPanel({ sessionCode }: { sessionCode: string }) {
       )}
       <div className="dev-buttons">
         {SAMPLES.map((s) => (
-          <button key={s.tool} onClick={() => fire(s.tool, s.params)}>{s.label}</button>
+          <button key={s.label} onClick={() => fire(s.tool, s.params)}>{s.label}</button>
         ))}
         <button className="dev-wide" onClick={saveSample}>Save sample for checker test</button>
       </div>

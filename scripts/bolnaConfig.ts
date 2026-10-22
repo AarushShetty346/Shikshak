@@ -143,6 +143,28 @@ export function buildTools(publicUrl: string, toolsToken?: string): ToolDef[] {
       required: ["section"],
     }),
     tool(base, token, {
+      name: "read_material",
+      description:
+        "Ask the student's uploaded material (their textbook chapter PDF, notes or worksheet) a question. Answers come only from the actual pages, with page numbers, or say it isn't there. Use it when they mention their book or notes, ask about a page or figure, or right after they upload something ('dtmf_number: 4'). Never invent book content or page numbers.",
+      pre_call_message: { hi: "एक सेकंड, आपकी किताब देखती हूँ।", en: "One second, let me check your book." },
+      properties: {
+        question: { type: "string", description: "What to look up, e.g. 'definition of common difference', 'which page has the circuit diagram', or 'what does this cover'." },
+      },
+      required: ["question"],
+    }),
+    tool(base, token, {
+      name: "show_page",
+      description:
+        "Put a real page of the student's uploaded material on the board (with its source), e.g. the page with the figure you're about to explain. Then point at it with highlight using the label it returns.",
+      pre_call_message: { hi: "यह देखो, आपकी किताब का पेज।", en: "Here's the page from your book." },
+      properties: {
+        page: { type: "string", description: "Page number in the PDF (first page = 1). For a photo, 1." },
+        document: { type: "string", description: "Optional: which file (its number or part of its name) if they uploaded several." },
+        caption: { type: "string", description: "Optional short caption, e.g. 'Fig 12.3 circuit'." },
+      },
+      required: ["page"],
+    }),
+    tool(base, token, {
       name: "give_practice",
       description:
         "Put the next prepared practice problem from the study plan on the board. Its answer stays hidden; look_at_board checks it. Only when the lesson plan says practice problems are ready.",
@@ -201,19 +223,24 @@ const GOODBYE: Spoken = {
 };
 
 /** Request body for POST /v2/agent (create) and PUT /v2/agent/{id} (update). */
-export function buildAgentPayload(opts: { publicUrl: string; toolsToken?: string; voice?: VoiceOptions }) {
+/** Voice speed per agent (Bolna can't change it mid-call, so each speed is its own agent). */
+export const SPEED_RATES = { slower: 0.95, normal: 1.1, faster: 1.3 } as const;
+export type SpeedName = keyof typeof SPEED_RATES;
+
+export function buildAgentPayload(opts: { publicUrl: string; toolsToken?: string; voice?: VoiceOptions; speed?: SpeedName }) {
   const v = opts.voice ?? DEFAULT_VOICE;
+  const rate = SPEED_RATES[opts.speed ?? "normal"];
   const base = v.languages[0];
   const { welcome, prompt } = readPrompt();
   const tools = buildTools(opts.publicUrl, opts.toolsToken);
   const synthesizerFor = (language: string) => ({
     provider: v.synthesizer.provider,
-    provider_config: { voice: v.synthesizer.voice, voice_id: v.synthesizer.voice_id, model: v.synthesizer.model, language },
+    provider_config: { voice: v.synthesizer.voice, voice_id: v.synthesizer.voice_id, model: v.synthesizer.model, language, speed: rate },
   });
 
   return {
     agent_config: {
-      agent_name: "Shikshak",
+      agent_name: opts.speed && opts.speed !== "normal" ? `Shikshak (${opts.speed})` : "Shikshak",
       agent_welcome_message: welcome,
       tasks: [
         {
@@ -278,7 +305,8 @@ export function buildAgentPayload(opts: { publicUrl: string; toolsToken?: string
             check_user_online_message: STILL_THERE,
             call_hangup_message: GOODBYE,
             // Stop talking as soon as the student says a word.
-            number_of_words_for_interruption: 1,
+            // Push-to-talk makes interruptions deliberate; 2 words avoids stray noise in hands-free mode.
+            number_of_words_for_interruption: 2,
             incremental_delay: 400,
             // Keypad digits reach the LLM as "dtmf_number: 1": that's the board's Done button.
             dtmf_enabled: true,

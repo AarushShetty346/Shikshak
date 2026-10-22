@@ -1,13 +1,14 @@
 // Shows who has the floor: the teacher speaking (pulses with her real audio level), the student
 // speaking (reacts to their mic), the teacher thinking, listening, or idle. Small and out of the way.
 
-export type VoiceState = "idle" | "listening" | "student" | "thinking" | "teacher" | "connecting";
+export type VoiceState = "idle" | "listening" | "student" | "thinking" | "teacher" | "connecting" | "paused";
 
 const LABEL: Record<VoiceState, string> = {
   idle: "",
   connecting: "Connecting…",
-  listening: "Listening",
-  student: "You're speaking",
+  listening: "Hold Talk to speak",
+  student: "Recording…",
+  paused: "Paused",
   thinking: "Thinking…",
   teacher: "Teacher",
 };

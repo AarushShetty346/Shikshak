@@ -1258,3 +1258,343 @@ sub {
     bottom: 120px;
   }
 }
+
+/* ---------- Home: sessions ---------- */
+
+.home {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 40px 20px 60px;
+}
+
+.home-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.home-head h1 {
+  margin: 0;
+  font-size: clamp(28px, 4vw, 40px);
+  letter-spacing: -0.02em;
+}
+
+.home-empty {
+  background: var(--surface);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+  padding: 32px;
+  text-align: center;
+}
+
+.home-empty p {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+.muted {
+  color: var(--ink-soft);
+  font-size: 15px !important;
+  max-width: 52ch;
+  margin: 0 auto 18px !important;
+}
+
+.session-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.session-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  padding: 14px 16px;
+}
+
+.session-card[data-archived="true"] {
+  opacity: 0.6;
+}
+
+.session-open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  background: none;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  color: var(--ink);
+}
+
+.session-name {
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.session-meta,
+.session-time {
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+
+.session-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.session-actions button {
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 14px;
+  background: #f1ebde;
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.session-actions .btn-primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+.session-actions .danger,
+.menu .danger {
+  color: var(--red);
+}
+
+.link-button {
+  margin-top: 16px;
+  background: none;
+  border: 0;
+  color: var(--ink-soft);
+  text-decoration: underline;
+}
+
+/* ---------- Session menu (top left in a class) ---------- */
+
+.session-menu {
+  position: fixed;
+  top: 10px;
+  left: 12px;
+  z-index: 6;
+}
+
+.menu-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 60vw;
+  border: 0;
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: rgba(0, 0, 0, 0.22);
+  color: rgba(244, 241, 232, 0.85);
+  font-weight: 600;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.menu {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  min-width: 240px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.35);
+  padding: 6px;
+}
+
+.menu button {
+  text-align: left;
+  border: 0;
+  background: none;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.menu button:hover {
+  background: #f4efe4;
+}
+
+.menu-docs {
+  font-size: 13px;
+  color: var(--ink-soft);
+  padding: 6px 12px 8px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  margin: 4px 0;
+}
+
+/* ---------- Class controls ---------- */
+
+.board-tools .btn-talk,
+.board-tools .btn-stop,
+.board-tools .btn-pause,
+.board-tools .btn-speed {
+  width: auto;
+  padding: 0 12px;
+  font-weight: 700;
+  font-size: 14px;
+  border-radius: 10px;
+}
+
+.board-tools .btn-talk {
+  background: #e8f1fb;
+  color: #1f4f86;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.board-tools .btn-talk[data-on="true"] {
+  background: #2c6fb6;
+  color: #fff;
+}
+
+.board-tools .btn-stop {
+  background: #fdecea;
+  color: var(--red);
+}
+
+.board-tools .btn-pause {
+  background: #2a2722;
+  color: #fff;
+}
+
+.board-tools .btn-speed {
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.board-tools .btn-done[data-ready="true"] {
+  box-shadow: 0 0 0 3px rgba(31, 138, 76, 0.3);
+}
+
+.board-tools .btn-done[data-state="submitting"],
+.board-tools .btn-done[data-state="reviewing"] {
+  background: #2c6fb6;
+  opacity: 1;
+}
+
+.spin {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--line);
+  border-top-color: var(--accent);
+  animation: orb-spin 0.8s linear infinite;
+}
+
+/* ---------- Done: where the submission is ---------- */
+
+.submission {
+  position: absolute;
+  right: 12px;
+  bottom: 70px;
+  max-width: min(420px, calc(100% - 24px));
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: #fff;
+  color: var(--ink);
+  border-radius: 12px;
+  padding: 10px 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  font-size: 14px;
+  border-left: 4px solid #2c6fb6;
+  z-index: 3;
+  animation: pop 0.2s ease-out both;
+}
+
+.submission[data-state="done"][data-status="correct"] {
+  border-left-color: var(--green);
+}
+
+.submission[data-state="done"][data-status="mistake"],
+.submission[data-state="failed"] {
+  border-left-color: var(--red);
+}
+
+.submission span {
+  color: var(--ink-soft);
+}
+
+.submission-retry {
+  align-self: flex-start;
+  margin-top: 4px;
+  border: 0;
+  border-radius: 999px;
+  padding: 5px 12px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+/* ---------- A real page from the student's material ---------- */
+
+.source-page {
+  margin: 0;
+  background: #fff;
+  border-radius: calc(var(--s) * 6px);
+  padding: calc(var(--s) * 6px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+
+.source-page img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 3px;
+}
+
+.source-page figcaption {
+  padding: calc(var(--s) * 6px) calc(var(--s) * 4px) calc(var(--s) * 2px);
+  font-family: var(--font-ui);
+  font-size: max(12px, calc(var(--s) * 15px));
+  color: #3c3a33;
+}
+
+.source-wait {
+  padding: 40px;
+  text-align: center;
+  color: #6b675c;
+  font-family: var(--font-ui);
+}
+
+@media (max-width: 640px) {
+  .session-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .session-actions {
+    justify-content: flex-start;
+  }
+
+  .board-tools .btn-talk {
+    flex: 1 1 100%;
+    height: 48px;
+  }
+
+  .submission {
+    bottom: 130px;
+  }
+}

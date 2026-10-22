@@ -135,3 +135,12 @@ export function noteInterrupt(s: Session) {
     section: s.study?.section ?? null,
   };
 }
+
+/** For a resumed class (after Pause): what was on the board and where the lesson was. */
+export function lessonState(s: Session): string {
+  const live = s.blocks.filter((b) => !b.erased);
+  if (!live.length) return "";
+  const section = s.study && s.study.section > 0 ? `Plan section ${s.study.section} of ${s.study.plan.sections.length} ("${s.study.plan.sections[s.study.section - 1].title}") was the last one taught. ` : "";
+  const at = s.interrupt?.label ? `The student had interrupted while you explained ${s.interrupt.label}. ` : "";
+  return `This class was paused and is now resuming; the board is still on their screen. ${section}${at}Board so far: ${boardMap(s, 10)}`;
+}
