@@ -22,3 +22,6 @@ services:
         sync: false
       - key: TOOLS_TOKEN
         sync: false
+      # Set to 1 until ANTHROPIC_API_KEY is filled in, then delete it.
+      - key: FAKE_CHECKER
+        sync: false
