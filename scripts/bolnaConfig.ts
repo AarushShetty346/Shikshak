@@ -75,16 +75,37 @@ export function buildTools(publicUrl: string, toolsToken?: string): ToolDef[] {
       required: ["problem", "answer"],
     }),
     tool(base, token, {
-      name: "check_work",
+      name: "look_at_board",
       description:
-        "Look at what the student has written in their notebook and find the first wrong step. Use when the student says they are done, says 'check karo', 'ho gaya', 'dekho', asks if they are right, or seems stuck.",
+        "Look at what the student wrote or drew on the board: their working, a doubt, a diagram. Returns what is written and, for working, the first wrong step (the board circles it). Call it when you receive 'dtmf_number: 1' (the student pressed Done), or when they say they are done, 'check karo', 'ho gaya', 'dekho', 'maine likha hai', ask if they are right, or ask about something they drew.",
       pre_call_message: { hi: "एक सेकंड, देखती हूँ।", en: "One second, let me look." },
-      properties: {},
+      properties: {
+        student_said: {
+          type: "string",
+          description: "What the student said about their writing or drawing, in a few words, if anything (e.g. 'why is this minus?'). Empty if nothing.",
+        },
+      },
       required: [],
     }),
     tool(base, token, {
+      name: "show_section",
+      description:
+        "Write the next part of today's prepared study plan on the board (made from the student's own notes if they uploaded any). Pass 'next' to move on, or a section number to go back or jump. Returns a short line to say and a question to ask. Only when the lesson plan lists sections.",
+      pre_call_message: { hi: "अच्छा, बोर्ड पर देखो।", en: "Okay, look at the board." },
+      properties: { section: { type: "string", description: "'next', or a section number from the lesson plan, e.g. '3'." } },
+      required: ["section"],
+    }),
+    tool(base, token, {
+      name: "give_practice",
+      description:
+        "Put the next prepared practice problem from the study plan on the board. Its answer stays hidden; look_at_board checks it. Only when the lesson plan says practice problems are ready.",
+      pre_call_message: { hi: "अच्छा, एक सवाल देती हूँ।", en: "Okay, here is one for you." },
+      properties: { number: { type: "string", description: "'next', or a practice number, e.g. '2'." } },
+      required: ["number"],
+    }),
+    tool(base, token, {
       name: "clear_board",
-      description: "Wipe the chalkboard. Only use when moving to a completely new topic.",
+      description: "Start a fresh page on the board. Only when moving to a completely new topic.",
       pre_call_message: { hi: "अच्छा।", en: "Okay." },
       properties: {},
       required: [],
@@ -113,11 +134,21 @@ export interface VoiceOptions {
 // Defaults: Sarvam for Indian-language speech in and out (a buildathon sponsor), a fast GPT for the conversation.
 export const DEFAULT_VOICE: VoiceOptions = {
   languages: ["hi", "en"],
-  transcriber: { provider: "sarvam", model: "saaras:v3" },
+  // Soniox: understands Hindi-English mixing and detects when the student has finished a thought
+  // (semantic end of turn) instead of a fixed silence timer, so it doesn't cut in when they pause.
+  transcriber: { provider: "soniox", model: "stt-rt-v5" },
   synthesizer: { provider: "sarvam", model: "bulbul:v3", voice: "suhani", voice_id: "suhani" },
   llm: { provider: "openai", model: "gpt-5.4-mini" },
   telephony: "plivo",
 };
+
+// Words the speech recogniser should expect in a maths class (no weights; Bolna strips them).
+const MATHS_KEYWORDS =
+  "quadratic, equation, factorise, factorisation, discriminant, square root, x square, polynomial, coefficient, " +
+  "arithmetic progression, trigonometry, theta, sine, cosine, tangent, Pythagoras, numerator, denominator, check karo, ho gaya, dekho";
+const TRANSCRIBER_CONTEXT =
+  "A class 10 maths tutoring session in India. The student speaks Hindi, English or a mix (Hinglish), " +
+  "talks about equations, steps and their working, and often pauses mid-sentence while thinking or writing.";
 
 // Bolna's own system lines, in each language (it falls back to its English defaults otherwise).
 const STILL_THERE: Spoken = {
@@ -168,7 +199,10 @@ export function buildAgentPayload(opts: { publicUrl: string; toolsToken?: string
               stream: true,
               encoding: "linear16",
               sampling_rate: 16000,
-              endpointing: 300,
+              // Fallback silence before replying, for transcribers without their own turn detection.
+              endpointing: 700,
+              keywords: MATHS_KEYWORDS,
+              context: TRANSCRIBER_CONTEXT,
             },
             input: { provider: v.telephony, format: "wav" },
             output: { provider: v.telephony, format: "wav" },
@@ -203,8 +237,11 @@ export function buildAgentPayload(opts: { publicUrl: string; toolsToken?: string
             trigger_user_online_message_after: 45,
             check_user_online_message: STILL_THERE,
             call_hangup_message: GOODBYE,
-            number_of_words_for_interruption: 2,
+            // Stop talking as soon as the student says a word.
+            number_of_words_for_interruption: 1,
             incremental_delay: 400,
+            // Keypad digits reach the LLM as "dtmf_number: 1": that's the board's Done button.
+            dtmf_enabled: true,
           },
         },
       ],

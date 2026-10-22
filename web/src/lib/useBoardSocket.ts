@@ -5,11 +5,13 @@ import type { BoardEvent, ClientMessage, ServerMessage } from "../../../shared/t
  * Live connection to the server. Board events (from the agent's tool calls) arrive here;
  * notebook snapshots go back. Reconnects on its own and replays the board after a reconnect.
  */
-export function useBoardSocket(sessionCode: string, onEvent: (e: BoardEvent, replay: boolean) => void) {
+export function useBoardSocket(sessionCode: string, onEvent: (e: BoardEvent, replay: boolean) => void, onReset: () => void) {
   const [connected, setConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const onEventRef = useRef(onEvent);
   onEventRef.current = onEvent;
+  const onResetRef = useRef(onReset);
+  onResetRef.current = onReset;
 
   useEffect(() => {
     let stopped = false;
@@ -27,7 +29,7 @@ export function useBoardSocket(sessionCode: string, onEvent: (e: BoardEvent, rep
       ws.onmessage = (m) => {
         const msg = JSON.parse(m.data) as ServerMessage;
         if (msg.kind === "welcome") {
-          onEventRef.current({ type: "clear" }, true);
+          onResetRef.current();
           for (const e of msg.replay) onEventRef.current(e, true);
         } else if (msg.kind === "board") {
           onEventRef.current(msg.event, false);

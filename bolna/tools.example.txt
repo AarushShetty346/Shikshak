@@ -90,10 +90,10 @@
   }
 }
 
-// ----- check_work -----
+// ----- look_at_board -----
 {
-  "name": "check_work",
-  "description": "Look at what the student has written in their notebook and find the first wrong step. Use when the student says they are done, says 'check karo', 'ho gaya', 'dekho', asks if they are right, or seems stuck.",
+  "name": "look_at_board",
+  "description": "Look at what the student wrote or drew on the board: their working, a doubt, a diagram. Returns what is written and, for working, the first wrong step (the board circles it). Call it when you receive 'dtmf_number: 1' (the student pressed Done), or when they say they are done, 'check karo', 'ho gaya', 'dekho', 'maine likha hai', ask if they are right, or ask about something they drew.",
   "pre_call_message": {
     "hi": "एक सेकंड, देखती हूँ।",
     "en": "One second, let me look."
@@ -104,6 +104,10 @@
       "session_code": {
         "type": "string",
         "description": "The session code from the prompt. Always pass it exactly."
+      },
+      "student_said": {
+        "type": "string",
+        "description": "What the student said about their writing or drawing, in a few words, if anything (e.g. 'why is this minus?'). Empty if nothing."
       }
     },
     "required": [
@@ -114,9 +118,90 @@
   "value": {
     "method": "POST",
     "param": {
-      "session_code": "%(session_code)s"
+      "session_code": "%(session_code)s",
+      "student_said": "%(student_said)s"
     },
-    "url": "https://shikshak-o0l8.onrender.com/tools/check_work",
+    "url": "https://shikshak-o0l8.onrender.com/tools/look_at_board",
+    "api_token": null,
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}
+
+// ----- show_section -----
+{
+  "name": "show_section",
+  "description": "Write the next part of today's prepared study plan on the board (made from the student's own notes if they uploaded any). Pass 'next' to move on, or a section number to go back or jump. Returns a short line to say and a question to ask. Only when the lesson plan lists sections.",
+  "pre_call_message": {
+    "hi": "अच्छा, बोर्ड पर देखो।",
+    "en": "Okay, look at the board."
+  },
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "session_code": {
+        "type": "string",
+        "description": "The session code from the prompt. Always pass it exactly."
+      },
+      "section": {
+        "type": "string",
+        "description": "'next', or a section number from the lesson plan, e.g. '3'."
+      }
+    },
+    "required": [
+      "session_code",
+      "section"
+    ]
+  },
+  "key": "custom_task",
+  "value": {
+    "method": "POST",
+    "param": {
+      "session_code": "%(session_code)s",
+      "section": "%(section)s"
+    },
+    "url": "https://shikshak-o0l8.onrender.com/tools/show_section",
+    "api_token": null,
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}
+
+// ----- give_practice -----
+{
+  "name": "give_practice",
+  "description": "Put the next prepared practice problem from the study plan on the board. Its answer stays hidden; look_at_board checks it. Only when the lesson plan says practice problems are ready.",
+  "pre_call_message": {
+    "hi": "अच्छा, एक सवाल देती हूँ।",
+    "en": "Okay, here is one for you."
+  },
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "session_code": {
+        "type": "string",
+        "description": "The session code from the prompt. Always pass it exactly."
+      },
+      "number": {
+        "type": "string",
+        "description": "'next', or a practice number, e.g. '2'."
+      }
+    },
+    "required": [
+      "session_code",
+      "number"
+    ]
+  },
+  "key": "custom_task",
+  "value": {
+    "method": "POST",
+    "param": {
+      "session_code": "%(session_code)s",
+      "number": "%(number)s"
+    },
+    "url": "https://shikshak-o0l8.onrender.com/tools/give_practice",
     "api_token": null,
     "headers": {
       "Content-Type": "application/json"
@@ -127,7 +212,7 @@
 // ----- clear_board -----
 {
   "name": "clear_board",
-  "description": "Wipe the chalkboard. Only use when moving to a completely new topic.",
+  "description": "Start a fresh page on the board. Only when moving to a completely new topic.",
   "pre_call_message": {
     "hi": "अच्छा।",
     "en": "Okay."

@@ -10,20 +10,33 @@ student's handwriting.
 ## How it works
 
 ```
-Browser                               Server (Node, one process)                 Bolna voice agent
- ├─ Chalkboard   ◀── WebSocket ◀────── POST /tools/show_steps    ◀────────────── tool call
- ├─ Problem card ◀── WebSocket ◀────── POST /tools/give_problem  ◀────────────── tool call
- ├─ Pen notebook ── snapshot ────────▶ stored per session
- ├─ Red circle   ◀── WebSocket ◀────── POST /tools/check_work    ◀────────────── tool call
- │                                      └─ Gemini or Claude reads the numbered lines, names the wrong one
- └─ Voice (Bolna Web Call SDK) ◀──────────────────────────────────────────────────▶ live audio
+Browser                                Server (Node, one process)                Bolna voice agent
+ ├─ One shared, scrollable blackboard
+ │   ├─ tutor blocks  ◀── WebSocket ◀── /tools/show_steps, show_section,   ◀──── tool calls
+ │   │                                    give_problem, give_practice
+ │   ├─ student ink (finger / stylus / mouse; two fingers scroll)
+ │   └─ Done button ── capture ──────▶ starts reading the work at once (Gemini)
+ │        └─ keypad tone "1#" over the call ─────────────────────────────▶ "dtmf_number: 1"
+ │                                     /tools/look_at_board  ◀────────────── tutor looks
+ ├─ red circle / Shabash  ◀── WebSocket ◀── result (usually instant, already read)
+ └─ Voice (Bolna Web Call SDK, Soniox speech-to-text, Sarvam voice) ◀─────▶ live audio
 ```
 
-- The browser makes a 6-character **session code** and passes it to Bolna as `userData`. Bolna fills it into
-  every tool call, so the server knows which screen to update.
-- The student's strokes are grouped into **lines** in the browser. The snapshot sent to the model has line numbers
-  in the margin, so it only answers "line 2 is wrong". We draw the circle from our own stroke geometry.
-- See [PLAN.md](PLAN.md) for the full plan, schedule, and risks.
+- **One board for both.** The page is 640 board units wide and scales to the screen, so the tutor's writing
+  and the student's ink line up the same on a phone and a laptop. Tutor blocks stack below whatever is
+  already written; only the visible part of the ink is drawn.
+- **Done.** Sends the student's work below the latest question as a line-numbered image, and starts the
+  model reading it right away. It also sends a keypad tone through the call; with `dtmf_enabled`, Bolna hands
+  it to the tutor as `dtmf_number: 1`, and the prompt tells the tutor to call `look_at_board`. Saying "dekho"
+  works too.
+- **Session code.** The browser makes a 6-character code and passes it to Bolna as `userData`. Bolna fills it
+  into every tool call, so the server knows which board to update.
+- **Notes.** Photos (up to 6) or a PDF become a study plan in the chosen language: sections the tutor writes
+  on the board one at a time (`show_section`) and practice problems whose answers stay on the server
+  (`give_practice`, checked by `look_at_board`).
+- **Turn-taking.** Soniox detects when the student has finished a thought instead of a fixed silence timer;
+  the tutor stops after one word from the student.
+- See [PLAN.md](PLAN.md) for the plan, schedule, and risks.
 
 ## Run it locally
 

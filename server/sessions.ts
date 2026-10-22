@@ -1,15 +1,35 @@
+import { createHash } from "node:crypto";
 import type { WebSocket } from "ws";
 import type { BoardEvent, ServerMessage } from "../shared/types";
+import type { LookResult } from "./look";
+import type { StudyPlan } from "./plan";
+
+/** The student's work as sent by the browser (PNG with numbered lines). */
+export interface Capture {
+  id: string;
+  reason: "done" | "request";
+  png: string | null;
+  lineCount: number;
+  at: number;
+  /** Same drawing => same hash, so a Done press and the tutor's later look share one analysis. */
+  hash: string;
+}
 
 export interface Session {
   code: string;
   sockets: Set<WebSocket>;
   lastActive: number;
-  /** Latest snapshot of the student's notebook. */
-  canvas: { png: string | null; lineCount: number; at: number } | null;
-  problem: { text: string; answer?: string } | null;
+  /** Latest capture of the student's work. */
+  capture: Capture | null;
+  /** Analyses by capture hash; started on Done so the tutor's look is usually instant. */
+  analyses: Map<string, Promise<LookResult>>;
+  problem: { text: string; answer?: string; hint?: string } | null;
   language: string;
-  /** Board events since the last clear, replayed when the tab reconnects. */
+  /** Prepared study plan (from notes or a topic), with where the tutor has got to. */
+  study: { plan: StudyPlan; section: number; practice: number; lastSectionAt: number } | null;
+  /** Tutor's recent board lines, as context for reading the student's work. */
+  recentBoard: string[];
+  /** Board events, replayed when the tab reconnects. */
   history: BoardEvent[];
 }
 
@@ -23,7 +43,18 @@ export function getOrCreate(code: string): Session {
   const key = normalizeCode(code);
   let s = sessions.get(key);
   if (!s) {
-    s = { code: key, sockets: new Set(), lastActive: Date.now(), canvas: null, problem: null, language: "hinglish", history: [] };
+    s = {
+      code: key,
+      sockets: new Set(),
+      lastActive: Date.now(),
+      capture: null,
+      analyses: new Map(),
+      problem: null,
+      language: "hinglish",
+      study: null,
+      recentBoard: [],
+      history: [],
+    };
     sessions.set(key, s);
   }
   return s;
@@ -49,16 +80,33 @@ export function touch(s: Session) {
   s.lastActive = Date.now();
 }
 
+const HISTORY_LIMIT = 120;
+
 export function emit(s: Session, event: BoardEvent) {
-  if (event.type === "clear") s.history = [];
-  else if (event.type !== "checking") s.history.push(event);
-  if (s.history.length > 50) s.history.splice(0, s.history.length - 50);
+  if (event.type !== "checking" && event.type !== "unclear") s.history.push(event);
+  if (s.history.length > HISTORY_LIMIT) s.history.splice(0, s.history.length - HISTORY_LIMIT);
+  if (event.type === "steps") s.recentBoard = [...s.recentBoard, ...(event.title ? [event.title] : []), ...event.steps].slice(-12);
+  if (event.type === "problem") s.recentBoard = [`Problem: ${event.problem}`];
   const msg: ServerMessage = { kind: "board", event };
   const data = JSON.stringify(msg);
   for (const ws of s.sockets) {
     if (ws.readyState === ws.OPEN) ws.send(data);
   }
   touch(s);
+}
+
+export function hashPng(png: string | null): string {
+  return createHash("sha1").update(png ?? "").digest("hex");
+}
+
+/** Waits briefly for the browser to send a capture newer than `since`. */
+export async function freshCapture(s: Session, since: number, timeoutMs = 1500): Promise<Capture | null> {
+  const until = Date.now() + timeoutMs;
+  while (Date.now() < until) {
+    if (s.capture && s.capture.at >= since) return s.capture;
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  return s.capture;
 }
 
 /** For tests. */

@@ -2,6 +2,7 @@
 
 export type Point = [number, number];
 
+/** A pen stroke in board coordinates: x in 0..1000 (board width), y grows downward without limit. */
 export interface Stroke {
   id: string;
   points: Point[];
@@ -21,14 +22,27 @@ export interface WrittenLine {
   strokeIds: string[];
 }
 
-/** Something the tutor puts on screen. The server sends these to the browser. */
+/** A part of the study plan, shown on the board when the tutor reaches it. */
+export interface SectionInfo {
+  n: number;
+  of: number;
+}
+
+/**
+ * Something the tutor puts on the shared board, or a change to it. The server sends these to the
+ * browser; the board lays tutor blocks out one after another, below whatever is already written.
+ */
 export type BoardEvent =
-  | { type: "steps"; id: string; title: string; steps: string[] }
+  | { type: "steps"; id: string; title: string; steps: string[]; section?: SectionInfo }
   | { type: "problem"; id: string; problem: string }
-  | { type: "clear" }
+  | { type: "plan"; id: string; title: string; items: string[] }
+  /** Start a fresh page (new topic). Earlier pages stay above; the board scrolls to the new one. */
+  | { type: "page"; id: string }
+  /** The tutor is looking at the student's latest work; the browser replies with a capture. */
   | { type: "checking" }
-  | { type: "mark"; line: number; note: string }
-  | { type: "correct"; note: string }
+  /** Circle a line of a capture the student sent. */
+  | { type: "mark"; captureId: string; line: number; note: string }
+  | { type: "correct"; captureId: string | null; note: string }
   | { type: "unclear"; note: string };
 
 /** Server -> browser WebSocket messages. */
@@ -36,10 +50,14 @@ export type ServerMessage =
   | { kind: "welcome"; sessionCode: string; replay: BoardEvent[] }
   | { kind: "board"; event: BoardEvent };
 
-/** Browser -> server WebSocket messages. */
+/**
+ * Browser -> server: the student's latest work, as a PNG with line numbers in the margin.
+ * Sent when the student presses Done, and whenever the server asks (a check is starting).
+ */
 export type ClientMessage = {
-  kind: "canvas";
-  /** PNG data URL of the student's work, with line numbers drawn in the margin. */
+  kind: "capture";
+  id: string;
+  reason: "done" | "request";
   png: string | null;
   lineCount: number;
 };
