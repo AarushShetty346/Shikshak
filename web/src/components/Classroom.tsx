@@ -14,6 +14,7 @@ import { useVoiceCall } from "../lib/useVoiceCall";
 import { Board, type BoardStatus, type Highlight, type Submission, type TutorBlock } from "./Board";
 import { DevPanel } from "./DevPanel";
 import { VoiceOrb, type VoiceState } from "./VoiceOrb";
+import { ArrowLeft, FileText, HandPalm, List, Microphone, MicrophoneSlash, Pause, PencilSimpleLine, Play, SignOut, UploadSimple } from "@phosphor-icons/react";
 
 function toBlock(e: BoardEvent, instant: boolean): TutorBlock | null {
   switch (e.type) {
@@ -357,27 +358,35 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
           onContextMenu={(e) => e.preventDefault()}
           title="Hold to talk (or hold Space)"
         >
-          🎙 {voice.talking ? "Listening…" : "Hold to talk"}
+          <Microphone weight={voice.talking ? "fill" : "bold"} /> {voice.talking ? "Listening…" : "Hold to talk"}
         </button>
       )}
       {active && teacherSpeaking && (
         <button className="btn-stop" onClick={stopTeacher} title="Stop the teacher and ask">
-          ✋ Stop
+          <HandPalm /> Stop
         </button>
       )}
       <button onClick={() => fileInput.current?.click()} disabled={uploading} aria-label="Upload material" title="Upload a PDF or photos of your book or notes">
-        {uploading ? <span className="spin" /> : <UploadIcon />}
+        {uploading ? <span className="spin" /> : <UploadSimple />}
       </button>
       <button className="btn-speed" onClick={cycleSpeed} title="Teacher's speaking speed">
         {SPEED_LABEL[speed]}
       </button>
       {live ? (
         <button className="btn-pause" onClick={pause} title="Pause the class (the board stays as it is)">
-          {voice.state === "active" ? "⏸ Pause" : "Connecting…"}
+          {voice.state === "active" ? (
+            <>
+              <Pause weight="fill" /> Pause
+            </>
+          ) : (
+            <>
+              <span className="spin" /> Connecting…
+            </>
+          )}
         </button>
       ) : (
         <button className="btn-start" onClick={startOrResume} title={started ? "Resume the class" : "Start the class"}>
-          ▶ {started ? "Resume" : "Start"}
+          <Play weight="fill" /> {started ? "Resume" : "Start"}
         </button>
       )}
     </>
@@ -408,12 +417,14 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
 
       <div className="session-menu">
         <button className="menu-button" onClick={() => setMenuOpen((o) => !o)} aria-expanded={menuOpen} aria-label="Session menu">
-          <span className="dot" data-on={connected} /> {meta.name}
+          <List className="menu-icon" />
+          <span className="menu-name">{meta.name}</span>
+          {!connected && <span className="offline">offline</span>}
         </button>
         {menuOpen && (
           <div className="menu" role="menu">
             <button role="menuitem" onClick={onHome}>
-              ← All sessions
+              <ArrowLeft /> All sessions
             </button>
             <button
               role="menuitem"
@@ -423,13 +434,14 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
                 setMenuOpen(false);
               }}
             >
-              Rename
+              <PencilSimpleLine /> Rename
             </button>
             <button role="menuitem" onClick={toggleHandsFree}>
-              {handsFree ? "Use push-to-talk" : "Hands-free (always listening)"}
+              {handsFree ? <MicrophoneSlash /> : <Microphone />} {handsFree ? "Use push-to-talk" : "Hands-free (always listening)"}
             </button>
             <div className="menu-docs">
-              {docs.length ? `Material: ${docs.map((d) => d.name).join(", ")}` : "No material uploaded yet"}
+              <FileText />
+              <span>{docs.length ? docs.map((d) => d.name).join(", ") : "No books or notes yet"}</span>
             </div>
             <button
               role="menuitem"
@@ -441,7 +453,7 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
                 }
               }}
             >
-              End session
+              <SignOut /> End session
             </button>
           </div>
         )}
@@ -454,11 +466,3 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
     </div>
   );
 }
-
-const UploadIcon = () => (
-  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 16V4" />
-    <path d="m6 10 6-6 6 6" />
-    <path d="M4 20h16" />
-  </svg>
-);
