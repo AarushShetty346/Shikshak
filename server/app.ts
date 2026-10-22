@@ -4,11 +4,13 @@ import { WebSocketServer } from "ws";
 import { VOICE_LANGUAGE, type ClientMessage, type Language, type ServerMessage } from "../shared/types";
 import { hasModel, modelName } from "./llm";
 import { randomUUID } from "node:crypto";
-import { noteInterrupt } from "./board";
-import { analyze, canLook } from "./look";
+import { lessonState, noteInterrupt } from "./board";
+import { reviewSubmission } from "./look";
+import { addDocs, docList } from "./material";
 import { makePlan, outlineFor } from "./plan";
 import { saveSample } from "./samples";
-import { emit, getOrCreate, hashPng, normalizeCode, resolve, touch } from "./sessions";
+import { emit, getOrCreate, hashPng, hydrate, normalizeCode, resolve, touch } from "./sessions";
+import type { StudyPlan } from "./plan";
 import { toolsRouter } from "./tools";
 
 /** "98765 43210" -> "+919876543210". Accepts full international numbers starting with +. */
@@ -25,6 +27,13 @@ export function toE164(raw: unknown): string | null {
 export function agentLanguage(userData: Record<string, unknown>): { agent_data?: { language: string } } {
   const lang = VOICE_LANGUAGE[userData.language as Language];
   return lang ? { agent_data: { language: lang } } : {};
+}
+
+/** Bolna can't change voice speed mid-call, so there's one agent per speed (set up by bolna:setup). */
+export function agentForSpeed(speed: unknown): string | undefined {
+  if (speed === "slower") return process.env.BOLNA_AGENT_ID_SLOW || undefined;
+  if (speed === "faster") return process.env.BOLNA_AGENT_ID_FAST || undefined;
+  return undefined;
 }
 
 export function createApp(opts: { devTools?: boolean } = {}) {
@@ -52,16 +61,19 @@ export function createApp(opts: { devTools?: boolean } = {}) {
       res.status(503).json({ error: "Voice is not set up yet: add BOLNA_API_KEY and BOLNA_AGENT_ID to .env" });
       return;
     }
-    const userData = req.body?.user_data ?? {};
+    const userData = { ...(req.body?.user_data ?? {}) };
     if (userData.session_code) {
       const s = getOrCreate(userData.session_code);
       if (userData.language) s.language = String(userData.language);
+      // Resuming after Pause: tell the tutor what's on the board and where the lesson was.
+      userData.lesson_state = lessonState(s) || "New class: nothing has been taught yet.";
+      userData.material = docList(s);
     }
     try {
       const r = await fetch("https://api.bolna.ai/web-call/session", {
         method: "POST",
         headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ agent_id: agentId, user_data: userData, ...agentLanguage(userData) }),
+        body: JSON.stringify({ agent_id: agentForSpeed(userData.speed) ?? agentId, user_data: userData, ...agentLanguage(userData) }),
       });
       const text = await r.text();
       res.status(r.status).type("application/json").send(text);
@@ -133,6 +145,23 @@ export function createApp(opts: { devTools?: boolean } = {}) {
     });
   }
 
+  // Upload material into a session (home screen or mid-lesson). Kept in memory for that session only.
+  app.post("/api/documents", (req, res) => {
+    const code = normalizeCode(req.body?.session_code);
+    if (!code) {
+      res.status(400).json({ error: "Missing session" });
+      return;
+    }
+    const s = getOrCreate(code);
+    const result = addDocs(s, Array.isArray(req.body?.files) ? req.body.files : []);
+    if (result.error) {
+      res.status(400).json({ error: result.error });
+      return;
+    }
+    touch(s);
+    res.json({ ok: true, docs: result.docs });
+  });
+
   app.post("/api/plan", async (req, res) => {
     if (!hasModel()) {
       res.status(503).json({ error: "Planner is not set up (no GEMINI_API_KEY or ANTHROPIC_API_KEY)." });
@@ -147,6 +176,7 @@ export function createApp(opts: { devTools?: boolean } = {}) {
       const code = normalizeCode(req.body?.session_code);
       if (code) {
         const s = getOrCreate(code);
+        if (Array.isArray(req.body?.files) && req.body.files.length && !s.docs.length) addDocs(s, req.body.files);
         s.study = { plan, section: 0, practice: 0, lastSectionAt: 0 };
         if (req.body?.language) s.language = String(req.body.language);
         // The plan opens the board. A new plan (e.g. after changing language) replaces the old one.
@@ -171,7 +201,7 @@ export function createApp(opts: { devTools?: boolean } = {}) {
         const s = getOrCreate(code);
         s.sockets.add(ws);
         touch(s);
-        const welcome: ServerMessage = { kind: "welcome", sessionCode: s.code, replay: s.history };
+        const welcome: ServerMessage = { kind: "welcome", sessionCode: s.code, replay: s.history, docs: s.docs.map(({ data: _d, ...meta }) => meta) };
         ws.send(JSON.stringify(welcome));
 
         ws.on("message", (raw) => {
@@ -179,6 +209,10 @@ export function createApp(opts: { devTools?: boolean } = {}) {
           try {
             msg = JSON.parse(String(raw));
           } catch {
+            return;
+          }
+          if (msg.kind === "hydrate") {
+            if (Array.isArray(msg.events)) hydrate(s, msg.events, (msg.study as StudyPlan | null) ?? null);
             return;
           }
           if (msg.kind === "interrupt") {
@@ -197,8 +231,8 @@ export function createApp(opts: { devTools?: boolean } = {}) {
             };
             s.capture = capture;
             touch(s);
-            // Start reading as soon as the student presses Done, so the tutor's look is instant.
-            if (capture.reason === "done" && canLook()) analyze(s, capture).catch((err) => console.error("[look] early analysis failed", err));
+            // Done: acknowledge, read it at once, and show the result (so the tutor's look is instant too).
+            if (capture.reason === "done") void reviewSubmission(s, capture);
           }
         });
         ws.on("close", () => s.sockets.delete(ws));

@@ -6,7 +6,8 @@ import express, { type Request, type Response } from "express";
 import { randomUUID } from "node:crypto";
 import { splitSteps } from "../shared/mathText";
 import { continueLesson, draw, erase, highlight, write } from "./board";
-import { analyze, canLook, EMPTY_LOOK } from "./look";
+import { analyze, canLook, EMPTY_LOOK, publishResult } from "./look";
+import { readMaterial, showPage } from "./material";
 import { boardMap, emit, freshCapture, nextLabel, recordBlock, resolve, touch, type Session } from "./sessions";
 
 type Params = Record<string, unknown>;
@@ -69,15 +70,8 @@ async function lookAtBoard(req: Request, res: Response) {
   try {
     const studentSaid = String(p.student_said ?? p.question ?? "").trim() || undefined;
     const result = await analyze(s, capture, studentSaid);
-    if ((result.status === "mistake" || result.status === "unreadable") && result.line) {
-      emit(s, {
-        type: "mark",
-        captureId: capture.id,
-        line: result.line,
-        note: result.status === "unreadable" ? "Can't read this line" : result.what_went_wrong,
-      });
-    } else if (result.status === "correct") emit(s, { type: "correct", captureId: capture.id, note: result.what_went_wrong });
-    else if (result.status === "empty") emit(s, { type: "unclear", note: "Nothing new written yet" });
+    publishResult(s, capture, result);
+    if (result.status === "empty") emit(s, { type: "unclear", note: "Nothing new written yet" });
     console.log(`[look] ${s.code} ${result.kind}/${result.status} line=${result.line} ${result.what_went_wrong}`);
     res.json(result);
   } catch (err) {
@@ -219,6 +213,14 @@ export function toolsRouter() {
   router.all("/highlight", boardAction(highlight));
   router.all("/erase", boardAction(erase));
   router.all("/continue_lesson", boardAction((s) => continueLesson(s)));
+
+  router.all("/read_material", async (req: Request, res: Response) => {
+    const p = readParams(req);
+    const s = resolve(p.session_code);
+    if (!s) return void res.json(NO_SESSION);
+    res.json(await readMaterial(s, String(p.question ?? "")));
+  });
+  router.all("/show_page", boardAction(showPage));
 
   router.all("/look_at_board", lookAtBoard);
   // Older agents call it check_work.

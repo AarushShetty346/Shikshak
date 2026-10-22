@@ -12,6 +12,8 @@ import { diagramPieces, type Diagram } from "../../../shared/diagram";
 import { groupIntoLines, strokeBox } from "../../../shared/lines";
 import type { ClientMessage, MarkStyle, Place, Point, SectionInfo, Stroke, WriteStyle, WrittenLine } from "../../../shared/types";
 import { makeSnapshot } from "../lib/snapshot";
+import { getDoc } from "../lib/docStore";
+import { renderPdfPage } from "../lib/files";
 import { DiagramView, diagramHeight } from "./DiagramView";
 import { MathText } from "./MathText";
 
@@ -32,7 +34,16 @@ export type TutorBlock =
   | { kind: "steps"; id: string; label?: string; title: string; steps: string[]; section?: SectionInfo; instant: boolean }
   | { kind: "problem"; id: string; label?: string; problem: string; instant: boolean }
   | { kind: "plan"; id: string; label?: string; title: string; items: string[]; instant: boolean }
-  | { kind: "page"; id: string; instant: boolean };
+  | { kind: "page"; id: string; instant: boolean }
+  | { kind: "source"; id: string; label: string; docId: string; docName: string; page: number | null; caption: string; instant: boolean };
+
+/** Where the student's latest Done submission is. */
+export interface Submission {
+  captureId: string | null;
+  state: "idle" | "submitting" | "reviewing" | "done" | "failed";
+  status?: string;
+  summary?: string;
+}
 
 export interface Highlight {
   id: string;
@@ -60,16 +71,23 @@ interface Props {
   teacherSpeaking: boolean;
   /** Increments when the student interrupts (pause unfinished writing) / the tutor resumes. */
   holdTick: number;
+  /** Class paused: freeze half-written work until resumed. */
+  paused: boolean;
+  submission: Submission;
   resumeTick: number;
   send: (msg: ClientMessage) => void;
-  /** Student pressed Done: tell the tutor to look. */
-  onDone: () => void;
+  /** Student pressed Done (with the id of the work just sent): tell the tutor to look. */
+  onDone: (captureId: string) => void;
   /** Extra toolbar buttons (start/end class, ask doubt). */
   toolbarExtra?: ReactNode;
 }
 
 interface Saved {
-  strokes: Stroke[];
+  strokes: TimedStroke[];
+  /** When each tutor block first appeared, to tell which writing came after a question. */
+  arrivals?: Record<string, number>;
+  /** Time of the last Done, for work written without a question on the board. */
+  lastDoneAt?: number;
   /** For each tutor block: the lowest ink in its column when it arrived, so it goes below it. */
   floors: Record<string, number>;
   /** Page width in board units, fixed for the session. */
@@ -77,11 +95,14 @@ interface Saved {
 }
 
 let strokeCounter = 0;
+
+/** A stroke plus when it was written (ms), so Done can send "what I wrote since the question". */
+type TimedStroke = Stroke & { t?: number };
 const newId = () => (crypto.randomUUID ? crypto.randomUUID() : `id${Date.now()}${Math.random()}`);
 
 function loadSaved(code: string): Saved {
   try {
-    const raw = sessionStorage.getItem(`shikshak.board.${code}`);
+    const raw = localStorage.getItem(`shikshak.board.${code}`);
     if (raw) return JSON.parse(raw) as Saved;
   } catch {
     // storage blocked or corrupt: start empty
@@ -123,7 +144,9 @@ export function Board(props: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const saved = useMemo(() => loadSaved(sessionCode), [sessionCode]);
 
-  const [strokes, setStrokes] = useState<Stroke[]>(saved.strokes);
+  const [strokes, setStrokes] = useState<TimedStroke[]>(saved.strokes);
+  const arrivals = useRef<Record<string, number>>(saved.arrivals ?? {});
+  const lastDoneAt = useRef<number>(saved.lastDoneAt ?? 0);
   const floors = useRef<Record<string, number>>(saved.floors);
   const unitsW = useRef<number | undefined>(saved.w);
   const [heights, setHeights] = useState<Record<string, number>>({});
@@ -138,7 +161,7 @@ export function Board(props: Props) {
 
   const strokesRef = useRef(strokes);
   strokesRef.current = strokes;
-  const drawing = useRef<Stroke | null>(null);
+  const drawing = useRef<TimedStroke | null>(null);
   const activePointer = useRef<number | null>(null);
   const touches = useRef(new Map<number, { x: number; y: number }>());
   const panning = useRef<{ y: number } | null>(null);
@@ -170,17 +193,18 @@ export function Board(props: Props) {
 
   // ---------- layout ----------
   for (const b of blocks) {
+    if (arrivals.current[b.id] === undefined) arrivals.current[b.id] = b.instant ? 0 : Date.now();
     if (floors.current[b.id] === undefined) {
       const col = columnOf(b) === "side" ? side : main;
       floors.current[b.id] = b.kind === "page" ? inkBottom(strokesRef.current) : inkBottom(strokesRef.current, col.x0, col.x1);
     }
   }
   const estimate = (b: TutorBlock, width: number) =>
-    b.kind === "draw" ? diagramHeight(b.diagram, width) + 40 : b.kind === "page" ? 40 : 60 + piecesOf(b) * 46;
+    b.kind === "draw" ? diagramHeight(b.diagram, width) + 40 : b.kind === "page" ? 40 : b.kind === "source" ? width * 0.9 : 60 + piecesOf(b) * 46;
 
   const layout = useMemo(() => {
     const pos: Record<string, { x: number; y: number; w: number }> = {};
-    const byLabel: Record<string, { x: number; y: number; w: number }> = {};
+    const byLabel: Record<string, { x: number; y: number; w: number; h: number }> = {};
     let mainBottom = 0;
     let sideBottom = 0;
     let lastMainTop = 0;
@@ -190,7 +214,9 @@ export function Board(props: Props) {
       const box = col === "side" ? side : main;
       const w = b.kind === "page" ? W - PAD_L - PAD_R : box.x1 - box.x0;
       const h = heights[b.id] ?? estimate(b, w);
-      const reuse = "replaces" in b && b.replaces ? byLabel[b.replaces] : undefined;
+      // Write over a rubbed-out block's spot only if the new content fits there; otherwise go below.
+      const old = "replaces" in b && b.replaces ? byLabel[b.replaces] : undefined;
+      const reuse = old && h <= old.h + 12 ? old : undefined;
       let p: { x: number; y: number; w: number };
       if (reuse) p = reuse;
       else if (b.kind === "page") p = { x: PAD_L, y: Math.max(mainBottom, sideBottom, floor) + PAGE_GAP, w };
@@ -198,7 +224,7 @@ export function Board(props: Props) {
       else p = { x: box.x0, y: Math.max(mainBottom ? mainBottom + GAP : TOP, floor ? floor + GAP : TOP), w };
       pos[b.id] = p;
       const label = blockLabel(b);
-      if (label) byLabel[label] = p;
+      if (label) byLabel[label] = { ...p, h };
       const bottom = p.y + h;
       if (b.kind === "page") {
         mainBottom = sideBottom = bottom;
@@ -216,21 +242,15 @@ export function Board(props: Props) {
   const contentBottom = Math.max(layout.bottom, inkBottom(strokes));
   const pageHeightUnits = contentBottom + (view.h / scale) * 0.85 + 60;
 
-  // The student's current answer area: below the latest problem / "your turn" (or the latest block).
-  const regionTop = useMemo(() => {
-    let top = 0;
-    let lastBottom = 0;
-    for (const b of blocks) {
-      const p = layout.pos[b.id];
-      if (!p) continue;
-      const bottom = p.y + (heights[b.id] ?? 0);
-      if (b.kind === "page" || b.kind === "problem" || (b.kind === "write" && b.style === "your_turn")) top = bottom;
-      lastBottom = Math.max(lastBottom, bottom);
-    }
-    return top || lastBottom;
-  }, [blocks, layout, heights]);
+  // The latest question (problem / "your turn") and where it ends, for the "write here" hint.
+  const latestQuestion = [...blocks].reverse().find((b) => b.kind === "problem" || (b.kind === "write" && b.style === "your_turn"));
+  const regionTop = latestQuestion ? (layout.pos[latestQuestion.id]?.y ?? 0) + (heights[latestQuestion.id] ?? 0) : 0;
 
-  const response = useMemo(() => strokes.filter((s) => strokeBox(s).y >= regionTop - 12), [strokes, regionTop]);
+  // The student's answer: everything written since the latest question appeared (wherever it is on
+  // the board), or since the last Done if there's no question. Earlier this used position ("below the
+  // question"), which ignored work written beside or above it, so Done looked broken.
+  const since = latestQuestion ? Math.max(arrivals.current[latestQuestion.id] ?? 0, 1) : lastDoneAt.current;
+  const response = useMemo(() => strokes.filter((s) => (s.t ?? 0) > since || (!s.t && !latestQuestion && !since)), [strokes, since, latestQuestion]);
   const lines = useMemo(() => groupIntoLines(response), [response]);
   const responseKey = response.map((s) => s.id).join(",");
 
@@ -264,14 +284,15 @@ export function Board(props: Props) {
     });
   }, [blocks]);
 
-  const live = useRef({ callActive: props.callActive, teacherSpeaking: props.teacherSpeaking, blocks, revealed, held });
-  live.current = { callActive: props.callActive, teacherSpeaking: props.teacherSpeaking, blocks, revealed, held };
+  const live = useRef({ callActive: props.callActive, teacherSpeaking: props.teacherSpeaking, paused: props.paused, blocks, revealed, held });
+  live.current = { callActive: props.callActive, teacherSpeaking: props.teacherSpeaking, paused: props.paused, blocks, revealed, held };
   const speech = useRef({ talk: 0, quiet: 0, sinceHold: 0, blocksAtHold: 0 });
 
   useEffect(() => {
     const TICK = 0.2;
     const id = setInterval(() => {
-      const { callActive, teacherSpeaking, blocks: bs, revealed: rv, held: hd } = live.current;
+      const { callActive, teacherSpeaking, paused, blocks: bs, revealed: rv, held: hd } = live.current;
+      if (paused) return; // class paused: nothing moves until Resume
       const sp = speech.current;
       // A held lesson resumes by itself if the tutor simply carries on talking without new writing.
       if (hd.size) {
@@ -344,7 +365,10 @@ export function Board(props: Props) {
   useEffect(() => {
     const t = setTimeout(() => {
       try {
-        sessionStorage.setItem(`shikshak.board.${sessionCode}`, JSON.stringify({ strokes, floors: floors.current, w: unitsW.current }));
+        localStorage.setItem(
+          `shikshak.board.${sessionCode}`,
+          JSON.stringify({ strokes, floors: floors.current, w: unitsW.current, arrivals: arrivals.current, lastDoneAt: lastDoneAt.current }),
+        );
       } catch {
         // storage full or blocked: the board still works, it just won't survive a reload
       }
@@ -440,6 +464,7 @@ export function Board(props: Props) {
       captures.current.set(id, lines);
       if (captures.current.size > 20) captures.current.delete(captures.current.keys().next().value!);
       send({ kind: "capture", id, reason, png: makeSnapshot(response, lines), lineCount: lines.length });
+      return id;
     },
     [lines, response, send],
   );
@@ -449,11 +474,10 @@ export function Board(props: Props) {
   }, [captureTick]);
 
   const done = () => {
-    capture("done");
+    const id = capture("done");
     setLastDone(responseKey);
-    onDone();
-    setToast("Sent to your teacher. Keep talking if you want to explain.");
-    setTimeout(() => setToast(null), 3500);
+    if (!latestQuestion) lastDoneAt.current = Date.now();
+    onDone(id);
   };
 
   // ---------- touch handling: block page scroll/zoom under the pen (iOS) ----------
@@ -495,6 +519,7 @@ export function Board(props: Props) {
       return;
     }
     lastDrawAt.current = Date.now();
+    stroke.t = Date.now();
     setStrokes((prev) => [...prev, stroke]);
   };
 
@@ -599,8 +624,11 @@ export function Board(props: Props) {
     return set;
   }, [erased, blocks]);
 
-  const canDone = response.length > 0 && responseKey !== lastDone;
-  const latestQuestion = [...blocks].reverse().find((b) => b.kind === "problem" || (b.kind === "write" && b.style === "your_turn"));
+  const sub = props.submission;
+  const busy = sub.state === "submitting" || sub.state === "reviewing";
+  const canDone = response.length > 0 && responseKey !== lastDone && !busy;
+  const doneLabel =
+    sub.state === "submitting" ? "Sending…" : sub.state === "reviewing" ? "Teacher reading…" : canDone ? "✓ Done" : sub.state === "done" && responseKey === lastDone ? "✓ Seen" : "✓ Done";
 
   return (
     <div className="board" ref={wrapRef} data-tool={tool}>
@@ -618,7 +646,7 @@ export function Board(props: Props) {
                 data-held={held.has(b.id)}
                 style={{ top: px(p.y), left: px(p.x), width: px(p.w) }}
               >
-                <BlockBody block={b} shown={revealed[b.id] ?? (b.instant ? piecesOf(b) : 1)} width={p.w} currentSection={currentSection} />
+                <BlockBody block={b} shown={revealed[b.id] ?? (b.instant ? piecesOf(b) : 1)} width={p.w} currentSection={currentSection} sessionCode={sessionCode} />
               </div>
             );
           })}
@@ -639,17 +667,6 @@ export function Board(props: Props) {
               </span>
             );
           })}
-
-          {lines.map((l) => (
-            <span
-              key={l.index}
-              className="line-number"
-              data-marked={mark?.line === l.index && !!markedLine}
-              style={{ top: px(l.box.y + l.box.h / 2), left: px(Math.max(0, l.box.x - PAD_L)), width: px(PAD_L - 6) }}
-            >
-              {l.index}
-            </span>
-          ))}
 
           {markedLine && <MarkCircle box={markedLine.box} index={markedLine.index} note={mark!.note} scale={scale} faded={drewSinceMark} />}
           {correctAt && status === "correct" && (
@@ -697,6 +714,7 @@ export function Board(props: Props) {
         </button>
       )}
       {toast && <div className="board-toast" role="status">{toast}</div>}
+      {sub.state !== "idle" && <SubmissionCard sub={sub} onRetry={done} canRetry={response.length > 0} />}
 
       <div className="board-tools" role="toolbar" aria-label="Board tools">
         <button className={tool === "pen" ? "on" : ""} onClick={() => setTool("pen")} aria-label="Pen" title="Pen">
@@ -719,8 +737,8 @@ export function Board(props: Props) {
         >
           <TrashIcon />
         </button>
-        <button className="btn-done" onClick={done} disabled={!canDone} title="Send my work to the teacher">
-          ✓ Done
+        <button className="btn-done" data-ready={canDone} data-state={sub.state} onClick={done} disabled={!canDone} title="Send what I wrote to the teacher">
+          {doneLabel}
         </button>
         {toolbarExtra && <span className="tools-sep" aria-hidden="true" />}
         {toolbarExtra}
@@ -745,7 +763,7 @@ function RLine({ n, shown, children, as = "li" }: { n: number; shown: number; ch
   );
 }
 
-function BlockBody({ block, shown, width, currentSection }: { block: TutorBlock; shown: number; width: number; currentSection: number | null }) {
+function BlockBody({ block, shown, width, currentSection, sessionCode }: { block: TutorBlock; shown: number; width: number; currentSection: number | null; sessionCode: string }) {
   switch (block.kind) {
     case "page":
       return <div className="page-rule" />;
@@ -773,6 +791,8 @@ function BlockBody({ block, shown, width, currentSection }: { block: TutorBlock;
           </p>
         </>
       );
+    case "source":
+      return <SourcePage block={block} sessionCode={sessionCode} />;
     case "draw":
       return (
         <>
@@ -940,3 +960,56 @@ const TrashIcon = () => (
     <path d="m19 6-1 14H6L5 6" />
   </svg>
 );
+
+/** A real page of the student's uploaded material on the board, with its source. */
+function SourcePage({ block, sessionCode }: { block: Extract<TutorBlock, { kind: "source" }>; sessionCode: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const doc = await getDoc(sessionCode, block.docId).catch(() => undefined);
+      if (!doc) throw new Error("This file isn't on this device.");
+      const url = doc.mediaType === "application/pdf" ? await renderPdfPage(doc.data, block.page ?? 1) : `data:${doc.mediaType};base64,${doc.data}`;
+      if (!cancelled) setSrc(url);
+    })().catch((err) => !cancelled && setError((err as Error).message || "Couldn't open this page."));
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionCode, block.docId, block.page]);
+  return (
+    <figure className="source-page" data-line={1}>
+      {src ? <img className="hl-text" src={src} alt={`${block.docName}${block.page ? `, page ${block.page}` : ""}`} /> : <div className="source-wait">{error ?? "Opening the page…"}</div>}
+      <figcaption>
+        📖 {block.docName}
+        {block.page ? ` · page ${block.page}` : ""}
+        {block.caption ? ` · ${block.caption}` : ""}
+      </figcaption>
+    </figure>
+  );
+}
+
+/** Tells the student exactly where their Done submission is. */
+function SubmissionCard({ sub, onRetry, canRetry }: { sub: Submission; onRetry: () => void; canRetry: boolean }) {
+  const title =
+    sub.state === "submitting"
+      ? "Sending your work…"
+      : sub.state === "reviewing"
+        ? "Your teacher has it and is reading it…"
+        : sub.state === "failed"
+          ? "Didn't reach your teacher"
+          : sub.status === "correct"
+            ? "✓ Your teacher checked it"
+            : "Your teacher has read it";
+  return (
+    <div className="submission" data-state={sub.state} data-status={sub.status ?? ""} role="status" aria-live="polite">
+      <strong>{title}</strong>
+      {sub.summary && <span>{sub.summary}</span>}
+      {sub.state === "failed" && canRetry && (
+        <button onClick={onRetry} className="submission-retry">
+          Try again
+        </button>
+      )}
+    </div>
+  );
+}

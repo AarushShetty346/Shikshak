@@ -35,6 +35,18 @@ export interface Session {
   interrupt: { at: number; label: string | null; summary: string; section: number | null } | null;
   /** Board events, replayed when the tab reconnects. */
   history: BoardEvent[];
+  /** Material the student uploaded in this session (kept in memory, never shared across sessions). */
+  docs: SessionDoc[];
+}
+
+export interface SessionDoc {
+  id: string;
+  name: string;
+  mediaType: string;
+  /** base64 */
+  data: string;
+  pages: number | null;
+  uploadedAt: number;
 }
 
 export interface BoardBlock {
@@ -88,6 +100,7 @@ export function getOrCreate(code: string): Session {
       blocks: [],
       interrupt: null,
       history: [],
+      docs: [],
     };
     sessions.set(key, s);
   }
@@ -95,19 +108,45 @@ export function getOrCreate(code: string): Session {
 }
 
 /**
- * Finds the session a tool call belongs to. The agent should pass the exact code (Bolna fills it
- * in from the prompt variable), but if it is mangled we fall back to the most recently active
- * session that has a browser connected, so a one-student demo can't break on a typo.
+ * Finds the session a tool call belongs to: exact code only. (An earlier version fell back to
+ * "the latest connected tab", which let a late tool call from an old lesson land on a new one.
+ * Bolna fills the code in from the prompt variable, so an exact match is reliable.)
  */
 export function resolve(code: unknown): Session | null {
-  const exact = sessions.get(normalizeCode(code));
-  if (exact) return exact;
-  let best: Session | null = null;
-  for (const s of sessions.values()) {
-    if (s.sockets.size === 0) continue;
-    if (!best || s.lastActive > best.lastActive) best = s;
+  return sessions.get(normalizeCode(code)) ?? null;
+}
+
+/**
+ * Rebuilds a session from what the browser saved, after a server restart. Only used when the
+ * server has nothing for this session, so it can never overwrite a live lesson.
+ */
+export function hydrate(s: Session, events: BoardEvent[], study: StudyPlan | null) {
+  if (s.history.length || s.blocks.length) return false;
+  for (const e of events.slice(-HISTORY_LIMIT)) {
+    s.history.push(e);
+    if ("label" in e && e.label && (e.type === "write" || e.type === "draw" || e.type === "steps" || e.type === "problem" || e.type === "plan" || e.type === "source")) {
+      const lines = e.type === "write" ? e.lines : e.type === "steps" ? e.steps : [];
+      const summary =
+        e.type === "write" || e.type === "steps"
+          ? lines.join(" / ")
+          : e.type === "problem"
+            ? e.problem
+            : e.type === "plan"
+              ? e.title
+              : e.type === "source"
+                ? `${e.docName} page ${e.page ?? "-"}`
+                : e.caption;
+      s.blocks.push({ label: e.label, kind: e.type === "write" ? e.style : e.type, summary: summary.slice(0, 120), lines: Math.max(1, lines.length), erased: false });
+    }
+    if (e.type === "erase") {
+      const b = s.blocks.find((x) => x.label === e.target);
+      if (b) b.erased = true;
+    }
+    if (e.type === "page") for (const b of s.blocks) b.erased = true;
+    if (e.type === "problem") s.problem = { text: e.problem };
   }
-  return best;
+  if (study && !s.study) s.study = { plan: study, section: 0, practice: 0, lastSectionAt: 0 };
+  return true;
 }
 
 export function touch(s: Session) {
@@ -117,11 +156,11 @@ export function touch(s: Session) {
 const HISTORY_LIMIT = 120;
 
 export function emit(s: Session, event: BoardEvent) {
-  if (event.type !== "checking" && event.type !== "unclear") s.history.push(event);
+  if (event.type !== "checking" && event.type !== "unclear" && event.type !== "review") s.history.push(event);
   if (s.history.length > HISTORY_LIMIT) s.history.splice(0, s.history.length - HISTORY_LIMIT);
   if (event.type === "steps") s.recentBoard = [...s.recentBoard, ...(event.title ? [event.title] : []), ...event.steps].slice(-12);
   if (event.type === "problem") s.recentBoard = [`Problem: ${event.problem}`];
-  const msg: ServerMessage = { kind: "board", event };
+  const msg: ServerMessage = { kind: "board", sessionCode: s.code, event };
   const data = JSON.stringify(msg);
   for (const ws of s.sockets) {
     if (ws.readyState === ws.OPEN) ws.send(data);

@@ -21,6 +21,11 @@ services:
       # Not secret: useless without BOLNA_API_KEY, which stays in Render's dashboard.
       - key: BOLNA_AGENT_ID
         value: "7438fadd-ad12-411c-9e31-fb9ad976ecbd"
+      # The same teacher at a slower and a faster voice (the speed button picks one per call).
+      - key: BOLNA_AGENT_ID_SLOW
+        value: "640fa0f4-510e-4f56-91aa-e5bc2da409d4"
+      - key: BOLNA_AGENT_ID_FAST
+        value: "6ab6f015-fc04-491e-beba-df2d6da1206a"
       - key: PUBLIC_URL
         value: "https://shikshak-o0l8.onrender.com"
       - key: TOOLS_TOKEN

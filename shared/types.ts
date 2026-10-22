@@ -52,6 +52,10 @@ export type BoardEvent =
   | { type: "erase"; target: string }
   /** The doubt is answered: continue writing what was paused. */
   | { type: "resume" }
+  /** A real page of the student's uploaded material, shown on the board with its source. */
+  | { type: "source"; id: string; label: string; docId: string; docName: string; page: number | null; caption: string }
+  /** Progress of a Done submission: received by the server, read, or failed. */
+  | { type: "review"; captureId: string; state: "received" | "done" | "failed"; status?: string; summary?: string }
   /** The tutor is looking at the student's latest work; the browser replies with a capture. */
   | { type: "checking" }
   /** Circle a line of a capture the student sent. */
@@ -59,10 +63,20 @@ export type BoardEvent =
   | { type: "correct"; captureId: string | null; note: string }
   | { type: "unclear"; note: string };
 
+/** An uploaded file in a session, without its contents. */
+export interface DocMeta {
+  id: string;
+  name: string;
+  mediaType: string;
+  pages: number | null;
+  uploadedAt: number;
+}
+
 /** Server -> browser WebSocket messages. */
 export type ServerMessage =
-  | { kind: "welcome"; sessionCode: string; replay: BoardEvent[] }
-  | { kind: "board"; event: BoardEvent };
+  | { kind: "welcome"; sessionCode: string; replay: BoardEvent[]; docs?: DocMeta[] }
+  /** sessionCode lets the browser drop anything that isn't for the session it has open. */
+  | { kind: "board"; sessionCode: string; event: BoardEvent };
 
 /**
  * Browser -> server: the student's latest work, as a PNG with line numbers in the margin.
@@ -76,8 +90,13 @@ export type ClientMessage =
       png: string | null;
       lineCount: number;
     }
-  /** The student interrupted (Ask Doubt button, or started talking over the tutor). */
-  | { kind: "interrupt"; reason: "doubt" | "speech" };
+  /** The student interrupted (Stop button, or pressed Talk while the tutor was speaking). */
+  | { kind: "interrupt"; reason: "doubt" | "speech" }
+  /**
+   * Restores a saved session after a server restart: the board events and study plan the browser
+   * kept. The server only adopts them if it has nothing for this session.
+   */
+  | { kind: "hydrate"; events: BoardEvent[]; study: unknown };
 
 export type Language = "hi" | "hinglish" | "en";
 
@@ -91,8 +110,18 @@ export const LANGUAGE_NAMES: Record<Language, string> = {
 export const VOICE_LANGUAGE: Record<Language, "hi" | "en"> = { hi: "hi", hinglish: "hi", en: "en" };
 
 /** The tutor's first sentence, already in the student's language (sent as {{greeting}}). */
-export function greetingFor(language: Language, name: string, topic: string): string {
+export function greetingFor(language: Language, name: string, topic: string, resuming = false): string {
   const who = name && name !== "student" ? ` ${name}` : "";
+  if (resuming) {
+    switch (language) {
+      case "hi":
+        return `वापस स्वागत है${who}! चलिए, जहाँ रुके थे वहीं से आगे पढ़ते हैं।`;
+      case "en":
+        return `Welcome back${who}! Let's pick up where we left off.`;
+      default:
+        return `Welcome back${who}! Chalo, jahan ruke the wahin se aage badhte hain.`;
+    }
+  }
   switch (language) {
     case "hi":
       return `नमस्ते${who}! मैं आपकी मैथ्स टीचर हूँ। आज हम ${topic} पढ़ेंगे। शुरू करें?`;

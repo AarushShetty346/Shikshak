@@ -359,6 +359,96 @@
   }
 }
 
+// ----- read_material -----
+{
+  "name": "read_material",
+  "description": "Ask the student's uploaded material (their textbook chapter PDF, notes or worksheet) a question. Answers come only from the actual pages, with page numbers, or say it isn't there. Use it when they mention their book or notes, ask about a page or figure, or right after they upload something ('dtmf_number: 4'). Never invent book content or page numbers.",
+  "pre_call_message": {
+    "hi": "एक सेकंड, आपकी किताब देखती हूँ।",
+    "en": "One second, let me check your book."
+  },
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "session_code": {
+        "type": "string",
+        "description": "The session code from the prompt. Always pass it exactly."
+      },
+      "question": {
+        "type": "string",
+        "description": "What to look up, e.g. 'definition of common difference', 'which page has the circuit diagram', or 'what does this cover'."
+      }
+    },
+    "required": [
+      "session_code",
+      "question"
+    ]
+  },
+  "key": "custom_task",
+  "value": {
+    "method": "POST",
+    "param": {
+      "session_code": "%(session_code)s",
+      "question": "%(question)s"
+    },
+    "url": "https://shikshak-o0l8.onrender.com/tools/read_material",
+    "api_token": null,
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}
+
+// ----- show_page -----
+{
+  "name": "show_page",
+  "description": "Put a real page of the student's uploaded material on the board (with its source), e.g. the page with the figure you're about to explain. Then point at it with highlight using the label it returns.",
+  "pre_call_message": {
+    "hi": "यह देखो, आपकी किताब का पेज।",
+    "en": "Here's the page from your book."
+  },
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "session_code": {
+        "type": "string",
+        "description": "The session code from the prompt. Always pass it exactly."
+      },
+      "page": {
+        "type": "string",
+        "description": "Page number in the PDF (first page = 1). For a photo, 1."
+      },
+      "document": {
+        "type": "string",
+        "description": "Optional: which file (its number or part of its name) if they uploaded several."
+      },
+      "caption": {
+        "type": "string",
+        "description": "Optional short caption, e.g. 'Fig 12.3 circuit'."
+      }
+    },
+    "required": [
+      "session_code",
+      "page"
+    ]
+  },
+  "key": "custom_task",
+  "value": {
+    "method": "POST",
+    "param": {
+      "session_code": "%(session_code)s",
+      "page": "%(page)s",
+      "document": "%(document)s",
+      "caption": "%(caption)s"
+    },
+    "url": "https://shikshak-o0l8.onrender.com/tools/show_page",
+    "api_token": null,
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}
+
 // ----- give_practice -----
 {
   "name": "give_practice",

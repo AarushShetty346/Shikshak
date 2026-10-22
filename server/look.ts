@@ -4,7 +4,7 @@
 
 import { languageName } from "./claude";
 import { askJson, dataUrlToAttachment, hasModel } from "./llm";
-import type { Capture, Session } from "./sessions";
+import { emit, type Capture, type Session } from "./sessions";
 
 export interface LookResult {
   /** What the student put on the board. */
@@ -131,4 +131,55 @@ export function analyze(s: Session, capture: Capture, studentSaid?: string): Pro
   job.catch(() => s.analyses.delete(capture.hash));
   if (s.analyses.size > 30) s.analyses.delete(s.analyses.keys().next().value!);
   return job;
+}
+
+/** Puts a reading on the board: circle the wrong line, stamp a correct answer, or explain. */
+export function publishResult(s: Session, capture: Capture, result: LookResult) {
+  if ((result.status === "mistake" || result.status === "unreadable") && result.line) {
+    emit(s, {
+      type: "mark",
+      captureId: capture.id,
+      line: result.line,
+      note: result.status === "unreadable" ? "Can't read this line" : result.what_went_wrong,
+    });
+  } else if (result.status === "correct") emit(s, { type: "correct", captureId: capture.id, note: result.what_went_wrong });
+}
+
+/** One-line summary of a reading for the student's feedback card. */
+export function feedbackSummary(result: LookResult): string {
+  const read = result.reading.split(/\r?\n/).slice(0, 3).join("  ·  ");
+  switch (result.status) {
+    case "correct":
+      return `Correct. ${read}`;
+    case "mistake":
+      return `Step ${result.line ?? "?"} needs a look: ${result.what_went_wrong}`;
+    case "incomplete":
+      return `On the right track so far. ${read}`;
+    case "unreadable":
+      return `Couldn't read line ${result.line ?? "?"}. Rewrite it a little bigger?`;
+    case "empty":
+      return "Nothing new to read yet.";
+    default:
+      return result.what_went_wrong || read || "Read your work.";
+  }
+}
+
+/**
+ * The Done protocol on the server: acknowledge receipt at once, read the work, publish the result
+ * to the board (so the student sees it even before the tutor speaks), and report failure clearly.
+ */
+export async function reviewSubmission(s: Session, capture: Capture) {
+  emit(s, { type: "review", captureId: capture.id, state: "received" });
+  if (!canLook()) {
+    emit(s, { type: "review", captureId: capture.id, state: "failed", summary: "The board reader isn't set up on the server." });
+    return;
+  }
+  try {
+    const result = await analyze(s, capture);
+    publishResult(s, capture, result);
+    emit(s, { type: "review", captureId: capture.id, state: "done", status: result.status, summary: feedbackSummary(result) });
+  } catch (err) {
+    console.error("[look] review failed", err);
+    emit(s, { type: "review", captureId: capture.id, state: "failed", summary: "Couldn't read it just now. Tap Done again." });
+  }
 }

@@ -22,10 +22,23 @@ Browser                                Server (Node, one process)               
  └─ Voice (Bolna Web Call SDK, Soniox speech-to-text, Sarvam voice) ◀─────▶ live audio
 ```
 
-- **One board for both.** The page is 640 board units wide and scales to the screen, so the tutor's writing
+- **Sessions.** The home screen lists the student's classes, like chats (for example "Maths: AP" and
+  "Physics: Electricity"). Each has its own board, handwriting, plan and files, kept in the browser and re-sent to
+  the server after a restart. Opening another session stops the call and closes the old board first; the server
+  never routes a tool call to a session other than the one named in it.
+- **Start / Pause / Resume.** One button. Pause ends the (billed) call but keeps the board; Resume starts a new call
+  that's told where the lesson stopped.
+- **Push-to-talk.** The mic is muted except while **Hold to talk** (or Space) is held, so room noise doesn't
+  interrupt. **Stop teacher** cuts the tutor off to ask something. Hands-free is in the session menu.
+- **Books and notes.** Upload a PDF or photos before or during a class. The tutor gets `read_material` (answers only
+  from the pages, with page numbers) and `show_page` (puts the real page on the board, labelled with its source).
+- **Speed.** Slower / normal / faster voice (0.95×, 1.1×, 1.3×). Bolna can't change speed mid-call, so each is its
+  own agent and the choice applies from the next Start or Resume.
+- **One board for both.** The page width is fixed per session in board units and scales to the screen and scales to the screen, so the tutor's writing
   and the student's ink line up the same on a phone and a laptop. Tutor blocks stack below whatever is
   already written; only the visible part of the ink is drawn.
-- **Done.** Sends the student's work below the latest question as a line-numbered image, and starts the
+- **Done.** Sends what the student wrote since the latest question (wherever they wrote it) as a line-numbered
+  image (the numbers are only in the image), shows Sending → Teacher reading → Seen, and starts the
   model reading it right away. It also sends a keypad tone through the call; with `dtmf_enabled`, Bolna hands
   it to the tutor as `dtmf_number: 1`, and the prompt tells the tutor to call `look_at_board`. Saying "dekho"
   works too.
@@ -35,7 +48,7 @@ Browser                                Server (Node, one process)               
   on the board one at a time (`show_section`) and practice problems whose answers stay on the server
   (`give_practice`, checked by `look_at_board`).
 - **Turn-taking.** Soniox detects when the student has finished a thought instead of a fixed silence timer;
-  the tutor stops after one word from the student.
+  in hands-free mode the tutor stops after two words from the student.
 - See [PLAN.md](PLAN.md) for the plan, schedule, and risks.
 
 ## Run it locally
@@ -62,15 +75,13 @@ same calls the voice agent makes, and the fake checker always flags line 2.
    ```bash
    npm run bolna:setup
    ```
-   This creates the agent with the prompt, welcome message, voices (Sarvam, Hindi), the four board tools, and call
-   limits suited to a class (20-minute calls, 2 minutes of silence allowed while the student writes). It saves
-   `BOLNA_AGENT_ID` to `.env`; copy it into Render's settings too. Run it again any time to push prompt changes.
+   This creates three agents (normal, slower, faster voice) with the prompt, welcome message, voices (Sarvam), the
+   board and book tools, and call limits suited to a class (20-minute calls, 2.5 minutes of silence allowed while
+   the student writes). It saves `BOLNA_AGENT_ID`, `BOLNA_AGENT_ID_SLOW` and `BOLNA_AGENT_ID_FAST` to `.env`; copy
+   them into Render's settings too (render.yaml has ours). Run it again any time to push prompt changes.
    `npm run bolna:setup -- --dry` shows what it would send.
 4. **Try it.** Open the Render URL with `?dev=1`. The status line should read Voice ✓, Checker ✓, Public URL ✓.
 5. **Measure the checker** before trusting it in a demo (below).
-
-If the web call isn't enabled yet, the **Use my phone instead** link under Start has Bolna ring the student's phone
-(your Bolna account needs a phone number); the board keeps working in the browser.
 
 To set the agent up by hand instead: paste [bolna/agent-prompt.md](bolna/agent-prompt.md) into the dashboard and
 add each tool printed by `npm run bolna:tools`. Raise the call limit and the silence timeout, or Bolna hangs up
@@ -98,7 +109,8 @@ if something breaks live.
 | --- | --- |
 | `GEMINI_API_KEY` | Checking work and making lesson plans. Free tier. Model `gemini-3-flash-preview`, with automatic fallback to other Flash models when Google says it's busy; override with `GEMINI_MODEL` |
 | `ANTHROPIC_API_KEY` | Paid alternative, used only when `GEMINI_API_KEY` is empty (`claude-opus-5-5`, override with `CLAUDE_MODEL`) |
-| `BOLNA_API_KEY`, `BOLNA_AGENT_ID` | Starting web calls and phone calls |
+| `BOLNA_API_KEY`, `BOLNA_AGENT_ID` | Starting web calls |
+| `BOLNA_AGENT_ID_SLOW`, `BOLNA_AGENT_ID_FAST` | Optional. The slower and faster voice; without them every speed uses the normal agent |
 | `PUBLIC_URL` | Public HTTPS URL of the server; the agent's tools call it |
 | `TOOLS_TOKEN` | Optional. If set, tool calls must send `Authorization: Bearer <token>` (set before `bolna:setup`) |
 | `FAKE_CHECKER` | `1` to fake the checker for UI work |
