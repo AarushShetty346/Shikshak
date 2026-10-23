@@ -16,7 +16,7 @@ import { allow } from "./limits";
 import { analyze, canLook, EMPTY_LOOK, isCurrent, publishResult } from "./look";
 import { readMaterial, showPage } from "./material";
 import { awaitCapture, boardMap, emit, nextLabel, recordBlock, resolve, signal, touch, type Session } from "./sessions";
-import { teachingTools } from "./teaching";
+import { afterReview, revealsAnswer, teachingTools } from "./teaching";
 
 type Params = Record<string, unknown>;
 
@@ -36,6 +36,12 @@ export function readParams(req: Request): Params {
   }
   return params;
 }
+
+/** Refusal when a board write would hand over the answer to the question being worked on. */
+export const GIVES_AWAY = (s: Session) => ({
+  ok: false,
+  error: `That would give away the answer to the question they're working on. Use give_hint (${s.problem?.rung ?? 0} of 3 shown so far), or show_solution if they asked to see it.`,
+});
 
 const NO_SESSION = {
   ok: false,
@@ -93,6 +99,7 @@ async function lookAtBoard(req: Request, res: Response) {
     const studentSaid = String(p.student_said ?? p.question ?? "").trim().slice(0, 500) || undefined;
     const result = await analyze(s, capture, studentSaid);
     const published = publishResult(s, capture, result);
+    if (published) afterReview(s, capture, result);
     if (result.status === "empty") signal(s, { type: "unclear", note: "Nothing new written yet" });
     console.log(`[look] ${s.label} ${result.kind}/${result.status} line=${result.line}${published ? "" : " (stale, not shown)"}`);
     res.json(published ? result : { ...result, note: "A newer question or newer work arrived while reading; this result wasn't shown on the board." });
@@ -180,6 +187,7 @@ export function toolsRouter() {
     if (!s) return void res.json(NO_SESSION);
     const steps = splitSteps(p.steps);
     if (steps.length === 0) return void res.json({ ok: false, error: "No steps given. Pass steps separated by ||." });
+    if (revealsAnswer(s, steps)) return void res.json(GIVES_AWAY(s));
     const label = nextLabel(s);
     const title = String(p.title ?? "").trim().slice(0, 200);
     recordBlock(s, { label, kind: "steps", summary: `${title ? title + ": " : ""}${steps.join(" / ")}`.slice(0, 120), lines: steps.length });

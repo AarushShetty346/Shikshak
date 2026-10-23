@@ -172,6 +172,76 @@ export function buildTools(publicUrl: string, toolsToken?: string): ToolDef[] {
       properties: { number: { type: "string", description: "'next', or a practice number, e.g. '2'." } },
       required: ["number"],
     }),
+    tool(base, token, {
+      name: "next_problem",
+      description:
+        "Put a CHECKED problem from the library on the board (answer and solution verified, hints ready). Prefer this over making up problems. kind: practice (normal), transfer (a fresh one to see if they can do it alone), diagnostic (the quick check; usually via the diagnostic tool).",
+      pre_call_message: { hi: "अच्छा, एक सवाल देती हूँ।", en: "Here's one for you." },
+      properties: {
+        kind: { type: "string", description: "practice | transfer | diagnostic" },
+        skill: { type: "string", description: "Optional skill id, e.g. ap.nth_term, from plan_next or the memory note." },
+        problem_id: { type: "string", description: "Optional exact problem id (e.g. from the memory note's suggested exercise)." },
+      },
+      required: ["kind"],
+    }),
+    tool(base, token, {
+      name: "solve",
+      description:
+        "Get a worked solution for a problem (yours or the student's) BEFORE you teach or judge it. Returns the answer for your eyes only, steps, three hints, and exactly how much was verified ('library'/'exact' = checked; 'substitution' = only the final answer checked; 'unverified' = nothing checked: never call that checked). Never read out the answer.",
+      pre_call_message: { hi: "एक सेकंड।", en: "One second." },
+      properties: {
+        problem: { type: "string", description: "The problem text (plain-text maths). Leave empty to solve the question on the board." },
+        problem_id: { type: "string", description: "Optional library problem id." },
+      },
+      required: [],
+    }),
+    tool(base, token, {
+      name: "give_hint",
+      description:
+        "Help with the current question one rung at a time: 1 a nudge (a question), 2 the method, 3 one worked step. Each call shows the next rung on the board. Never skip rungs; never give more help than this.",
+      pre_call_message: { hi: "एक छोटा सा इशारा।", en: "Here's a small hint." },
+      properties: {},
+      required: [],
+    }),
+    tool(base, token, {
+      name: "show_solution",
+      description:
+        "Write the full checked solution on the board. Only after all three hints, or when the student clearly asks to see it (then student_asked = true). Afterwards give a similar problem to try alone.",
+      pre_call_message: { hi: "चलो, पूरा हल देखते हैं।", en: "Let's go through the full solution." },
+      properties: { student_asked: { type: "string", description: "true if the student asked to see the solution, else false." } },
+      required: ["student_asked"],
+    }),
+    tool(base, token, {
+      name: "check_answer",
+      description:
+        "Check an answer the student SAID aloud against the current question, exactly (fractions, signs, both roots). Returns correct / incorrect / partial / approximate / unreadable, and a known misconception if their answer matches one. For written work use look_at_board.",
+      pre_call_message: { hi: "देखती हूँ।", en: "Let me check." },
+      properties: { answer: { type: "string", description: "The student's answer as they said it, e.g. 'x = 3 or 4', '29'." } },
+      required: ["answer"],
+    }),
+    tool(base, token, {
+      name: "plan_next",
+      description:
+        "Ask what to do next when unsure: uses the question, their attempts, hints used, the quick check and their record. Returns one action (nudge, next_hint, explain_step, equivalent_example, transfer_question, follow_up_check, diagnostic_question, continue_lesson) and which tool to call.",
+      pre_call_message: { hi: "अच्छा।", en: "Okay." },
+      properties: {},
+      required: [],
+    }),
+    tool(base, token, {
+      name: "diagnostic",
+      description:
+        "A short quick check (up to 4 questions) at the start of a NEW topic to find where to start. action: start, next (after each answer is checked), skip (if the student doesn't want it). It adapts: harder after a right answer, easier after a wrong one.",
+      pre_call_message: { hi: "पहले एक छोटा सा चेक।", en: "First, a quick check." },
+      properties: { action: { type: "string", description: "start | next | skip" } },
+      required: ["action"],
+    }),
+    tool(base, token, {
+      name: "skip_question",
+      description: "The student wants to skip the current question (or doesn't know it in the quick check). Records it as skipped/unanswered, not wrong.",
+      pre_call_message: { hi: "ठीक है।", en: "That's fine." },
+      properties: {},
+      required: [],
+    }),
   ];
 }
 

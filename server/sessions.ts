@@ -15,6 +15,7 @@ import type { BoardEvent, BoardSnapshot, Box, DocMeta, Language, ServerMessage, 
 import { getDevice, randomId, updateDevice } from "./auth";
 import { config } from "./config";
 import type { LookResult } from "./look";
+import type { AnswerSpec } from "./maths/answers";
 import type { StudyPlan } from "./plan";
 import { store } from "./store";
 
@@ -41,10 +42,45 @@ export interface ActiveQuestion {
   hint?: string;
   /** Library problem id when the question comes from the checked problem library. */
   problemId?: string;
+  skill?: string;
+  chapter?: string;
   kind: "practice" | "diagnostic" | "transfer" | "tutor";
   askedAt: number;
-  /** Hint ladder progress for this question (0 = no help given yet). */
+  /** Hint ladder progress for this question (0 = no help given yet; max 3). */
   rung: number;
+  /** The checked solution for this question, if one was made (see teaching.ts). */
+  solutionId?: string;
+  /** The answer as a machine-checkable spec (library or solved), for deterministic checking. */
+  answerSpec?: AnswerSpec;
+  /** The whole solution was shown on purpose; later attempts don't count as independent. */
+  revealed?: boolean;
+  /** Solved correctly already (so the tutor can move on). */
+  solved?: boolean;
+}
+
+/** A worked solution the tutor can rely on, with exactly how much of it was checked. */
+export interface Solution {
+  id: string;
+  problemId: string | null;
+  question: string;
+  answer: AnswerSpec | null;
+  steps: { text: string; checked: boolean }[];
+  hints: [string, string, string];
+  /** library: reviewed problem, every step checked in tests. exact: solved by the maths engine.
+   * substitution: a model's answer, verified by substituting it back (steps not verified).
+   * unverified: nothing could be checked. */
+  verified: "library" | "exact" | "substitution" | "unverified";
+  createdAt: number;
+}
+
+export interface DiagnosticState {
+  chapter: string;
+  /** Problem ids asked, in order, with what happened. */
+  items: { problemId: string; questionId: string; outcome: "correct" | "incorrect" | "partial" | "unreadable" | "unanswered" | "pending" }[];
+  status: "running" | "done" | "skipped";
+  /** Where the lesson should start, once done. */
+  startSkill: string | null;
+  startedAt: number;
 }
 
 export interface BoardBlock {
@@ -90,6 +126,11 @@ export interface SessionRecord {
   interrupt: { at: number; label: string | null; summary: string; section: number | null } | null;
   study: StudyState | null;
   problem: ActiveQuestion | null;
+  /** Worked solutions made in this session (teacher-only), newest last. */
+  solutions: Solution[];
+  /** Library problems already used in this session, so they aren't repeated. */
+  used: string[];
+  diagnostic: DiagnosticState | null;
   docsMeta: DocMeta[];
   /** Voice calls minted for this session (for estimates and limits). */
   calls: { id: string; startedAt: number; endedAt: number | null }[];
@@ -133,6 +174,9 @@ function persisted(s: Session): SessionRecord {
     interrupt: s.interrupt,
     study: s.study,
     problem: s.problem,
+    solutions: s.solutions.slice(-20),
+    used: s.used.slice(-200),
+    diagnostic: s.diagnostic,
     docsMeta: s.docs.length ? s.docs.map(docMeta) : s.docsMeta,
     calls: s.calls.slice(-50),
   };
@@ -143,6 +187,10 @@ export function docMeta(d: SessionDoc): DocMeta {
 }
 
 function live(rec: SessionRecord): Session {
+  // Records saved by older versions lack the newer fields.
+  rec.solutions ??= [];
+  rec.used ??= [];
+  rec.diagnostic ??= null;
   return { ...rec, sockets: new Set(), docs: [], captures: new Map(), analyses: new Map(), pendingRequests: new Map() };
 }
 
@@ -183,6 +231,9 @@ export function createSession(deviceId: string, opts: NewSession = {}): Session 
     interrupt: null,
     study: null,
     problem: null,
+    solutions: [],
+    used: [],
+    diagnostic: null,
     docsMeta: [],
     calls: [],
   });
@@ -233,7 +284,7 @@ export function deleteSession(s: Session) {
   loaded.delete(s.id);
   store.delete("sessions", s.id);
   updateDevice(s.deviceId, (d) => (d.sessions = (d.sessions ?? []).filter((x) => x !== s.id)));
-  for (const id of store.ids("attempts")) if (id.startsWith(`${s.id}_`)) store.delete("attempts", id);
+  store.delete("attempts", s.id);
   store.delete("reports", s.id);
 }
 

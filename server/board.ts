@@ -7,6 +7,7 @@ import { DIAGRAM_EXAMPLES, parseDiagram } from "../shared/diagram";
 import { splitSteps } from "../shared/mathText";
 import type { MarkStyle, Place, WriteStyle } from "../shared/types";
 import { randomId } from "./auth";
+import { revealsAnswer } from "./teaching";
 import { boardMap, emit, findBlock, nextLabel, recordBlock, type Session } from "./sessions";
 
 export const newQuestionId = () => `q_${randomId(9)}`;
@@ -43,6 +44,9 @@ export function write(s: Session, p: Params): Reply {
   const style = (STYLES.includes(str(p.kind) as WriteStyle) ? str(p.kind) : "text") as WriteStyle;
   const lines = splitSteps(p.content ?? p.text ?? p.lines);
   if (!lines.length) return { ok: false, error: "Nothing to write. Pass content, with lines separated by ||." };
+  // Don't let an ordinary board write hand over the answer to the current question.
+  if (style !== "your_turn" && revealsAnswer(s, lines))
+    return { ok: false, error: `That would give away the answer to the question they're working on. Use give_hint (${s.problem?.rung ?? 0} of 3 shown so far), or show_solution if they asked to see it.` };
   const rep = replaced(s, p.replace);
   if (rep.error) return { ok: false, error: rep.error };
   const label = nextLabel(s);

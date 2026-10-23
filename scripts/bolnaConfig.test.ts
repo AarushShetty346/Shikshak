@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { buildAgentPayload, buildTools, readPrompt } from "./bolnaConfig";
 
+const TOOL_NAMES = [
+  "write", "draw", "highlight", "erase", "give_problem", "look_at_board", "continue_lesson", "show_section", "read_material", "show_page", "give_practice",
+  "next_problem", "solve", "give_hint", "show_solution", "check_answer", "plan_next", "diagnostic", "skip_question",
+];
+
 describe("Bolna agent config", () => {
   it("reads the welcome message and prompt from bolna/agent-prompt.md", () => {
     const { welcome, prompt } = readPrompt();
@@ -11,7 +16,7 @@ describe("Bolna agent config", () => {
 
   it("points every tool at the server and passes the session code", () => {
     const tools = buildTools("https://x.example.org/", "tok");
-    expect(tools.map((t) => t.name)).toEqual(["write", "draw", "highlight", "erase", "give_problem", "look_at_board", "continue_lesson", "show_section", "read_material", "show_page", "give_practice"]);
+    expect(tools.map((t) => t.name)).toEqual(TOOL_NAMES);
     for (const t of tools) {
       expect(t.value.url).toBe(`https://x.example.org/tools/${t.name}`);
       expect(t.value.param.session_code).toBe("%(session_code)s");
@@ -45,8 +50,15 @@ describe("Bolna agent config", () => {
     expect(task.task_config.hangup_after_silence).toBeGreaterThanOrEqual(60);
     expect(task.tools_config.llm_agent.llm_config.temperature).toBe(1);
     const params = task.tools_config.api_tools.tools_params;
-    expect(Object.keys(params)).toEqual(["write", "draw", "highlight", "erase", "give_problem", "look_at_board", "continue_lesson", "show_section", "read_material", "show_page", "give_practice"]);
+    expect(Object.keys(params)).toEqual(TOOL_NAMES);
     expect(JSON.parse(params.write.param)).toEqual({ session_code: "%(session_code)s", kind: "%(kind)s", content: "%(content)s", place: "%(place)s", replace: "%(replace)s" });
     expect(task.tools_config.api_tools.tools[0]).not.toHaveProperty("value");
+  });
+
+  it("every tool the agent knows has a route on the server", async () => {
+    const { toolsRouter } = await import("../server/tools");
+    const router = toolsRouter() as unknown as { stack: { route?: { path: string } }[] };
+    const routes = new Set(router.stack.map((l) => l.route?.path).filter(Boolean));
+    for (const t of buildTools("https://x.example.org")) expect(routes.has(`/${t.name}`), t.name).toBe(true);
   });
 });

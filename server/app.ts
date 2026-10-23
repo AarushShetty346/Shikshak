@@ -8,7 +8,26 @@ import { issueTicket, redeemTicket, registerDevice, requireDevice } from "./auth
 import { noteInterrupt } from "./board";
 import { config } from "./config";
 import { allow, BusyError, chargeModelCall, QuotaError, withModelSlot } from "./limits";
-import { memoryForCall, recordReview } from "./learners";
+import {
+  attachSession,
+  createLearner,
+  deleteLearner,
+  LearnerError,
+  learnerForDevice,
+  listLearners,
+  memoryForCall,
+  memoryOf,
+  resetLearnerMemory,
+  saveLearner,
+  setSessionLookup,
+  streakOf,
+  updateLearner,
+  type Learner,
+} from "./learners";
+import { MISCONCEPTIONS } from "./curriculum/library";
+import { afterReview, askQuestion, checkSpoken, giveHint, nextDiagnostic, noteDiagnostic, publicDiagnostic, showSolution, startDiagnostic } from "./teaching";
+import { attemptFor, recordAttempt } from "./learners";
+import { pickProblem, chapterForTopic } from "./curriculum/library";
 import { hasModel, modelName } from "./llm";
 import { reviewSubmission } from "./look";
 import { addDocs, checkFile, removeDoc } from "./material";
@@ -31,6 +50,7 @@ import {
   type Session,
   type SessionRecord,
 } from "./sessions";
+import { reportFor } from "./report";
 import { toolsRouter } from "./tools";
 import { endVoice, mintVoice, voiceConfigured, voiceUsage, type Speed } from "./voice";
 
@@ -61,7 +81,13 @@ export function publicSession(s: SessionRecord & { docs?: { length: number } }) 
     docs: s.docsMeta,
     plan: s.study ? publicPlan(s.study.plan) : null,
     started: s.calls.length > 0,
+    diagnostic: s.diagnostic ? { chapter: s.diagnostic.chapter, status: s.diagnostic.status, asked: s.diagnostic.items.length, right: s.diagnostic.items.filter((i) => i.outcome === "correct").length } : null,
   };
+}
+
+/** What the browser may see of a learner. */
+export function publicLearner(l: Learner) {
+  return { id: l.id, name: l.name, grade: l.grade, language: l.language, timezone: l.timezone, createdAt: l.createdAt, sessions: l.sessions.length, streak: streakOf(l) };
 }
 
 // ---------- lesson plan drafts: made in setup, attached when the session is created ----------
@@ -111,6 +137,10 @@ function sendLimitError(res: Response, err: unknown) {
 
 export function createApp(opts: { devTools?: boolean } = {}) {
   const app = express();
+  setSessionLookup((id) => {
+    const s = getSession(id);
+    return s ? { id: s.id, topic: s.topic || s.label, lastActive: s.lastActive } : null;
+  });
   app.disable("x-powered-by");
   app.use((_req, res, next) => {
     res.setHeader("X-Content-Type-Options", "nosniff");
@@ -179,10 +209,12 @@ export function createApp(opts: { devTools?: boolean } = {}) {
     if (b.draftId && (!draft || draft.deviceId !== req.device!.id)) return void res.status(409).json({ error: "That lesson plan has expired. Make it again." });
     const language = isLanguage(b.language) ? b.language : "hinglish";
     if (draft && draft.language !== language) return void res.status(409).json({ error: "The plan was made for a different language. Make it again." });
+    const learner = b.learnerId ? learnerForDevice(b.learnerId, req.device!.id) : null;
+    if (b.learnerId && !learner) return void res.status(404).json({ error: "That learner doesn't exist on this device." });
     try {
       const s = createSession(req.device!.id, {
         label: typeof b.label === "string" ? b.label.trim() : undefined,
-        learnerId: typeof b.learnerId === "string" ? b.learnerId : null,
+        learnerId: learner?.id ?? null,
         language,
         grade: /^(8|9|10|11|12)$/.test(String(b.grade)) ? String(b.grade) : "10",
         topic: typeof b.topic === "string" ? b.topic.trim() : "",
@@ -193,6 +225,7 @@ export function createApp(opts: { devTools?: boolean } = {}) {
         drafts.delete(draft.id);
         save(s);
       }
+      if (learner) attachSession(learner, s.id);
       res.status(201).json({ session: publicSession(s) });
     } catch (err) {
       if (sendLimitError(res, err) === false) throw err;
@@ -215,6 +248,11 @@ export function createApp(opts: { devTools?: boolean } = {}) {
   api.delete("/sessions/:id", (req, res) => {
     const s = ownSession(req, res);
     if (!s) return;
+    const l = s.learnerId ? learnerForDevice(s.learnerId, req.device!.id) : null;
+    if (l) {
+      l.sessions = l.sessions.filter((x) => x !== s.id);
+      saveLearner(l);
+    }
     deleteSession(s);
     res.status(204).end();
   });
@@ -270,6 +308,142 @@ export function createApp(opts: { devTools?: boolean } = {}) {
       console.error("[plan] failed", (err as Error).message);
       res.status(500).json({ error: "Could not make a plan. Try again or start without one." });
     }
+  });
+
+  // ---------- learners ----------
+  api.get("/learners", (req, res) => {
+    res.json({ learners: listLearners(req.device!.id).map(publicLearner) });
+  });
+
+  api.post("/learners", small, (req, res) => {
+    try {
+      const l = createLearner(req.device!.id, req.body ?? {});
+      res.status(201).json({ learner: publicLearner(l) });
+    } catch (err) {
+      if (err instanceof LearnerError) return void res.status(400).json({ error: err.message });
+      throw err;
+    }
+  });
+
+  const ownLearner = (req: Request, res: Response) => {
+    const l = learnerForDevice(req.params.id, req.device!.id);
+    if (!l) res.status(404).json({ error: "That learner doesn't exist on this device." });
+    return l;
+  };
+
+  api.patch("/learners/:id", small, (req, res) => {
+    const l = ownLearner(req, res);
+    if (!l) return;
+    updateLearner(l, req.body ?? {});
+    res.json({ learner: publicLearner(l) });
+  });
+
+  api.delete("/learners/:id", (req, res) => {
+    const l = ownLearner(req, res);
+    if (!l) return;
+    deleteLearner(l, (sid) => {
+      const s = getSession(sid);
+      if (s && s.deviceId === req.device!.id) {
+        s.learnerId = null;
+        save(s);
+      }
+    });
+    res.status(204).end();
+  });
+
+  /** Everything recorded about a learner, with the evidence behind it. */
+  api.get("/learners/:id/memory", (req, res) => {
+    const l = ownLearner(req, res);
+    if (!l) return;
+    const m = memoryOf(l, (id) => {
+      const s = getSession(id);
+      return s ? { id: s.id, topic: s.topic || s.label, lastActive: s.lastActive } : null;
+    });
+    res.json({ learner: publicLearner(l), memory: m });
+  });
+
+  api.post("/learners/:id/reset-memory", (req, res) => {
+    const l = ownLearner(req, res);
+    if (!l) return;
+    resetLearnerMemory(l);
+    res.json({ ok: true });
+  });
+
+  /** "That's not what I did": an inferred misconception is removed from this learner's record. */
+  api.post("/learners/:id/misconceptions/:mid/reject", (req, res) => {
+    const l = ownLearner(req, res);
+    if (!l) return;
+    const mid = String(req.params.mid);
+    if (!MISCONCEPTIONS.some((m) => m.id === mid)) return void res.status(404).json({ error: "Unknown misconception" });
+    if (!l.rejectedMisconceptions.some((r) => r.id === mid)) l.rejectedMisconceptions.push({ id: mid, at: Date.now() });
+    saveLearner(l);
+    res.json({ ok: true });
+  });
+
+  api.post("/learners/:id/misconceptions/:mid/restore", (req, res) => {
+    const l = ownLearner(req, res);
+    if (!l) return;
+    l.rejectedMisconceptions = l.rejectedMisconceptions.filter((r) => r.id !== String(req.params.mid));
+    saveLearner(l);
+    res.json({ ok: true });
+  });
+
+  // ---------- end-of-class report ----------
+  api.get("/sessions/:id/report", (req, res) => {
+    const s = ownSession(req, res);
+    if (s) res.json({ report: reportFor(s) });
+  });
+
+  // ---------- the student's own controls in class (work without the voice tutor too) ----------
+  api.post("/sessions/:id/hint", (req, res) => {
+    const s = ownSession(req, res);
+    if (s) res.json(giveHint(s));
+  });
+
+  api.post("/sessions/:id/solution", (req, res) => {
+    const s = ownSession(req, res);
+    if (s) res.json(showSolution(s, true));
+  });
+
+  api.post("/sessions/:id/practice", small, (req, res) => {
+    const s = ownSession(req, res);
+    if (!s) return;
+    const kind = req.body?.kind === "transfer" ? "transfer" : "practice";
+    const p =
+      pickProblem({ chapter: chapterForTopic(`${s.topic} ${s.study?.plan.topic ?? ""}`), skill: s.problem?.skill ?? null, kind, exclude: s.used }) ??
+      pickProblem({ chapter: chapterForTopic(`${s.topic} ${s.study?.plan.topic ?? ""}`), kind, exclude: s.used }) ??
+      pickProblem({ chapter: chapterForTopic(`${s.topic} ${s.study?.plan.topic ?? ""}`), exclude: s.used });
+    if (!p) return void res.status(404).json({ error: "No more checked problems for this topic yet." });
+    askQuestion(s, p, kind);
+    res.json({ ok: true, problem: p.statement });
+  });
+
+  /** An answer typed by the student (e.g. in the quick check). */
+  api.post("/sessions/:id/answer", small, (req, res) => {
+    const s = ownSession(req, res);
+    if (!s) return;
+    const answer = String(req.body?.answer ?? "").trim().slice(0, 200);
+    if (!answer) return void res.status(400).json({ error: "Type your answer first." });
+    res.json(checkSpoken(s, answer));
+  });
+
+  api.post("/sessions/:id/diagnostic", small, (req, res) => {
+    const s = ownSession(req, res);
+    if (!s) return;
+    const action = String(req.body?.action ?? "start");
+    if (action === "skip") {
+      if (s.diagnostic?.status === "running") s.diagnostic.status = "skipped";
+      else if (!s.diagnostic) s.diagnostic = { chapter: chapterForTopic(s.topic) ?? "ap", items: [], status: "skipped", startSkill: null, startedAt: Date.now() };
+      save(s);
+      return void res.json({ ok: true, diagnostic: publicDiagnostic(s) });
+    }
+    if (action === "skip_question" && s.diagnostic?.status === "running" && s.problem) {
+      recordAttempt(s, attemptFor(s, { key: `${s.problem.id}:unanswered`, source: "diagnostic", outcome: "unanswered", note: "Skipped in the quick check" }));
+      noteDiagnostic(s, s.problem.id, "unanswered");
+      return void res.json({ ...nextDiagnostic(s), diagnostic: publicDiagnostic(s) });
+    }
+    const out = action === "next" || (action === "start" && s.diagnostic?.status === "running") ? nextDiagnostic(s) : startDiagnostic(s, null);
+    res.json({ ...out, diagnostic: publicDiagnostic(s) });
   });
 
   // ---------- voice ----------
@@ -392,7 +566,7 @@ export function createApp(opts: { devTools?: boolean } = {}) {
             };
             storeCapture(s, capture);
             if (capture.reason === "done") {
-              reviewSubmission(s, capture, (result) => recordReview(s, capture, result)).catch((err) => console.error("[ws] review crashed", (err as Error).message));
+              reviewSubmission(s, capture, (result) => afterReview(s, capture, result)).catch((err) => console.error("[ws] review crashed", (err as Error).message));
             }
             return;
           }
