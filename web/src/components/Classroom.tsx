@@ -19,8 +19,10 @@ import { useMicLevel } from "../lib/useMicLevel";
 import { useVoiceCall } from "../lib/useVoiceCall";
 import { Board, type BoardStatus, type Submission, type TutorBlock } from "./Board";
 import { DevPanel } from "./DevPanel";
+import { QuestionBar, QuickCheck, QuickCheckOffer } from "./ClassTools";
+import { ReportCard } from "./ReportCard";
 import { VoiceOrb, type VoiceState } from "./VoiceOrb";
-import { ArrowLeft, FileText, HandPalm, List, Microphone, MicrophoneSlash, Pause, PencilSimpleLine, Play, SignOut, UploadSimple } from "@phosphor-icons/react";
+import { ArrowLeft, ChartBar, Exam, FileText, HandPalm, List, Microphone, MicrophoneSlash, Pause, PencilSimpleLine, Play, Question, SignOut, UploadSimple } from "@phosphor-icons/react";
 
 function toBlock(e: BlockEvent & { erased?: boolean }, instant: boolean): TutorBlock {
   switch (e.type) {
@@ -67,6 +69,8 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
   const [menuOpen, setMenuOpen] = useState(false);
   const [started, setStarted] = useState(meta.started);
   const [uploading, setUploading] = useState(false);
+  const [showReport, setShowReport] = useState<"view" | "end" | null>(null);
+  const [quickOffered, setQuickOffered] = useState(Boolean(initial.quickOffered));
   const fileInput = useRef<HTMLInputElement>(null);
   const voice = useVoiceCall(serverId);
   const active = voice.state === "active";
@@ -466,6 +470,41 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
             <button role="menuitem" onClick={toggleHandsFree}>
               {handsFree ? <MicrophoneSlash /> : <Microphone />} {handsFree ? "Use push-to-talk" : "Hands-free (always listening)"}
             </button>
+            <button
+              role="menuitem"
+              disabled={!serverId}
+              onClick={async () => {
+                setMenuOpen(false);
+                try {
+                  await apiFetch(`/sessions/${serverId}/practice`, { body: {} });
+                } catch (e) {
+                  showToast((e as Error).message);
+                }
+              }}
+            >
+              <Question /> Give me a practice question
+            </button>
+            <button
+              role="menuitem"
+              disabled={!serverId}
+              onClick={async () => {
+                setMenuOpen(false);
+                const r = await apiFetch<{ ok: boolean; error?: string }>(`/sessions/${serverId}/diagnostic`, { body: { action: "start" } }).catch((e: Error) => ({ ok: false, error: e.message }));
+                if (!r.ok && r.error) showToast(r.error);
+              }}
+            >
+              <Exam /> Quick check
+            </button>
+            <button
+              role="menuitem"
+              disabled={!serverId}
+              onClick={() => {
+                setMenuOpen(false);
+                setShowReport("view");
+              }}
+            >
+              <ChartBar /> Class report
+            </button>
             <div className="menu-docs">
               <FileText />
               <span>{docs.length ? docs.map((d) => d.name).join(", ") : "No books or notes yet"}</span>
@@ -476,7 +515,9 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
               onClick={() => {
                 if (window.confirm("End this class? The board is saved and you can resume it from All sessions.")) {
                   voice.stop();
-                  onHome();
+                  setMenuOpen(false);
+                  if (serverId) setShowReport("end");
+                  else onHome();
                 }
               }}
             >
@@ -497,6 +538,31 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
         <div className="toast" role="status">
           {toast}
         </div>
+      )}
+      {serverId && <QuestionBar serverId={serverId} snapshot={snapshot} onToast={showToast} />}
+      {serverId && <QuickCheck serverId={serverId} snapshot={snapshot} onToast={showToast} />}
+      {serverId && !quickOffered && !started && snapshot.blocks.length === 0 && (
+        <QuickCheckOffer
+          serverId={serverId}
+          onStarted={() => {
+            setQuickOffered(true);
+            saveData(sessionId, { quickOffered: true });
+          }}
+          onDismiss={() => {
+            setQuickOffered(true);
+            saveData(sessionId, { quickOffered: true });
+          }}
+        />
+      )}
+      {showReport && serverId && (
+        <ReportCard
+          serverId={serverId}
+          onClose={() => {
+            const ending = showReport === "end";
+            setShowReport(null);
+            if (ending) onHome();
+          }}
+        />
       )}
       {isDev && serverId && <DevPanel sessionId={serverId} />}
     </div>

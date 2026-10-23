@@ -272,7 +272,7 @@ describe("mastery and memory", () => {
     }
     const m = (await api().get(`/learners/${learnerId}/memory`)).json.memory as { progress: { skill: string; status: string; followUpDue: boolean }[]; next: { problemId: string; why: string } };
     expect(m.progress.find((p) => p.skill === "ap.nth_term")).toMatchObject({ status: "practising", followUpDue: true });
-    expect(m.next.why).toContain("follow-up");
+    expect(m.next.why).toContain("follow-up check");
     expect(await tool("plan_next", { session_code: (await learnerSession("x")).id })).toMatchObject({ action: "continue_lesson" });
   });
 

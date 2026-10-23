@@ -1988,6 +1988,442 @@ sub {
   border-left-color: var(--chalk-yellow);
 }
 
+/* ---------- Learners, progress, teacher view, pilot ---------- */
+
+.learner-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  margin-top: 18px;
+}
+
+.learner-bar-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.learner-chips,
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.filter-row {
+  margin: 18px 0 12px;
+}
+
+.learner-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1.5px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 15px;
+  font-weight: 500;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.learner-chip[aria-pressed="true"],
+.learner-chip[aria-selected="true"] {
+  border-color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 10%, var(--surface));
+  font-weight: 600;
+}
+
+.learner-add {
+  color: var(--ink-soft);
+  border-style: dashed;
+}
+
+.streak {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent-ink);
+  background: var(--accent);
+  border-radius: 999px;
+  padding: 0 7px;
+}
+
+.add-learner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px 160px;
+  gap: 12px;
+  align-items: end;
+  width: 100%;
+  background: var(--surface);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  padding: 16px;
+}
+
+.add-learner .actions,
+.add-learner .form-error {
+  grid-column: 1 / -1;
+}
+
+.home-foot {
+  display: flex;
+  gap: 18px;
+  margin-top: 40px;
+  font-size: 14px;
+}
+
+.home-foot a {
+  color: var(--ink-soft);
+}
+
+.muted-line {
+  margin: 4px 0 0;
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+
+.panel {
+  background: var(--surface);
+  border-radius: 20px;
+  box-shadow: var(--shadow);
+  padding: 20px 22px;
+  margin: 16px 0;
+}
+
+.panel h2 {
+  margin: 0 0 10px;
+  font-size: 19px;
+  letter-spacing: -0.01em;
+}
+
+.panel-accent {
+  border-left: 5px solid var(--accent);
+}
+
+.panel-quiet {
+  box-shadow: none;
+  border: 1px solid var(--line);
+}
+
+.next-q {
+  margin: 0;
+  font-family: var(--font-hand);
+  font-size: 20px;
+}
+
+.skill-list,
+.mistake-list,
+.report-list,
+.grant-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.skill-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.skill-name {
+  font-weight: 600;
+}
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 2px 10px;
+  background: var(--surface-2);
+  color: var(--ink-soft);
+}
+
+.status-chip[data-status="secure"] {
+  background: #d8f0e1;
+  color: #165c33;
+}
+
+.status-chip[data-status="practising"] {
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+
+.status-chip[data-status="learning"] {
+  background: #fbe2df;
+  color: #8a241e;
+}
+
+.remedy {
+  margin: 6px 0 0;
+  font-size: 15px;
+}
+
+.rules {
+  display: flex;
+  gap: 8px;
+  margin: 14px 0 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.actions-left {
+  justify-content: flex-start;
+}
+
+.share-box {
+  margin-top: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.share-code {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.share-code .code {
+  font-family: ui-monospace, monospace;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 4px 12px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+}
+
+.grant-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.claim {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.preview-tag {
+  font-size: 12px;
+  color: var(--ink-soft);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0 8px;
+}
+
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  margin: 8px 0;
+}
+
+.skeleton {
+  border-radius: 12px;
+  background: linear-gradient(90deg, var(--surface-2), var(--surface), var(--surface-2));
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.quiz-q {
+  font-family: var(--font-hand);
+  font-weight: 400;
+  font-size: clamp(26px, 4vw, 36px);
+  margin: 12px 0 24px;
+}
+
+/* ---------- In-class help, quick check, report ---------- */
+
+.question-bar {
+  position: fixed;
+  right: 12px;
+  bottom: 74px;
+  display: flex;
+  gap: 6px;
+  padding: 5px;
+  background: #f7f9f7;
+  border-radius: 999px;
+  box-shadow: 0 8px 24px rgb(8 20 15 / 0.4);
+  z-index: 5;
+}
+
+.question-bar button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  border-radius: 999px;
+  padding: 7px 14px;
+  background: transparent;
+  color: #15211c;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.question-bar button:hover:not(:disabled) {
+  background: #e3eae5;
+}
+
+.quick-card {
+  position: fixed;
+  left: 50%;
+  bottom: 86px;
+  transform: translateX(-50%);
+  width: min(460px, calc(100% - 24px));
+  display: grid;
+  gap: 8px;
+  background: #fbfcfb;
+  color: #15211c;
+  border-radius: 18px;
+  box-shadow: 0 12px 34px rgb(8 20 15 / 0.45);
+  padding: 16px 18px;
+  z-index: 6;
+  animation: fade-up 0.25s var(--ease-out) both;
+}
+
+.quick-card .muted-line {
+  color: #4a5751;
+}
+
+.quick-card .btn-icon {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  color: #4a5751;
+}
+
+.quick-row {
+  display: flex;
+  gap: 8px;
+}
+
+.quick-row input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  padding: 9px 12px;
+  border-radius: 12px;
+  border: 1.5px solid #d3dcd6;
+}
+
+.quick-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.quick-links .link-button,
+.quick-card .link-button {
+  margin: 0;
+  color: #4a5751;
+}
+
+.verdict {
+  font-weight: 600;
+}
+
+.verdict-good {
+  color: var(--green);
+}
+
+.verdict-bad {
+  color: var(--red);
+}
+
+.report-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgb(8 20 15 / 0.55);
+}
+
+.report-card {
+  width: min(560px, 100%);
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  background: #fbfcfb;
+  color: #15211c;
+  border-radius: 20px;
+  padding: 20px 22px;
+  box-shadow: 0 20px 60px rgb(0 0 0 / 0.4);
+  --surface: #fbfcfb;
+  --surface-2: #e3eae5;
+  --ink: #15211c;
+  --ink-soft: #4a5751;
+  --line: #d3dcd6;
+  --brand: #23392f;
+  --brand-ink: #f4f6f1;
+}
+
+.report-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.report-head h2 {
+  margin: 0;
+}
+
+.report-view {
+  margin: 12px 0;
+}
+
+.report-body h3 {
+  margin: 14px 0 4px;
+  font-size: 15px;
+}
+
+.report-body ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.report-meta,
+.report-note {
+  color: #4a5751;
+  font-size: 14px;
+}
+
+@media (max-width: 560px) {
+  .add-learner,
+  .claim {
+    grid-template-columns: 1fr;
+  }
+
+  .question-bar {
+    right: 8px;
+    bottom: 124px;
+  }
+
+  .quick-card {
+    bottom: 128px;
+  }
+}
+
 /* Motion off when the student asks for it: everything lands in its final state at once. */
 @media (prefers-reduced-motion: reduce) {
   *,

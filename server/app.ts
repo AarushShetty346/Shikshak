@@ -9,6 +9,7 @@ import { noteInterrupt } from "./board";
 import { config } from "./config";
 import { allow, BusyError, chargeModelCall, QuotaError, withModelSlot } from "./limits";
 import {
+  getLearner as getLearnerSafe,
   attachSession,
   createLearner,
   deleteLearner,
@@ -51,6 +52,8 @@ import {
   type SessionRecord,
 } from "./sessions";
 import { reportFor } from "./report";
+import { answerItem, createParticipant, deleteParticipant, exportCsv, listParticipants, noteIssue, participantFor, PilotError, publicForm, saveFeedback, startForm, summary, type FormId } from "./pilot";
+import { claimShareCode, createShareCode, grantsFor, revokeAllFor, revokeGrant, ShareError, teacherGrant } from "./shares";
 import { toolsRouter } from "./tools";
 import { endVoice, mintVoice, voiceConfigured, voiceUsage, type Speed } from "./voice";
 
@@ -241,6 +244,14 @@ export function createApp(opts: { devTools?: boolean } = {}) {
     const s = ownSession(req, res);
     if (!s) return;
     if (typeof req.body?.label === "string" && req.body.label.trim()) s.label = req.body.label.trim().slice(0, 40);
+    // Linking an older class to a learner (once; a class never moves between learners).
+    if (typeof req.body?.learnerId === "string") {
+      const l = learnerForDevice(req.body.learnerId, req.device!.id);
+      if (!l) return void res.status(404).json({ error: "That learner doesn't exist on this device." });
+      if (s.learnerId && s.learnerId !== l.id) return void res.status(409).json({ error: "This class already belongs to another learner." });
+      s.learnerId = l.id;
+      attachSession(l, s.id);
+    }
     save(s);
     res.json({ session: publicSession(s) });
   });
@@ -341,6 +352,7 @@ export function createApp(opts: { devTools?: boolean } = {}) {
   api.delete("/learners/:id", (req, res) => {
     const l = ownLearner(req, res);
     if (!l) return;
+    revokeAllFor(l.id);
     deleteLearner(l, (sid) => {
       const s = getSession(sid);
       if (s && s.deviceId === req.device!.id) {
@@ -388,6 +400,147 @@ export function createApp(opts: { devTools?: boolean } = {}) {
     res.json({ ok: true });
   });
 
+  // ---------- sharing with a teacher ----------
+  api.post("/learners/:id/shares", (req, res) => {
+    const l = ownLearner(req, res);
+    if (!l) return;
+    const c = createShareCode(l);
+    res.status(201).json({ code: c.code, expiresAt: c.expiresAt });
+  });
+
+  api.get("/learners/:id/shares", (req, res) => {
+    const l = ownLearner(req, res);
+    if (!l) return;
+    res.json({ grants: grantsFor({ learnerId: l.id }).map((g) => ({ id: g.id, teacher: g.teacherLabel, createdAt: g.createdAt })) });
+  });
+
+  api.delete("/learners/:id/shares/:gid", (req, res) => {
+    const l = ownLearner(req, res);
+    if (!l) return;
+    if (!revokeGrant(String(req.params.gid), req.device!.id)) return void res.status(404).json({ error: "No such share" });
+    res.status(204).end();
+  });
+
+  api.post("/teacher/claim", small, rateLimit((req) => `claim:${req.device!.id}`, 5, 5), (req, res) => {
+    try {
+      const g = claimShareCode(String(req.body?.code ?? ""), req.device!.id, String(req.body?.label ?? "Teacher"));
+      res.status(201).json({ ok: true, learnerId: g.learnerId });
+    } catch (err) {
+      if (err instanceof ShareError) return void res.status(400).json({ error: err.message });
+      throw err;
+    }
+  });
+
+  const sessionSummary = (id: string) => {
+    const s = getSession(id);
+    return s ? { id: s.id, topic: s.topic || s.label, lastActive: s.lastActive } : null;
+  };
+
+  /** Only learners explicitly shared with this device. */
+  api.get("/teacher/learners", (req, res) => {
+    const out = grantsFor({ teacherDeviceId: req.device!.id })
+      .map((g) => {
+        const l = getLearnerSafe(g.learnerId);
+        if (!l) return null;
+        const m = memoryOf(l, sessionSummary);
+        return {
+          learner: { id: l.id, name: l.name, grade: l.grade },
+          sharedAt: g.createdAt,
+          evidence: m.evidenceCount,
+          lastAt: m.topics[0]?.lastAt ?? null,
+          topics: m.topics.map((t) => t.name),
+          skills: m.progress.map((p) => ({ name: p.name, status: p.status })),
+          recurring: m.mistakes.filter((x) => !x.resolved && x.count >= 1).map((x) => ({ name: x.name, count: x.count, confidence: x.confidence })),
+        };
+      })
+      .filter(Boolean);
+    res.json({ learners: out });
+  });
+
+  api.get("/teacher/learners/:learnerId", (req, res) => {
+    const g = teacherGrant(req.device!.id, String(req.params.learnerId));
+    const l = g ? getLearnerSafe(g.learnerId) : null;
+    if (!g || !l) return void res.status(404).json({ error: "This learner hasn't been shared with you." });
+    const m = memoryOf(l, sessionSummary);
+    const reports = l.sessions
+      .map((sid) => getSession(sid))
+      .filter((s): s is Session => Boolean(s))
+      .sort((a, b) => b.lastActive - a.lastActive)
+      .slice(0, 20)
+      .map((s) => reportFor(s));
+    res.json({ learner: { id: l.id, name: l.name, grade: l.grade }, memory: m, reports });
+  });
+
+  // ---------- pilot (facilitator's device only) ----------
+  const pilotErr = (res: Response, err: unknown) => {
+    if (err instanceof PilotError) return void res.status(400).json({ error: err.message });
+    throw err;
+  };
+  const ownParticipant = (req: Request, res: Response) => {
+    const p = participantFor(String(req.params.pid), req.device!.id);
+    if (!p) res.status(404).json({ error: "No such participant on this device." });
+    return p;
+  };
+  const isForm = (f: unknown): f is FormId => f === "A" || f === "B" || f === "C";
+
+  api.get("/pilot", (req, res) => {
+    res.json({
+      summary: summary(req.device!.id),
+      participants: listParticipants(req.device!.id).map((p) => ({ id: p.id, code: p.code, consent: p.consent, forms: p.forms, issues: p.technicalIssues.length, feedback: Boolean(p.feedback) })),
+    });
+  });
+  api.post("/pilot/participants", small, (req, res) => {
+    try {
+      const p = createParticipant(req.device!.id, req.body ?? {});
+      res.status(201).json({ id: p.id, code: p.code });
+    } catch (err) {
+      pilotErr(res, err);
+    }
+  });
+  api.delete("/pilot/participants/:pid", (req, res) => {
+    const p = ownParticipant(req, res);
+    if (!p) return;
+    deleteParticipant(p);
+    res.status(204).end();
+  });
+  api.post("/pilot/participants/:pid/forms/:form", (req, res) => {
+    const p = ownParticipant(req, res);
+    if (!p) return;
+    if (!isForm(req.params.form)) return void res.status(404).json({ error: "No such form" });
+    res.json(startForm(p, req.params.form));
+  });
+  api.post("/pilot/participants/:pid/forms/:form/answers", small, (req, res) => {
+    const p = ownParticipant(req, res);
+    if (!p) return;
+    if (!isForm(req.params.form)) return void res.status(404).json({ error: "No such form" });
+    try {
+      // No right/wrong is sent back: this is a quiz, not practice.
+      res.json(answerItem(p, req.params.form, String(req.body?.item ?? ""), String(req.body?.answer ?? ""), Number(req.body?.ms ?? 0)));
+    } catch (err) {
+      pilotErr(res, err);
+    }
+  });
+  api.post("/pilot/participants/:pid/issues", small, (req, res) => {
+    const p = ownParticipant(req, res);
+    if (!p) return;
+    noteIssue(p, String(req.body?.note ?? ""));
+    res.json({ ok: true });
+  });
+  api.post("/pilot/participants/:pid/feedback", small, (req, res) => {
+    const p = ownParticipant(req, res);
+    if (!p) return;
+    saveFeedback(p, req.body ?? {});
+    res.json({ ok: true });
+  });
+  api.get("/pilot/forms/:form", (req, res) => {
+    if (!isForm(req.params.form)) return void res.status(404).json({ error: "No such form" });
+    res.json(publicForm(req.params.form));
+  });
+  api.get("/pilot/export.csv", (req, res) => {
+    res.type("text/csv").setHeader("Content-Disposition", 'attachment; filename="shikshak-pilot.csv"');
+    res.send(exportCsv(req.device!.id));
+  });
+
   // ---------- end-of-class report ----------
   api.get("/sessions/:id/report", (req, res) => {
     const s = ownSession(req, res);
@@ -409,8 +562,10 @@ export function createApp(opts: { devTools?: boolean } = {}) {
     const s = ownSession(req, res);
     if (!s) return;
     const kind = req.body?.kind === "transfer" ? "transfer" : "practice";
+    // Practise where the quick check said to start; otherwise stay on the current skill.
+    const skillWanted = (s.diagnostic?.status === "done" && s.diagnostic.startSkill) || (s.problem?.kind !== "diagnostic" ? s.problem?.skill : null) || null;
     const p =
-      pickProblem({ chapter: chapterForTopic(`${s.topic} ${s.study?.plan.topic ?? ""}`), skill: s.problem?.skill ?? null, kind, exclude: s.used }) ??
+      pickProblem({ chapter: chapterForTopic(`${s.topic} ${s.study?.plan.topic ?? ""}`), skill: skillWanted, kind, exclude: s.used }) ??
       pickProblem({ chapter: chapterForTopic(`${s.topic} ${s.study?.plan.topic ?? ""}`), kind, exclude: s.used }) ??
       pickProblem({ chapter: chapterForTopic(`${s.topic} ${s.study?.plan.topic ?? ""}`), exclude: s.used });
     if (!p) return void res.status(404).json({ error: "No more checked problems for this topic yet." });

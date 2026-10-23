@@ -47,6 +47,8 @@ export interface SessionData {
   docs: DocMeta[];
   speed: Speed;
   handsFree: boolean;
+  /** The quick check was offered (started or skipped) for this class. */
+  quickOffered?: boolean;
 }
 
 export const isDev = typeof location !== "undefined" && new URLSearchParams(location.search).has("dev");
@@ -131,6 +133,7 @@ function migrate(raw: Record<string, unknown>): SessionData {
     docs: Array.isArray(raw.docs) ? (raw.docs as DocMeta[]) : d.docs,
     speed: raw.speed === "slower" || raw.speed === "faster" ? raw.speed : "normal",
     handsFree: raw.handsFree === true,
+    quickOffered: raw.quickOffered === true,
   };
   if (!raw.snapshot && Array.isArray(raw.events)) {
     let snap = emptySnapshot();

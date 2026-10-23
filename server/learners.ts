@@ -378,7 +378,7 @@ export function suggestNext(attempts: Attempt[], progress: SkillProgress[]): Mem
   return {
     problemId: p.id,
     statement: p.statement,
-    why: target.followUpDue ? `A follow-up check after a recent mistake on ${target.name.toLowerCase()}.` : `${target.name}: ${target.because}`,
+    why: target.followUpDue ? `A follow-up check after a recent mistake (${target.name})` : `${target.name}: ${target.because.replace(/\.$/, "")}`,
   };
 }
 
