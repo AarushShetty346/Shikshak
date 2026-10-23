@@ -3,9 +3,10 @@
 //
 //   npm run bolna:setup             create or update
 //   npm run bolna:setup -- --dry    print the request body only
+//   npm run bolna:setup -- --phone  create or update only the phone revision agent (no calls are placed)
 import "dotenv/config";
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
-import { buildAgentPayload, type SpeedName } from "./bolnaConfig";
+import { buildAgentPayload, buildPhoneAgentPayload, type SpeedName } from "./bolnaConfig";
 
 const dry = process.argv.includes("--dry");
 const key = process.env.BOLNA_API_KEY;
@@ -16,7 +17,8 @@ if (!publicUrl || publicUrl.includes("example.com")) {
   if (!dry) process.exit(1);
 }
 
-const ENV_KEYS: Record<SpeedName, string> = { normal: "BOLNA_AGENT_ID", slower: "BOLNA_AGENT_ID_SLOW", faster: "BOLNA_AGENT_ID_FAST" };
+type AgentName = SpeedName | "phone";
+const ENV_KEYS: Record<AgentName, string> = { normal: "BOLNA_AGENT_ID", slower: "BOLNA_AGENT_ID_SLOW", faster: "BOLNA_AGENT_ID_FAST", phone: "BOLNA_PHONE_AGENT_ID" };
 
 function saveEnv(key: string, value: string) {
   const envFile = ".env";
@@ -27,11 +29,15 @@ function saveEnv(key: string, value: string) {
 }
 
 // One agent per voice speed (Bolna can't change speed mid-call). The normal one is the main agent.
-const speeds = (process.argv.includes("--normal-only") ? ["normal"] : ["normal", "slower", "faster"]) as SpeedName[];
+const speeds = (process.argv.includes("--phone") ? ["phone"] : process.argv.includes("--normal-only") ? ["normal"] : ["normal", "slower", "faster"]) as AgentName[];
 for (const speed of speeds) {
-  const body = buildAgentPayload({ publicUrl: publicUrl || "https://YOUR-SERVER.example.com", toolsToken: process.env.TOOLS_TOKEN, speed });
+  const url0 = publicUrl || "https://YOUR-SERVER.example.com";
+  const body =
+    speed === "phone"
+      ? buildPhoneAgentPayload({ publicUrl: url0, toolsToken: process.env.TOOLS_TOKEN, maxCallSeconds: Number(process.env.PHONE_MAX_CALL_SECONDS) || 300 })
+      : buildAgentPayload({ publicUrl: url0, toolsToken: process.env.TOOLS_TOKEN, speed });
   if (dry) {
-    if (speed === "normal") console.log(JSON.stringify(body, null, 2));
+    if (speed === "normal" || speed === "phone") console.log(JSON.stringify(body, null, 2));
     continue;
   }
   if (!key) {
@@ -48,7 +54,7 @@ for (const speed of speeds) {
   const text = await res.text();
   if (!res.ok) {
     console.error(`Bolna said ${res.status} for the ${speed} agent: ${text}`);
-    console.error("\nIf it rejected a voice or model, change DEFAULT_VOICE in scripts/bolnaConfig.ts.");
+    console.error("\nIf it rejected a voice or model, change DEFAULT_VOICE in scripts/bolnaConfig.ts (voices) or roll the model back with npm run bolna:model -- --rollback.");
     process.exit(1);
   }
   if (existing) console.log(`Updated ${speed} agent ${existing}.`);

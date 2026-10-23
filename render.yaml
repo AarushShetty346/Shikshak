@@ -28,8 +28,18 @@ services:
         value: "6ab6f015-fc04-491e-beba-df2d6da1206a"
       - key: PUBLIC_URL
         value: "https://shikshak-o0l8.onrender.com"
+      # Required in production (see docs/DEPLOYMENT.md): the same value the agents were set up with.
       - key: TOOLS_TOKEN
         sync: false
+      # Operator endpoints (phone revision). Leave empty to keep them off.
+      - key: ADMIN_TOKEN
+        sync: false
+      # Languages the agents have. Add ta,te only after npm run bolna:setup has pushed them.
+      - key: BOLNA_AGENT_LANGUAGES
+        value: "hi,en"
+      # The free plan has no persistent disk: data is lost on each deploy. See docs/DEPLOYMENT.md.
+      - key: DATA_DIR
+        value: "data"
       # Set to 1 until GEMINI_API_KEY is filled in, then delete it.
       - key: FAKE_CHECKER
         sync: false

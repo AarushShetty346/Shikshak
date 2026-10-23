@@ -9,7 +9,10 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 /** Spoken while a tool runs. Keyed by language; Bolna plays the one matching the language the agent is speaking. */
-export type Spoken = Record<"hi" | "en", string>;
+export type Spoken = Record<"hi" | "en", string> & Partial<Record<"ta" | "te", string>>;
+
+/** Tamil and Telugu are in preview (not yet reviewed by fluent speakers): tools use a short neutral filler. */
+const PREVIEW_FILLER = { ta: "சரி.", te: "సరే." };
 
 export interface ToolDef {
   name: string;
@@ -24,17 +27,22 @@ const SESSION = {
   session_code: { type: "string", description: "The session code from the prompt. Always pass it exactly." },
 };
 
+const CALL = {
+  call_code: { type: "string", description: "The call code from the prompt. Always pass it exactly." },
+};
+
 function tool(
   base: string,
   token: string | null,
   opts: { name: string; description: string; pre_call_message: Spoken; properties: ToolDef["parameters"]["properties"]; required: string[] },
+  id: typeof SESSION | typeof CALL = SESSION,
 ): ToolDef {
-  const all = { ...SESSION, ...opts.properties };
+  const all = { ...id, ...opts.properties };
   return {
     name: opts.name,
     description: opts.description,
-    pre_call_message: opts.pre_call_message,
-    parameters: { type: "object", properties: all, required: ["session_code", ...opts.required] },
+    pre_call_message: { ...PREVIEW_FILLER, ...opts.pre_call_message },
+    parameters: { type: "object", properties: all, required: [...Object.keys(id), ...opts.required] },
     key: "custom_task",
     value: {
       method: "POST",
@@ -172,35 +180,206 @@ export function buildTools(publicUrl: string, toolsToken?: string): ToolDef[] {
       properties: { number: { type: "string", description: "'next', or a practice number, e.g. '2'." } },
       required: ["number"],
     }),
+    tool(base, token, {
+      name: "next_problem",
+      description:
+        "Put a CHECKED problem from the library on the board (answer and solution verified, hints ready). Prefer this over making up problems. kind: practice (normal), transfer (a fresh one to see if they can do it alone), diagnostic (the quick check; usually via the diagnostic tool).",
+      pre_call_message: { hi: "अच्छा, एक सवाल देती हूँ।", en: "Here's one for you." },
+      properties: {
+        kind: { type: "string", description: "practice | transfer | diagnostic" },
+        skill: { type: "string", description: "Optional skill id, e.g. ap.nth_term, from plan_next or the memory note." },
+        problem_id: { type: "string", description: "Optional exact problem id (e.g. from the memory note's suggested exercise)." },
+      },
+      required: ["kind"],
+    }),
+    tool(base, token, {
+      name: "solve",
+      description:
+        "Get a worked solution for a problem (yours or the student's) BEFORE you teach or judge it. Returns the answer for your eyes only, steps, three hints, and exactly how much was verified ('library'/'exact' = checked; 'substitution' = only the final answer checked; 'unverified' = nothing checked: never call that checked). Never read out the answer.",
+      pre_call_message: { hi: "एक सेकंड।", en: "One second." },
+      properties: {
+        problem: { type: "string", description: "The problem text (plain-text maths). Leave empty to solve the question on the board." },
+        problem_id: { type: "string", description: "Optional library problem id." },
+      },
+      required: [],
+    }),
+    tool(base, token, {
+      name: "give_hint",
+      description:
+        "Help with the current question one rung at a time: 1 a nudge (a question), 2 the method, 3 one worked step. Each call shows the next rung on the board. Never skip rungs; never give more help than this.",
+      pre_call_message: { hi: "एक छोटा सा इशारा।", en: "Here's a small hint." },
+      properties: {},
+      required: [],
+    }),
+    tool(base, token, {
+      name: "show_solution",
+      description:
+        "Write the full checked solution on the board. Only after all three hints, or when the student clearly asks to see it (then student_asked = true). Afterwards give a similar problem to try alone.",
+      pre_call_message: { hi: "चलो, पूरा हल देखते हैं।", en: "Let's go through the full solution." },
+      properties: { student_asked: { type: "string", description: "true if the student asked to see the solution, else false." } },
+      required: ["student_asked"],
+    }),
+    tool(base, token, {
+      name: "check_answer",
+      description:
+        "Check an answer the student SAID aloud against the current question, exactly (fractions, signs, both roots). Returns correct / incorrect / partial / approximate / unreadable, and a known misconception if their answer matches one. For written work use look_at_board.",
+      pre_call_message: { hi: "देखती हूँ।", en: "Let me check." },
+      properties: { answer: { type: "string", description: "The student's answer as they said it, e.g. 'x = 3 or 4', '29'." } },
+      required: ["answer"],
+    }),
+    tool(base, token, {
+      name: "plan_next",
+      description:
+        "Ask what to do next when unsure: uses the question, their attempts, hints used, the quick check and their record. Returns one action (nudge, next_hint, explain_step, equivalent_example, transfer_question, follow_up_check, diagnostic_question, continue_lesson) and which tool to call.",
+      pre_call_message: { hi: "अच्छा।", en: "Okay." },
+      properties: {},
+      required: [],
+    }),
+    tool(base, token, {
+      name: "diagnostic",
+      description:
+        "A short quick check (up to 4 questions) at the start of a NEW topic to find where to start. action: start, next (after each answer is checked), skip (if the student doesn't want it). It adapts: harder after a right answer, easier after a wrong one.",
+      pre_call_message: { hi: "पहले एक छोटा सा चेक।", en: "First, a quick check." },
+      properties: { action: { type: "string", description: "start | next | skip" } },
+      required: ["action"],
+    }),
+    tool(base, token, {
+      name: "skip_question",
+      description: "The student wants to skip the current question (or doesn't know it in the quick check). Records it as skipped/unanswered, not wrong.",
+      pre_call_message: { hi: "ठीक है।", en: "That's fine." },
+      properties: {},
+      required: [],
+    }),
   ];
+}
+
+/** The phone revision agent's tools (Phase 7): keyed by a call code, not a class session. */
+export function buildPhoneTools(publicUrl: string, toolsToken?: string): ToolDef[] {
+  const base = publicUrl.replace(/\/$/, "");
+  const token = toolsToken ? `Bearer ${toolsToken}` : null;
+  const number = { type: "string", description: "The question number, 1, 2 or 3." };
+  return [
+    tool(
+      base,
+      token,
+      {
+        name: "phone_question",
+        description: "Gets question number N of this revision call, to read aloud. Says done when there are no more.",
+        pre_call_message: { hi: "अगला सवाल।", en: "Next question." },
+        properties: { number },
+        required: ["number"],
+      },
+      CALL,
+    ),
+    tool(
+      base,
+      token,
+      {
+        name: "phone_answer",
+        description: "Checks the student's keypad answer to question N exactly. Pass the digits from 'dtmf_number: <digits>'. Returns correct, or a hint for one more try.",
+        pre_call_message: { hi: "देखते हैं।", en: "Let's see." },
+        properties: { number, digits: { type: "string", description: "The digits they typed, e.g. 29." } },
+        required: ["number", "digits"],
+      },
+      CALL,
+    ),
+    tool(
+      base,
+      token,
+      {
+        name: "phone_opt_out",
+        description: "The student or family doesn't want these calls (said so, or pressed 9). Stops all future calls to this number.",
+        pre_call_message: { hi: "ठीक है।", en: "Okay." },
+        properties: { how: { type: "string", description: "keypad | voice" } },
+        required: [],
+      },
+      CALL,
+    ),
+    tool(
+      base,
+      token,
+      {
+        name: "phone_end",
+        description: "Call at the end of the call (all questions done, or they need to go). Records how it went.",
+        pre_call_message: { hi: "ठीक है।", en: "Okay." },
+        properties: {},
+        required: [],
+      },
+      CALL,
+    ),
+  ];
+}
+
+function readPromptFile(file: string): { welcome: string; prompt: string } {
+  const text = readFileSync(path.join(root, "bolna", file), "utf8").replace(/\r\n/g, "\n");
+  const welcome = /^Welcome message:\s*`([^`]+)`/m.exec(text)?.[1];
+  const split = text.indexOf("\n---\n");
+  if (!welcome || split < 0) throw new Error(`bolna/${file} is missing the welcome message line or the --- separator`);
+  return { welcome, prompt: text.slice(split + 5).trim() };
 }
 
 /** Reads bolna/agent-prompt.md: the welcome message line, and the prompt below the "---" line. */
 export function readPrompt(): { welcome: string; prompt: string } {
-  const text = readFileSync(path.join(root, "bolna", "agent-prompt.md"), "utf8").replace(/\r\n/g, "\n");
-  const welcome = /^Welcome message:\s*`([^`]+)`/m.exec(text)?.[1];
-  const split = text.indexOf("\n---\n");
-  if (!welcome || split < 0) throw new Error("bolna/agent-prompt.md is missing the welcome message line or the --- separator");
-  return { welcome, prompt: text.slice(split + 5).trim() };
+  return readPromptFile("agent-prompt.md");
+}
+
+export function readPhonePrompt(): { welcome: string; prompt: string } {
+  return readPromptFile("phone-prompt.md");
 }
 
 export interface VoiceOptions {
   /** Languages the agent can speak, ISO 639-1. The first is the default. Hinglish runs on "hi". */
-  languages: ("hi" | "en")[];
+  languages: ("hi" | "en" | "ta" | "te")[];
   transcriber: { provider: string; model: string };
   synthesizer: { provider: string; model: string; voice: string; voice_id: string };
   llm: { provider: string; model: string };
   telephony: string;
 }
 
+export interface LlmChoice {
+  provider: string;
+  model: string;
+  since: string;
+  evidence: string;
+}
+export interface LlmConfig {
+  note?: string;
+  current: LlmChoice;
+  previous: LlmChoice | null;
+}
+export const LLM_FILE = path.join(root, "bolna", "llm.json");
+
+/** The conversation model (bolna/llm.json), the same on every agent. */
+export function readLlmConfig(file = LLM_FILE): LlmConfig {
+  return JSON.parse(readFileSync(file, "utf8")) as LlmConfig;
+}
+function currentLlm() {
+  const { provider, model } = readLlmConfig().current;
+  return { provider, model };
+}
+
+/** Switch to a new model, keeping the current one for rollback. Needs evidence (a benchmark result). */
+export function switchLlm(cfg: LlmConfig, next: { provider: string; model: string }, evidence: string, today: string): LlmConfig {
+  if (!evidence.trim()) throw new Error("A switch needs evidence: the benchmark result that supports it.");
+  if (cfg.current.provider === next.provider && cfg.current.model === next.model) throw new Error("That model is already in use.");
+  return { ...cfg, current: { ...next, since: today, evidence }, previous: cfg.current };
+}
+
+/** Go back to the previous model. */
+export function rollbackLlm(cfg: LlmConfig, today: string): LlmConfig {
+  if (!cfg.previous) throw new Error("There is no previous model to roll back to.");
+  return { ...cfg, current: { ...cfg.previous, since: today, evidence: `Rolled back from ${cfg.current.provider}:${cfg.current.model}` }, previous: cfg.current };
+}
+
 // Defaults: Sarvam for Indian-language speech in and out (a buildathon sponsor), a fast GPT for the conversation.
 export const DEFAULT_VOICE: VoiceOptions = {
-  languages: ["hi", "en"],
+  // Tamil and Telugu: supported by Soniox (ta, te) and Sarvam bulbul:v3 (ta-IN, te-IN); preview.
+  languages: ["hi", "en", "ta", "te"],
   // Soniox: understands Hindi-English mixing and detects when the student has finished a thought
   // (semantic end of turn) instead of a fixed silence timer, so it doesn't cut in when they pause.
   transcriber: { provider: "soniox", model: "stt-rt-v5" },
   synthesizer: { provider: "sarvam", model: "bulbul:v3", voice: "suhani", voice_id: "suhani" },
-  llm: { provider: "openai", model: "gpt-5.4-mini" },
+  llm: currentLlm(),
   telephony: "plivo",
 };
 
@@ -216,10 +395,14 @@ const TRANSCRIBER_CONTEXT =
 const STILL_THERE: Spoken = {
   hi: "आप वहाँ हो? आराम से लिखो, हो जाए तो बताना।",
   en: "Are you still there? Take your time, and tell me when you're done.",
+  ta: "நீங்கள் இருக்கிறீர்களா? நிதானமாக எழுதுங்கள், முடிந்ததும் சொல்லுங்கள்.",
+  te: "మీరు ఉన్నారా? నెమ్మదిగా రాయండి, అయిపోయాక చెప్పండి.",
 };
 const GOODBYE: Spoken = {
   hi: "आज के लिए इतना ही। बहुत अच्छा किया, फिर मिलते हैं!",
   en: "That's all for today. Well done, see you next time!",
+  ta: "இன்றைக்கு இவ்வளவுதான். நன்றாகச் செய்தீர்கள், மீண்டும் சந்திப்போம்!",
+  te: "ఈరోజుకి ఇంతే. బాగా చేశారు, మళ్ళీ కలుద్దాం!",
 };
 
 /** Request body for POST /v2/agent (create) and PUT /v2/agent/{id} (update). */
@@ -316,4 +499,31 @@ export function buildAgentPayload(opts: { publicUrl: string; toolsToken?: string
     },
     agent_prompts: { task_1: { system_prompt: prompt } },
   };
+}
+
+/** The phone revision agent: same voices and model, its own prompt and tools, short calls, keypad on. */
+export function buildPhoneAgentPayload(opts: { publicUrl: string; toolsToken?: string; maxCallSeconds?: number; voice?: VoiceOptions }) {
+  const body = buildAgentPayload({ publicUrl: opts.publicUrl, toolsToken: opts.toolsToken, voice: opts.voice });
+  const { welcome, prompt } = readPhonePrompt();
+  const tools = buildPhoneTools(opts.publicUrl, opts.toolsToken);
+  const task = body.agent_config.tasks[0];
+  const cfg = task.tools_config;
+  body.agent_config.agent_name = "Shikshak phone revision";
+  body.agent_config.agent_welcome_message = welcome;
+  cfg.api_tools = {
+    tools: tools.map(({ value: _value, ...def }) => def),
+    tools_params: Object.fromEntries(
+      tools.map((t) => [t.name, { method: t.value.method, url: t.value.url, api_token: t.value.api_token, param: JSON.stringify(t.value.param) }]),
+    ),
+  };
+  for (const lang of Object.values(cfg.multilingual_config.languages)) lang.system_prompt = prompt;
+  body.agent_prompts.task_1.system_prompt = prompt;
+  Object.assign(task.task_config, {
+    // A revision call is short; the server also caps it (PHONE_MAX_CALL_SECONDS).
+    call_terminate: opts.maxCallSeconds ?? 300,
+    hangup_after_silence: 30,
+    trigger_user_online_message_after: 15,
+    dtmf_enabled: true,
+  });
+  return body;
 }

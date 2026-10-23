@@ -1,7 +1,7 @@
 // Draws a tutor diagram in chalk, revealing `shown` pieces in order (the board advances it
 // while the tutor talks). Everything is in board units; the SVG scales with the board.
 
-import { compileExpr, type Diagram } from "../../../shared/diagram";
+import { compileExpr, graphSegments, type Diagram } from "../../../shared/diagram";
 import { prettify as prettifyText } from "../../../shared/mathText";
 
 const SUP: Record<string, string> = { "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹", n: "ⁿ", "-": "⁻" };
@@ -144,7 +144,8 @@ function Body({ d, w, h, shown }: { d: Diagram; w: number; h: number; shown: num
       const pad = 30;
       const fns = d.exprs.map((e) => compileExpr(e));
       const xs = Array.from({ length: 121 }, (_, i) => d.xmin + ((d.xmax - d.xmin) * i) / 120);
-      const ys = fns.flatMap((f) => xs.map(f)).filter((v) => Number.isFinite(v));
+      // Range from the sensible part of each curve (ignore the huge values next to an asymptote).
+      const ys = fns.flatMap((f) => xs.map(f)).filter((v) => Number.isFinite(v) && Math.abs(v) <= 20);
       const pys = d.points.map((p) => p.y);
       let ymin = Math.max(-20, Math.min(0, ...ys, ...pys));
       let ymax = Math.min(20, Math.max(0, ...ys, ...pys));
@@ -168,16 +169,19 @@ function Body({ d, w, h, shown }: { d: Diagram; w: number; h: number; shown: num
             </Text>
           </Piece>
           {fns.map((f, i) => {
-            const pts = xs
-              .map((x) => [x, f(x)] as const)
-              .filter(([, y]) => Number.isFinite(y) && y >= ymin - 1 && y <= ymax + 1)
-              .map(([x, y]) => `${sx(x).toFixed(1)},${sy(Math.max(ymin, Math.min(ymax, y))).toFixed(1)}`);
+            // Separate pieces where the curve is undefined or jumps (1/x, tan): no false vertical lines.
+            const segs = graphSegments(f, d.xmin, d.xmax, ymin, ymax);
+            const last = segs.at(-1)?.at(-1);
             return (
               <Piece key={i} on={shown > 1 + i}>
-                <polyline points={pts.join(" ")} fill="none" stroke={colors[i % 3]} strokeWidth={3} pathLength={1} className="dline" />
-                <Text x={sx(d.xmax) - 70} y={sy(Math.max(ymin, Math.min(ymax, f(d.xmax)))) - 18} fill={colors[i % 3]} fontSize={20}>
-                  {`y = ${prettify(d.exprs[i])}`}
-                </Text>
+                {segs.map((seg, j) => (
+                  <polyline key={j} points={seg.map(([x, y]) => `${sx(x).toFixed(1)},${sy(y).toFixed(1)}`).join(" ")} fill="none" stroke={colors[i % 3]} strokeWidth={3} pathLength={1} className="dline" />
+                ))}
+                {last && (
+                  <Text x={Math.min(sx(last[0]), sx(d.xmax) - 70)} y={sy(last[1]) - 18} fill={colors[i % 3]} fontSize={20}>
+                    {`y = ${prettify(d.exprs[i])}`}
+                  </Text>
+                )}
               </Piece>
             );
           })}

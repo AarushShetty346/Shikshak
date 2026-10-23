@@ -126,6 +126,65 @@ export function parseDiagram(raw: string): Diagram {
   }
 }
 
+// ---------- turning y = f(x) into drawable pieces ----------
+
+/**
+ * Samples f over [xmin, xmax] and splits the curve wherever it is undefined (sqrt of a negative,
+ * division by zero) or jumps across an asymptote (1/x, tan), so no false vertical line is drawn.
+ * Pieces are clipped to [ymin, ymax], ending exactly where they cross the edge.
+ */
+export function graphSegments(f: (x: number) => number, xmin: number, xmax: number, ymin: number, ymax: number, samples = 400): [number, number][][] {
+  const out: [number, number][][] = [];
+  let seg: [number, number][] = [];
+  const span = ymax - ymin;
+  const inside = (y: number) => y >= ymin && y <= ymax;
+  const clampY = (y: number) => Math.max(ymin, Math.min(ymax, y));
+  const close = () => {
+    if (seg.length > 1) out.push(seg);
+    seg = [];
+  };
+  let prev: [number, number] | null = null;
+  for (let i = 0; i <= samples; i++) {
+    const x = xmin + ((xmax - xmin) * i) / samples;
+    const y = f(x);
+    if (!Number.isFinite(y)) {
+      close();
+      prev = null;
+      continue;
+    }
+    if (prev) {
+      const [px, py] = prev;
+      // An asymptote: the curve leaves through one edge and comes back through the other.
+      const jump = Math.abs(y - py) > span * 2 || ((py > ymax && y < ymin) || (py < ymin && y > ymax));
+      if (jump) {
+        close();
+        prev = [x, y];
+        if (inside(y)) seg.push([x, y]);
+        continue;
+      }
+      if (inside(py) !== inside(y)) {
+        // Crossing the top or bottom edge: end (or start) the piece exactly on the edge.
+        const edge = (inside(py) ? y : py) > ymax ? ymax : ymin;
+        const t = (edge - py) / (y - py);
+        const ex = px + (x - px) * t;
+        if (inside(py)) {
+          seg.push([ex, edge]);
+          close();
+        } else {
+          seg.push([ex, edge]);
+          seg.push([x, y]);
+        }
+        prev = [x, y];
+        continue;
+      }
+    }
+    if (inside(y)) seg.push([x, clampY(y)]);
+    prev = [x, y];
+  }
+  close();
+  return out;
+}
+
 // ---------- a small, safe expression compiler for y = f(x) ----------
 // Supports numbers, x, + - * / ^, brackets, implicit multiplication (2x, 3(x+1), x(x-2)),
 // and sqrt, abs, sin, cos, tan (degrees, as in class 10).

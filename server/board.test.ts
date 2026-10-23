@@ -1,14 +1,21 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { BoardEvent } from "../shared/types";
 import { continueLesson, draw, erase, highlight, noteInterrupt, parseTarget, write } from "./board";
-import { getOrCreate, resetSessions, type Session } from "./sessions";
+import { createSession, resetSessions, type Session } from "./sessions";
+import { store } from "./store";
 
 let s: Session;
-const events = () => s.history as BoardEvent[];
+let sent: BoardEvent[] = [];
+const events = () => sent;
 
 beforeEach(() => {
   resetSessions();
-  s = getOrCreate("BRD001");
+  store.reset();
+  s = createSession("d_test");
+  sent = [];
+  // A stand-in browser tab that records every board event it receives.
+  const fake = { readyState: 1, OPEN: 1, send: (d: string) => { const m = JSON.parse(d); if (m.kind === "event") sent.push(m.event); }, close() {}, terminate() {} };
+  s.sockets.add(fake as never);
 });
 
 describe("board actions", () => {
@@ -59,6 +66,7 @@ describe("board actions", () => {
     const r = continueLesson(s);
     expect(String(r.resume)).toContain("B2: d = a2 - a1 / d = 5 - 2 = 3");
     expect(events().at(-1)).toEqual({ type: "resume" });
+    expect(s.board.seq).toBe(events().length);
     expect(s.interrupt).toBeNull();
   });
 });

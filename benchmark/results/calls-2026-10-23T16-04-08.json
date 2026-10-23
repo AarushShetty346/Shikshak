@@ -1,0 +1,1867 @@
+{
+  "generatedAt": "2026-10-23T16:04:08.205Z",
+  "summary": {
+    "calls": 23,
+    "callsWithTurns": 15,
+    "turns": 201,
+    "configs": [
+      "gpt-5.4-mini / stt-rt-v5 / bulbul:v3 / suhani",
+      "gpt-5.4-mini / saaras:v3 / bulbul:v3 / suhani"
+    ],
+    "stt": {
+      "median": 599.16675,
+      "p95": 1242.74243,
+      "n": 121
+    },
+    "llmFirst": {
+      "median": 901.49346,
+      "p95": 1296.01533,
+      "n": 154
+    },
+    "llmLast": {
+      "median": 1368.77554,
+      "p95": 1924.65594,
+      "n": 154
+    },
+    "ttsFirst": {
+      "median": 151,
+      "p95": 158,
+      "n": 140
+    },
+    "response": {
+      "median": 1561.09592,
+      "p95": 2363.54335,
+      "n": 76
+    },
+    "interruptions": 65,
+    "failed": 5,
+    "minutes": 28.318333333333335,
+    "cost": {
+      "total": 184.25,
+      "llm": 31.938000000000002,
+      "tts": 64.024,
+      "stt": 7.1370000000000005,
+      "platform": 67,
+      "perCallMedian": 5.5
+    },
+    "lessons": {
+      "count": 0,
+      "median": null
+    }
+  },
+  "records": [
+    {
+      "id": "9603a160-8860-46ff-a8c6-b86d991fcb75",
+      "at": "2026-10-23T03:36:31.947607+00:00",
+      "seconds": 38.7,
+      "status": "completed",
+      "config": "gpt-5.4-mini / stt-rt-v5 / bulbul:v3 / suhani",
+      "turns": [
+        {
+          "stt": 481.97559,
+          "llmFirst": 1118.30437,
+          "llmLast": 1924.65594,
+          "ttsFirst": 3,
+          "response": 1603.27996
+        }
+      ],
+      "interruptions": 0,
+      "cost": {
+        "total": 5.5,
+        "llm": 0.32,
+        "tts": 1.052,
+        "stt": 0.133,
+        "platform": 2
+      },
+      "agent": "normal"
+    },
+    {
+      "id": "8c7be24d-0fe2-4775-89e1-5e137543bb58",
+      "at": "2026-10-22T16:57:22.352767+00:00",
+      "seconds": 72,
+      "status": "completed",
+      "config": "gpt-5.4-mini / stt-rt-v5 / bulbul:v3 / suhani",
+      "turns": [
+        {
+          "stt": 470.59033,
+          "llmFirst": 699.85846,
+          "llmLast": 1063.42268,
+          "ttsFirst": 4,
+          "response": 1174.44879
+        },
+        {
+          "stt": 412.72021,
+          "llmFirst": 671.55646,
+          "llmLast": 934.75385,
+          "ttsFirst": 152,
+          "response": 1236.27667
+        },
+        {
+          "stt": 455.22485,
+          "llmFirst": 1017.44331,
+          "llmLast": 1367.13911,
+          "ttsFirst": 149,
+          "response": 1621.66816
+        },
+        {
+          "stt": 472.70264,
+          "llmFirst": 1141.8959,
+          "llmLast": 1580.62092,
+          "ttsFirst": 150,
+          "response": 1764.59854
+        },
+        {
+          "stt": null,
+          "llmFirst": 1414.55994,
+          "llmLast": 1758.56856,
+          "ttsFirst": 149,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 1287.22766,
+          "llmLast": 1717.36611,
+          "ttsFirst": 149,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 1217.31611,
+          "llmLast": 1563.44174,
+          "ttsFirst": 129,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 781.92334,
+          "llmLast": 1146.74507,
+          "ttsFirst": 152,
+          "response": null
+        }
+      ],
+      "interruptions": 0,
+      "cost": {
+        "total": 8.25,
+        "llm": 1.356,
+        "tts": 2.104,
+        "stt": 0.248,
+        "platform": 3
+      },
+      "agent": "normal"
+    },
+    {
+      "id": "90d7ea3e-60d9-40c8-a53d-fa3cc504e30a",
+      "at": "2026-10-22T16:54:59.878731+00:00",
+      "seconds": 125.6,
+      "status": "completed",
+      "config": "gpt-5.4-mini / stt-rt-v5 / bulbul:v3 / suhani",
+      "turns": [
+        {
+          "stt": 418.77783,
+          "llmFirst": 911.78088,
+          "llmLast": 1348.12834,
+          "ttsFirst": 4,
+          "response": 1334.55871
+        },
+        {
+          "stt": 427.71899,
+          "llmFirst": 809.58348,
+          "llmLast": 1038.54109,
+          "ttsFirst": 42,
+          "response": 1279.30247
+        },
+        {
+          "stt": 456.00269,
+          "llmFirst": 867.98516,
+          "llmLast": 1331.78736,
+          "ttsFirst": 137,
+          "response": 1460.98785
+        },
+        {
+          "stt": 399.76562,
+          "llmFirst": 776.12057,
+          "llmLast": 1096.51107,
+          "ttsFirst": 153,
+          "response": 1328.8861900000002
+        },
+        {
+          "stt": 467.10913,
+          "llmFirst": 1198.06678,
+          "llmLast": 1585.49196,
+          "ttsFirst": 137,
+          "response": 1802.1759100000002
+        },
+        {
+          "stt": 422.02295,
+          "llmFirst": 974.97883,
+          "llmLast": 1640.85428,
+          "ttsFirst": 151,
+          "response": 1548.00178
+        },
+        {
+          "stt": 823.40112,
+          "llmFirst": 683.79013,
+          "llmLast": 1339.08502,
+          "ttsFirst": 153,
+          "response": 1660.1912499999999
+        },
+        {
+          "stt": null,
+          "llmFirst": 1524.13368,
+          "llmLast": 2241.52593,
+          "ttsFirst": 148,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 918.27023,
+          "llmLast": 1166.35013,
+          "ttsFirst": 150,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 747.08769,
+          "llmLast": 1565.84713,
+          "ttsFirst": 152,
+          "response": null
+        }
+      ],
+      "interruptions": 1,
+      "cost": {
+        "total": 13.75,
+        "llm": 0.936,
+        "tts": 2.52,
+        "stt": 0.186,
+        "platform": 5
+      },
+      "agent": "normal"
+    },
+    {
+      "id": "c23e455c-d03f-44d3-bb74-fffb07edc916",
+      "at": "2026-10-22T16:46:45.711174+00:00",
+      "seconds": 30.3,
+      "status": "completed",
+      "config": "gpt-5.4-mini / stt-rt-v5 / bulbul:v3 / suhani",
+      "turns": [
+        {
+          "stt": 813.33667,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": 630.33008,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": 830.3269,
+          "llmFirst": 1289.33204,
+          "llmLast": 1654.22957,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": 4062.61084,
+          "llmFirst": 717.84005,
+          "llmLast": 1002.60333,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": 471.84009,
+          "llmFirst": 990.34454,
+          "llmLast": 1604.22883,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": 574.72778,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": 12245.71851,
+          "llmFirst": 745.22089,
+          "llmLast": 1119.6347,
+          "ttsFirst": 152,
+          "response": 13142.939400000001
+        },
+        {
+          "stt": 658.85156,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": 327.44409,
+          "llmFirst": 1014.07154,
+          "llmLast": 1549.33937,
+          "ttsFirst": 152,
+          "response": 1493.51563
+        },
+        {
+          "stt": null,
+          "llmFirst": 661.23482,
+          "llmLast": 1026.69146,
+          "ttsFirst": 153,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": null,
+          "response": null
+        }
+      ],
+      "interruptions": 3,
+      "cost": {
+        "total": 5.5,
+        "llm": 1.335,
+        "tts": 2.36,
+        "stt": 0.104,
+        "platform": 2
+      },
+      "agent": "normal"
+    },
+    {
+      "id": "be98077b-ab0d-49ec-b241-4d65dc44a871",
+      "at": "2026-10-22T16:28:49.546838+00:00",
+      "seconds": 203.2,
+      "status": "completed",
+      "config": "gpt-5.4-mini / stt-rt-v5 / bulbul:v3 / suhani",
+      "turns": [
+        {
+          "stt": 434.54443,
+          "llmFirst": 656.02769,
+          "llmLast": 1166.43165,
+          "ttsFirst": 4,
+          "response": 1094.57212
+        },
+        {
+          "stt": 617.75391,
+          "llmFirst": 976.68984,
+          "llmLast": 1596.07936,
+          "ttsFirst": 154,
+          "response": 1748.44375
+        },
+        {
+          "stt": 574.9873,
+          "llmFirst": 1026.94972,
+          "llmLast": 1809.49403,
+          "ttsFirst": 153,
+          "response": 1754.93702
+        },
+        {
+          "stt": 639.94727,
+          "llmFirst": 845.65998,
+          "llmLast": 1101.19437,
+          "ttsFirst": 149,
+          "response": 1634.60725
+        },
+        {
+          "stt": 683.27637,
+          "llmFirst": 1296.01533,
+          "llmLast": 1650.32744,
+          "ttsFirst": 153,
+          "response": 2132.2916999999998
+        },
+        {
+          "stt": 633.67773,
+          "llmFirst": 842.52073,
+          "llmLast": 1209.68874,
+          "ttsFirst": 144,
+          "response": 1620.19846
+        },
+        {
+          "stt": 453.56543,
+          "llmFirst": 714.54216,
+          "llmLast": 1220.18433,
+          "ttsFirst": 152,
+          "response": 1320.10759
+        },
+        {
+          "stt": 621.18042,
+          "llmFirst": 770.4918,
+          "llmLast": 1199.66644,
+          "ttsFirst": 150,
+          "response": 1541.67222
+        },
+        {
+          "stt": 641.05054,
+          "llmFirst": 787.75842,
+          "llmLast": 1379.85625,
+          "ttsFirst": 154,
+          "response": 1582.8089599999998
+        },
+        {
+          "stt": 835.94897,
+          "llmFirst": 1022.8379,
+          "llmLast": 1392.5163,
+          "ttsFirst": 150,
+          "response": 2008.78687
+        },
+        {
+          "stt": 633.22583,
+          "llmFirst": 1201.96015,
+          "llmLast": 1720.05542,
+          "ttsFirst": 152,
+          "response": 1987.1859800000002
+        },
+        {
+          "stt": 634.64014,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": 400.03882,
+          "llmFirst": 968.73865,
+          "llmLast": 1698.20908,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": 619.71875,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": 141,
+          "response": null
+        },
+        {
+          "stt": 431.38867,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": 1089.81494,
+          "llmFirst": 664.67757,
+          "llmLast": 970.79712,
+          "ttsFirst": 155,
+          "response": 1909.49251
+        },
+        {
+          "stt": 471.55371,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": 429.09082,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 1005.53499,
+          "llmLast": 1608.97129,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": 151,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 991.85683,
+          "llmLast": 1586.97812,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 960.69146,
+          "llmLast": 1707.27025,
+          "ttsFirst": 141,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 1254.73821,
+          "llmLast": 1823.90429,
+          "ttsFirst": 152,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 1099.16504,
+          "llmLast": 1872.406,
+          "ttsFirst": 150,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 1230.5113,
+          "llmLast": 1889.29857,
+          "ttsFirst": 153,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 1247.06115,
+          "llmLast": 1793.63662,
+          "ttsFirst": 150,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 911.51658,
+          "llmLast": 1515.36047,
+          "ttsFirst": 152,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 957.14696,
+          "llmLast": 1562.32317,
+          "ttsFirst": 156,
+          "response": null
+        }
+      ],
+      "interruptions": 12,
+      "cost": {
+        "total": 19.25,
+        "llm": 5.344,
+        "tts": 9.588,
+        "stt": 0.697,
+        "platform": 7
+      },
+      "agent": "normal"
+    },
+    {
+      "id": "d34f353d-9b47-47ad-b7b4-c08be03e68fb",
+      "at": "2026-10-22T16:19:32.696155+00:00",
+      "seconds": 215.4,
+      "status": "completed",
+      "config": "gpt-5.4-mini / stt-rt-v5 / bulbul:v3 / suhani",
+      "turns": [
+        {
+          "stt": 473.8335,
+          "llmFirst": 975.02967,
+          "llmLast": 1303.1165,
+          "ttsFirst": 5,
+          "response": 1453.86317
+        },
+        {
+          "stt": 421.61572,
+          "llmFirst": 985.4802,
+          "llmLast": 1404.52561,
+          "ttsFirst": 154,
+          "response": 1561.09592
+        },
+        {
+          "stt": 429.87378,
+          "llmFirst": 900.69048,
+          "llmLast": 1328.10713,
+          "ttsFirst": 155,
+          "response": 1485.56426
+        },
+        {
+          "stt": 481.5564,
+          "llmFirst": 711.02182,
+          "llmLast": 1144.0142,
+          "ttsFirst": 154,
+          "response": 1346.57822
+        },
+        {
+          "stt": 836.13843,
+          "llmFirst": 1016.86317,
+          "llmLast": 1681.49549,
+          "ttsFirst": 155,
+          "response": 2008.0016
+        },
+        {
+          "stt": 629.30298,
+          "llmFirst": 843.05768,
+          "llmLast": 1392.86598,
+          "ttsFirst": 156,
+          "response": 1628.36066
+        },
+        {
+          "stt": 474.94946,
+          "llmFirst": 889.59061,
+          "llmLast": 1471.45099,
+          "ttsFirst": 152,
+          "response": 1516.54007
+        },
+        {
+          "stt": 636.56543,
+          "llmFirst": 855.24489,
+          "llmLast": 1327.99257,
+          "ttsFirst": 154,
+          "response": 1645.81032
+        },
+        {
+          "stt": 656.25952,
+          "llmFirst": 893.13509,
+          "llmLast": 1740.57796,
+          "ttsFirst": 150,
+          "response": 1699.3946099999998
+        },
+        {
+          "stt": 475.43872,
+          "llmFirst": 1264.01508,
+          "llmLast": 1818.35439,
+          "ttsFirst": 150,
+          "response": 1889.4537999999998
+        },
+        {
+          "stt": 487.33716,
+          "llmFirst": 771.23582,
+          "llmLast": 1634.93333,
+          "ttsFirst": 156,
+          "response": 1414.57298
+        },
+        {
+          "stt": null,
+          "llmFirst": 856.16797,
+          "llmLast": 1375.99874,
+          "ttsFirst": 150,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 1170.06409,
+          "llmLast": 1927.13024,
+          "ttsFirst": 151,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 881.61548,
+          "llmLast": 1292.00468,
+          "ttsFirst": 158,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 751.52921,
+          "llmLast": 1605.49215,
+          "ttsFirst": 150,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 927.23891,
+          "llmLast": 1227.82149,
+          "ttsFirst": 150,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 981.88782,
+          "llmLast": 1568.42817,
+          "ttsFirst": 157,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 810.64,
+          "llmLast": 1595.18192,
+          "ttsFirst": 151,
+          "response": null
+        }
+      ],
+      "interruptions": 5,
+      "cost": {
+        "total": 22,
+        "llm": 3.848,
+        "tts": 8.368,
+        "stt": 0.739,
+        "platform": 8
+      },
+      "agent": "normal"
+    },
+    {
+      "id": "c2a82a8a-dc7f-4bd3-a4b3-61444b137711",
+      "at": "2026-10-22T16:18:13.701322+00:00",
+      "seconds": 4.1,
+      "status": "completed",
+      "config": "gpt-5.4-mini / stt-rt-v5 / bulbul:v3 / suhani",
+      "turns": [
+        {
+          "stt": 412.5332,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": null,
+          "response": null
+        }
+      ],
+      "interruptions": 0,
+      "cost": {
+        "total": 2.75,
+        "llm": 0,
+        "tts": 0,
+        "stt": 0.016,
+        "platform": 1
+      },
+      "agent": "normal"
+    },
+    {
+      "id": "46e42826-27a7-4ede-890f-4d9e030f83c8",
+      "at": "2026-10-22T16:17:46.849090+00:00",
+      "seconds": 4,
+      "status": "completed",
+      "config": "gpt-5.4-mini / stt-rt-v5 / bulbul:v3 / suhani",
+      "turns": [],
+      "interruptions": 0,
+      "cost": {
+        "total": 2.75,
+        "llm": 0,
+        "tts": 0,
+        "stt": 0.015,
+        "platform": 1
+      },
+      "agent": "normal"
+    },
+    {
+      "id": "5fc99524-7fb8-4732-875e-e3b3cbaeefea",
+      "at": "2026-10-22T16:17:08.591636+00:00",
+      "seconds": 15.5,
+      "status": "completed",
+      "config": "gpt-5.4-mini / stt-rt-v5 / bulbul:v3 / suhani",
+      "turns": [],
+      "interruptions": 0,
+      "cost": {
+        "total": 2.75,
+        "llm": 0,
+        "tts": 0,
+        "stt": 0.05,
+        "platform": 1
+      },
+      "agent": "normal"
+    },
+    {
+      "id": "1c1483c3-4a90-4082-9c33-f70f72e3743f",
+      "at": "2026-10-22T16:16:21.590274+00:00",
+      "seconds": 26,
+      "status": "completed",
+      "config": "gpt-5.4-mini / stt-rt-v5 / bulbul:v3 / suhani",
+      "turns": [
+        {
+          "stt": 590.11255,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": 479.79028,
+          "llmFirst": 662.02213,
+          "llmLast": 867.44173,
+          "ttsFirst": 5,
+          "response": 1146.81241
+        },
+        {
+          "stt": null,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": null,
+          "response": null
+        }
+      ],
+      "interruptions": 0,
+      "cost": {
+        "total": 2.75,
+        "llm": 0.249,
+        "tts": 0.056,
+        "stt": 0.087,
+        "platform": 1
+      },
+      "agent": "normal"
+    },
+    {
+      "id": "df545346-9b57-499f-be63-985d7b833bd1",
+      "at": "2026-10-22T16:15:10.392053+00:00",
+      "seconds": 22.5,
+      "status": "completed",
+      "config": "gpt-5.4-mini / stt-rt-v5 / bulbul:v3 / suhani",
+      "turns": [
+        {
+          "stt": 974.8877,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": 586.21045,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": 622.26025,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": 627.0354,
+          "llmFirst": 730.42998,
+          "llmLast": 1313.25125,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": 666.85083,
+          "llmFirst": 699.61568,
+          "llmLast": 1172.03639,
+          "ttsFirst": 156,
+          "response": 1522.46651
+        },
+        {
+          "stt": null,
+          "llmFirst": 828.35724,
+          "llmLast": 1388.95609,
+          "ttsFirst": 151,
+          "response": null
+        }
+      ],
+      "interruptions": 1,
+      "cost": {
+        "total": 2.75,
+        "llm": 0.789,
+        "tts": 1.36,
+        "stt": 0.075,
+        "platform": 1
+      },
+      "agent": "normal"
+    },
+    {
+      "id": "e5567ef3-38dd-4f66-bb8b-8fe279a60223",
+      "at": "2026-10-22T16:10:35.893524+00:00",
+      "seconds": 289.8,
+      "status": "completed",
+      "config": "gpt-5.4-mini / stt-rt-v5 / bulbul:v3 / suhani",
+      "turns": [
+        {
+          "stt": 862.22778,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": 649.39819,
+          "llmFirst": 1128.24677,
+          "llmLast": 1704.88565,
+          "ttsFirst": 4,
+          "response": 1781.64496
+        },
+        {
+          "stt": 452.73315,
+          "llmFirst": 691.93984,
+          "llmLast": 1018.12716,
+          "ttsFirst": 153,
+          "response": 1297.67299
+        },
+        {
+          "stt": 619.82837,
+          "llmFirst": 722.32157,
+          "llmLast": 1166.80499,
+          "ttsFirst": 150,
+          "response": 1492.1499399999998
+        },
+        {
+          "stt": 469.67432,
+          "llmFirst": 1112.73985,
+          "llmLast": 1397.81505,
+          "ttsFirst": 152,
+          "response": 1734.41417
+        },
+        {
+          "stt": 624.63257,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": 468.72388,
+          "llmFirst": 947.93545,
+          "llmLast": 1346.06957,
+          "ttsFirst": 152,
+          "response": 1568.65933
+        },
+        {
+          "stt": 623.57251,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": 468.28442,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": 599.16675,
+          "llmFirst": 707.54221,
+          "llmLast": 1465.43485,
+          "ttsFirst": 149,
+          "response": 1455.70896
+        },
+        {
+          "stt": 468.62793,
+          "llmFirst": 1429.10729,
+          "llmLast": 2160.04829,
+          "ttsFirst": 153,
+          "response": 2050.73522
+        },
+        {
+          "stt": 1242.74243,
+          "llmFirst": 1064.93089,
+          "llmLast": 1835.25563,
+          "ttsFirst": 151,
+          "response": 2458.67332
+        },
+        {
+          "stt": 623.13989,
+          "llmFirst": 1007.24037,
+          "llmLast": 1327.17998,
+          "ttsFirst": 86,
+          "response": 1716.38026
+        },
+        {
+          "stt": 471.25513,
+          "llmFirst": 924.97747,
+          "llmLast": 1423.91517,
+          "ttsFirst": 152,
+          "response": 1548.2326
+        },
+        {
+          "stt": 470.24976,
+          "llmFirst": 1243.88655,
+          "llmLast": 2104.90864,
+          "ttsFirst": 151,
+          "response": 1865.1363099999999
+        },
+        {
+          "stt": 1419.65942,
+          "llmFirst": 785.88393,
+          "llmLast": 1065.72052,
+          "ttsFirst": 158,
+          "response": 2363.54335
+        },
+        {
+          "stt": 649.37866,
+          "llmFirst": 996.51748,
+          "llmLast": 1234.63987,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": 476.79663,
+          "llmFirst": 1349.29114,
+          "llmLast": 1692.51499,
+          "ttsFirst": 151,
+          "response": 1977.08777
+        },
+        {
+          "stt": 648.1626,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": 886.01709,
+          "llmFirst": 756.40516,
+          "llmLast": 1229.8013,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": 503.47168,
+          "llmFirst": 916.5237,
+          "llmLast": 1335.06997,
+          "ttsFirst": 153,
+          "response": 1572.9953799999998
+        },
+        {
+          "stt": 464.22949,
+          "llmFirst": 910.41387,
+          "llmLast": 1297.44532,
+          "ttsFirst": 151,
+          "response": 1525.64336
+        },
+        {
+          "stt": 2436.21826,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": 1637.55542,
+          "llmFirst": 848.36454,
+          "llmLast": 1143.48238,
+          "ttsFirst": 151,
+          "response": 2636.91996
+        },
+        {
+          "stt": 625.41333,
+          "llmFirst": 1140.00584,
+          "llmLast": 1373.01919,
+          "ttsFirst": 154,
+          "response": 1919.4191700000001
+        },
+        {
+          "stt": 1020.44043,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": 485.22852,
+          "llmFirst": 870.72605,
+          "llmLast": 1875.63456,
+          "ttsFirst": 159,
+          "response": 1514.9545699999999
+        },
+        {
+          "stt": 433.0022,
+          "llmFirst": 769.96339,
+          "llmLast": 1198.52304,
+          "ttsFirst": 152,
+          "response": 1354.96559
+        },
+        {
+          "stt": 834.19458,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": 621.93604,
+          "llmFirst": 735.05297,
+          "llmLast": 1100.79652,
+          "ttsFirst": 157,
+          "response": 1513.98901
+        },
+        {
+          "stt": 608.85352,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": 489.67017,
+          "llmFirst": 1118.85435,
+          "llmLast": 1461.29229,
+          "ttsFirst": 153,
+          "response": 1761.52452
+        },
+        {
+          "stt": 678.12402,
+          "llmFirst": 1284.9379,
+          "llmLast": 1725.72909,
+          "ttsFirst": 152,
+          "response": 2115.06192
+        },
+        {
+          "stt": 422.6001,
+          "llmFirst": 801.33766,
+          "llmLast": 1165.95254,
+          "ttsFirst": 156,
+          "response": 1379.93776
+        },
+        {
+          "stt": 668.08643,
+          "llmFirst": 1064.36827,
+          "llmLast": 1428.79442,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": 628.59644,
+          "llmFirst": 1018.00166,
+          "llmLast": 1330.27775,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": 631.47974,
+          "llmFirst": 1162.51498,
+          "llmLast": 1472.54184,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": 628.3147,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": 430.604,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": 476.79492,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": 466.84497,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": 423.6792,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": 481.06592,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": 616.77319,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": 1416.46802,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": 622.2959,
+          "llmFirst": 802.51132,
+          "llmLast": 1094.53562,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": 465.33716,
+          "llmFirst": 1124.51116,
+          "llmLast": 1480.51715,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": 625.71948,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 784.57817,
+          "llmLast": 968.6433,
+          "ttsFirst": null,
+          "response": null
+        }
+      ],
+      "interruptions": 22,
+      "cost": {
+        "total": 27.5,
+        "llm": 9.694,
+        "tts": 9.628,
+        "stt": 0.989,
+        "platform": 10
+      },
+      "agent": "normal"
+    },
+    {
+      "id": "75ef8a47-3e2c-4fca-be6d-2d052b917b0d",
+      "at": "2026-10-22T16:04:50.711277+00:00",
+      "seconds": 140.6,
+      "status": "completed",
+      "config": "gpt-5.4-mini / stt-rt-v5 / bulbul:v3 / suhani",
+      "turns": [
+        {
+          "stt": 482.8208,
+          "llmFirst": 1000.65069,
+          "llmLast": 1265.68557,
+          "ttsFirst": 3,
+          "response": 1486.4714900000001
+        },
+        {
+          "stt": 463.85132,
+          "llmFirst": 803.60395,
+          "llmLast": 1335.9697,
+          "ttsFirst": 533,
+          "response": 1800.45527
+        },
+        {
+          "stt": 467.87573,
+          "llmFirst": 734.1197,
+          "llmLast": 1099.89633,
+          "ttsFirst": 122,
+          "response": 1323.99543
+        },
+        {
+          "stt": 622.05469,
+          "llmFirst": 718.08283,
+          "llmLast": 1057.04695,
+          "ttsFirst": 139,
+          "response": 1479.13752
+        },
+        {
+          "stt": 624.10718,
+          "llmFirst": 664.06224,
+          "llmLast": 1122.72253,
+          "ttsFirst": 151,
+          "response": 1439.16942
+        },
+        {
+          "stt": 668.37329,
+          "llmFirst": 1132.82807,
+          "llmLast": 1632.47376,
+          "ttsFirst": 151,
+          "response": 1952.20136
+        },
+        {
+          "stt": 669.64453,
+          "llmFirst": 716.49404,
+          "llmLast": 981.55128,
+          "ttsFirst": 152,
+          "response": 1538.13857
+        },
+        {
+          "stt": 811.54248,
+          "llmFirst": 932.53578,
+          "llmLast": 1363.01767,
+          "ttsFirst": 151,
+          "response": 1895.07826
+        },
+        {
+          "stt": 359.6377,
+          "llmFirst": 791.24858,
+          "llmLast": 1208.18466,
+          "ttsFirst": 154,
+          "response": 1304.88628
+        },
+        {
+          "stt": 636.39453,
+          "llmFirst": 722.14124,
+          "llmLast": 1009.57348,
+          "ttsFirst": 151,
+          "response": 1509.53577
+        },
+        {
+          "stt": null,
+          "llmFirst": 691.86473,
+          "llmLast": 1000.86312,
+          "ttsFirst": 3,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 1647.33545,
+          "llmLast": 1973.29597,
+          "ttsFirst": 152,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 796.72556,
+          "llmLast": 1043.64635,
+          "ttsFirst": 151,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 709.66069,
+          "llmLast": 1138.36927,
+          "ttsFirst": 150,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 948.18259,
+          "llmLast": 1356.82122,
+          "ttsFirst": 151,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 1481.4909,
+          "llmLast": 1803.48647,
+          "ttsFirst": 157,
+          "response": null
+        }
+      ],
+      "interruptions": 4,
+      "cost": {
+        "total": 13.75,
+        "llm": 2.89,
+        "tts": 5.44,
+        "stt": 0.48,
+        "platform": 5
+      },
+      "agent": "normal"
+    },
+    {
+      "id": "dd263138-72d8-46ac-aee0-b9fdcac48a83",
+      "at": "2026-10-22T16:03:06.842663+00:00",
+      "seconds": 89.8,
+      "status": "completed",
+      "config": "gpt-5.4-mini / stt-rt-v5 / bulbul:v3 / suhani",
+      "turns": [],
+      "interruptions": 0,
+      "cost": {
+        "total": 8.25,
+        "llm": 0,
+        "tts": 0.168,
+        "stt": 0.139,
+        "platform": 3
+      },
+      "agent": "normal"
+    },
+    {
+      "id": "b6406f0a-32bd-45f7-9b34-6273cbde9e4b",
+      "at": "2026-10-22T14:40:43.023589+00:00",
+      "seconds": 39.2,
+      "status": "completed",
+      "config": "gpt-5.4-mini / stt-rt-v5 / bulbul:v3 / suhani",
+      "turns": [
+        {
+          "stt": 419.28931,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": 421.98755,
+          "llmFirst": 1127.69927,
+          "llmLast": 1760.52938,
+          "ttsFirst": 3,
+          "response": 1552.6868200000001
+        },
+        {
+          "stt": null,
+          "llmFirst": 591.9702,
+          "llmLast": 968.37928,
+          "ttsFirst": 150,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 642.01425,
+          "llmLast": 1158.96449,
+          "ttsFirst": 162,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 623.99179,
+          "llmLast": 1027.43915,
+          "ttsFirst": 151,
+          "response": null
+        }
+      ],
+      "interruptions": 0,
+      "cost": {
+        "total": 5.5,
+        "llm": 0.431,
+        "tts": 0.86,
+        "stt": 0.131,
+        "platform": 2
+      },
+      "agent": "normal"
+    },
+    {
+      "id": "3770282e-0b77-4cc2-8bb8-802512adcb9c",
+      "at": "2026-10-22T14:39:09.712106+00:00",
+      "seconds": 70.2,
+      "status": "completed",
+      "config": "gpt-5.4-mini / stt-rt-v5 / bulbul:v3 / suhani",
+      "turns": [
+        {
+          "stt": 418.55933,
+          "llmFirst": 828.83438,
+          "llmLast": 1183.86898,
+          "ttsFirst": 3,
+          "response": 1250.39371
+        },
+        {
+          "stt": 467.76758,
+          "llmFirst": 785.05222,
+          "llmLast": 2011.75768,
+          "ttsFirst": 159,
+          "response": 1411.8198
+        },
+        {
+          "stt": 629.50708,
+          "llmFirst": 975.2722,
+          "llmLast": 1502.95449,
+          "ttsFirst": 153,
+          "response": 1757.77928
+        },
+        {
+          "stt": null,
+          "llmFirst": 722.2668,
+          "llmLast": 1034.05341,
+          "ttsFirst": 141,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 1130.71614,
+          "llmLast": 1684.71852,
+          "ttsFirst": 137,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 1168.64168,
+          "llmLast": 1654.20216,
+          "ttsFirst": 152,
+          "response": null
+        }
+      ],
+      "interruptions": 1,
+      "cost": {
+        "total": 8.25,
+        "llm": 0.683,
+        "tts": 1.932,
+        "stt": 0.242,
+        "platform": 3
+      },
+      "agent": "normal"
+    },
+    {
+      "id": "b78967b8-0cbe-49fc-b153-ea07dec8badc",
+      "at": "2026-10-22T13:38:21.555181+00:00",
+      "seconds": 0,
+      "status": "failed",
+      "config": "",
+      "turns": [],
+      "interruptions": 0,
+      "cost": {
+        "total": 0,
+        "llm": 0,
+        "tts": 0,
+        "stt": 0,
+        "platform": 0
+      },
+      "agent": "normal"
+    },
+    {
+      "id": "83461015-4b4f-4a72-9e46-e619a061b79f",
+      "at": "2026-10-22T13:38:21.477804+00:00",
+      "seconds": 0,
+      "status": "failed",
+      "config": "",
+      "turns": [],
+      "interruptions": 0,
+      "cost": {
+        "total": 0,
+        "llm": 0,
+        "tts": 0,
+        "stt": 0,
+        "platform": 0
+      },
+      "agent": "normal"
+    },
+    {
+      "id": "7a157c7a-097b-4167-aab5-aaab98de5089",
+      "at": "2026-10-22T13:28:33.792960+00:00",
+      "seconds": 122.2,
+      "status": "completed",
+      "config": "gpt-5.4-mini / saaras:v3 / bulbul:v3 / suhani",
+      "turns": [
+        {
+          "stt": null,
+          "llmFirst": 878.14725,
+          "llmLast": 1564.21331,
+          "ttsFirst": 3,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 619.69998,
+          "llmLast": 1183.10944,
+          "ttsFirst": 151,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 901.49346,
+          "llmLast": 1368.77554,
+          "ttsFirst": 158,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 682.72851,
+          "llmLast": 1256.23273,
+          "ttsFirst": 151,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 686.78292,
+          "llmLast": 1122.31359,
+          "ttsFirst": 163,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 901.91056,
+          "llmLast": 1254.65359,
+          "ttsFirst": 150,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 1058.83508,
+          "llmLast": 1417.53946,
+          "ttsFirst": 152,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 904.29935,
+          "llmLast": 1438.9949,
+          "ttsFirst": 150,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 1013.28565,
+          "llmLast": 1819.20023,
+          "ttsFirst": 152,
+          "response": null
+        }
+      ],
+      "interruptions": 3,
+      "cost": {
+        "total": 13.75,
+        "llm": 0.956,
+        "tts": 5.248,
+        "stt": 1.086,
+        "platform": 5
+      },
+      "agent": "normal"
+    },
+    {
+      "id": "309a2cf5-2dad-4f10-a8ea-4391c9f4a826",
+      "at": "2026-10-22T13:22:31.429998+00:00",
+      "seconds": 190,
+      "status": "completed",
+      "config": "gpt-5.4-mini / saaras:v3 / bulbul:v3 / suhani",
+      "turns": [
+        {
+          "stt": null,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 831.2334,
+          "llmLast": 1482.643,
+          "ttsFirst": 3,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 1010.37188,
+          "llmLast": 1696.67778,
+          "ttsFirst": 159,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 722.55182,
+          "llmLast": 1328.00868,
+          "ttsFirst": 152,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 921.06384,
+          "llmLast": 1709.832,
+          "ttsFirst": 255,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 646.69743,
+          "llmLast": 1353.40497,
+          "ttsFirst": 150,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 661.44935,
+          "llmLast": 882.34726,
+          "ttsFirst": 157,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 1010.81741,
+          "llmLast": 1422.83783,
+          "ttsFirst": 154,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 813.83658,
+          "llmLast": 1241.51125,
+          "ttsFirst": 154,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 903.91044,
+          "llmLast": 1263.3083,
+          "ttsFirst": 151,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 706.2709,
+          "llmLast": 1426.19827,
+          "ttsFirst": 151,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 714.49923,
+          "llmLast": 1192.53342,
+          "ttsFirst": 152,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 739.61892,
+          "llmLast": 1330.78536,
+          "ttsFirst": 69,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 988.75584,
+          "llmLast": 1666.77014,
+          "ttsFirst": 148,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 647.35939,
+          "llmLast": 970.20129,
+          "ttsFirst": 155,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 2126.42124,
+          "llmLast": 3285.76317,
+          "ttsFirst": 155,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 1011.29543,
+          "llmLast": 1584.11452,
+          "ttsFirst": 146,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": null,
+          "llmLast": null,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 646.0431,
+          "llmLast": 1193.56338,
+          "ttsFirst": null,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 940.68016,
+          "llmLast": 1683.41049,
+          "ttsFirst": 32,
+          "response": null
+        },
+        {
+          "stt": null,
+          "llmFirst": 717.90237,
+          "llmLast": 1079.97048,
+          "ttsFirst": 151,
+          "response": null
+        }
+      ],
+      "interruptions": 13,
+      "cost": {
+        "total": 19.25,
+        "llm": 3.107,
+        "tts": 13.34,
+        "stt": 1.72,
+        "platform": 7
+      },
+      "agent": "normal"
+    },
+    {
+      "id": "6b44eb7f-f57e-4249-bcc3-59b4d9145db6",
+      "at": "2026-10-22T13:22:29.088361+00:00",
+      "seconds": 0,
+      "status": "failed",
+      "config": "",
+      "turns": [],
+      "interruptions": 0,
+      "cost": {
+        "total": 0,
+        "llm": 0,
+        "tts": 0,
+        "stt": 0,
+        "platform": 0
+      },
+      "agent": "normal"
+    },
+    {
+      "id": "8c2c6f7a-a03d-4acf-b5da-ac8e23b926ca",
+      "at": "2026-10-22T13:20:58.627456+00:00",
+      "seconds": 0,
+      "status": "failed",
+      "config": "",
+      "turns": [],
+      "interruptions": 0,
+      "cost": {
+        "total": 0,
+        "llm": 0,
+        "tts": 0,
+        "stt": 0,
+        "platform": 0
+      },
+      "agent": "normal"
+    },
+    {
+      "id": "915221b8-f99c-4ec2-8354-d952fb49bbf3",
+      "at": "2026-10-22T13:10:54.639202+00:00",
+      "seconds": 0,
+      "status": "failed",
+      "config": "",
+      "turns": [],
+      "interruptions": 0,
+      "cost": {
+        "total": 0,
+        "llm": 0,
+        "tts": 0,
+        "stt": 0,
+        "platform": 0
+      },
+      "agent": "normal"
+    }
+  ]
+}

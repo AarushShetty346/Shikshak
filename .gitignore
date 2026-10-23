@@ -3,5 +3,14 @@ dist
 .env
 *.log
 
-# Saved handwriting samples are kept; uncomment to keep them out of git
-# eval/samples/
+# Server state (sessions, devices, learners). Never commit: it holds students' work.
+data/
+
+# Handwriting samples saved for checker tests are students' work: keep them out of git.
+eval/samples/
+eval/cases.json
+
+# Browser test runs
+e2e/.data/
+test-results/
+playwright-report/

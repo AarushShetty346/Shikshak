@@ -1,0 +1,202 @@
+{
+  "generatedAt": "2026-10-23T16:25:12.390Z",
+  "repeat": 1,
+  "blocked": [
+    "openai:gpt-5.4-mini (needs OPENAI_API_KEY)",
+    "anthropic:claude-haiku-5-5 (needs ANTHROPIC_API_KEY)"
+  ],
+  "rows": [
+    {
+      "candidate": "gemini:gemini-3-flash-preview",
+      "scenario": "done-pressed",
+      "run": 1,
+      "reply": {
+        "text": "",
+        "tool": "look_at_board",
+        "args": {
+          "session_code": "s_benchmarkbenchmarkbench"
+        },
+        "ttftMs": 1404.5874999999996,
+        "totalMs": 1443.9415,
+        "inputTokens": 5660,
+        "outputTokens": 24,
+        "error": null
+      },
+      "score": {
+        "toolCorrect": true,
+        "argsValid": true,
+        "hintPolicy": true,
+        "language": true,
+        "failed": false
+      }
+    },
+    {
+      "candidate": "gemini:gemini-3-flash-preview",
+      "scenario": "stuck-hint",
+      "run": 1,
+      "reply": {
+        "text": "",
+        "tool": "write",
+        "args": {
+          "content": "a = first term || d = common difference || a_n = a + (n-1)d",
+          "kind": "steps",
+          "session_code": "s_benchmarkbenchmarkbench"
+        },
+        "ttftMs": 1911.0969000000005,
+        "totalMs": 2005.9855000000025,
+        "inputTokens": 5668,
+        "outputTokens": 99,
+        "error": null
+      },
+      "score": {
+        "toolCorrect": false,
+        "argsValid": true,
+        "hintPolicy": true,
+        "language": true,
+        "failed": false
+      }
+    },
+    {
+      "candidate": "gemini:gemini-3-flash-preview",
+      "scenario": "answer-aloud",
+      "run": 1,
+      "reply": {
+        "text": "",
+        "tool": "check_answer",
+        "args": {
+          "answer": "32",
+          "session_code": "s_benchmarkbenchmarkbench"
+        },
+        "ttftMs": 1446.3349000000017,
+        "totalMs": 1458.0083999999988,
+        "inputTokens": 5657,
+        "outputTokens": 29,
+        "error": null
+      },
+      "score": {
+        "toolCorrect": true,
+        "argsValid": true,
+        "hintPolicy": true,
+        "language": true,
+        "failed": false
+      }
+    },
+    {
+      "candidate": "gemini:gemini-3-flash-preview",
+      "scenario": "new-topic-diagnostic",
+      "run": 1,
+      "reply": {
+        "text": "",
+        "tool": "diagnostic",
+        "args": {
+          "session_code": "s_benchmarkbenchmarkbench",
+          "action": "start"
+        },
+        "ttftMs": 1415.501400000001,
+        "totalMs": 1426.3537999999971,
+        "inputTokens": 5615,
+        "outputTokens": 26,
+        "error": null
+      },
+      "score": {
+        "toolCorrect": true,
+        "argsValid": true,
+        "hintPolicy": true,
+        "language": true,
+        "failed": false
+      }
+    },
+    {
+      "candidate": "gemini:gemini-3-flash-preview",
+      "scenario": "explain-on-board",
+      "run": 1,
+      "reply": {
+        "text": "",
+        "tool": "write",
+        "args": {
+          "kind": "steps",
+          "content": "Common Difference (d) || arithmetic progression mein || do consecutive terms ka difference || d = a_2 - a_1 || Example: 2, 5, 8... || d = 5 - 2 = 3",
+          "session_code": "s_benchmarkbenchmarkbench"
+        },
+        "ttftMs": 1785.4997000000003,
+        "totalMs": 1790.9421000000002,
+        "inputTokens": 5650,
+        "outputTokens": 79,
+        "error": null
+      },
+      "score": {
+        "toolCorrect": true,
+        "argsValid": true,
+        "hintPolicy": true,
+        "language": true,
+        "failed": false
+      }
+    },
+    {
+      "candidate": "gemini:gemini-3-flash-preview",
+      "scenario": "hindi-reply",
+      "run": 1,
+      "reply": {
+        "text": "",
+        "tool": null,
+        "args": {},
+        "ttftMs": null,
+        "totalMs": 0,
+        "inputTokens": null,
+        "outputTokens": null,
+        "error": "rate limited (429)"
+      },
+      "score": {
+        "toolCorrect": false,
+        "argsValid": false,
+        "hintPolicy": true,
+        "language": true,
+        "failed": true
+      }
+    },
+    {
+      "candidate": "gemini:gemini-3-flash-preview",
+      "scenario": "back-after-doubt",
+      "run": 1,
+      "reply": {
+        "text": "",
+        "tool": null,
+        "args": {},
+        "ttftMs": null,
+        "totalMs": 0,
+        "inputTokens": null,
+        "outputTokens": null,
+        "error": "rate limited (429)"
+      },
+      "score": {
+        "toolCorrect": false,
+        "argsValid": false,
+        "hintPolicy": true,
+        "language": true,
+        "failed": true
+      }
+    },
+    {
+      "candidate": "gemini:gemini-3-flash-preview",
+      "scenario": "harder-problem",
+      "run": 1,
+      "reply": {
+        "text": "",
+        "tool": null,
+        "args": {},
+        "ttftMs": null,
+        "totalMs": 0,
+        "inputTokens": null,
+        "outputTokens": null,
+        "error": "rate limited (429)"
+      },
+      "score": {
+        "toolCorrect": false,
+        "argsValid": false,
+        "hintPolicy": true,
+        "language": true,
+        "failed": true
+      }
+    }
+  ]
+}
