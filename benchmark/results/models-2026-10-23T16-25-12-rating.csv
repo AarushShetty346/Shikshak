@@ -1,0 +1,9 @@
+﻿candidate_hidden,scenario,what,student_said,tutor_reply,tool,tool_args,clarity_1to5,warmth_1to5,language_natural_1to5,teaching_move_ok_yes_no,notes
+"M1","done-pressed","Student pressed Done on the board","dtmf_number: 1","","look_at_board","{""session_code"":""s_benchmarkbenchmarkbench""}","","","","",""
+"M1","hindi-reply","A Hindi-speaking student: reply in Devanagari","मुझे AP में common difference समझ नहीं आया।","","","{}","","","","",""
+"M1","answer-aloud","Student says an answer out loud","Ma'am mera answer 32 aaya.","","check_answer","{""answer"":""32"",""session_code"":""s_benchmarkbenchmarkbench""}","","","","",""
+"M1","harder-problem","Student asks for a harder problem","Ma'am ek aur, thoda mushkil wala sawaal do.","","","{}","","","","",""
+"M1","explain-on-board","Asked to explain the common difference on the board","Common difference kya hota hai? Board pe likh ke samjhao na.","","write","{""kind"":""steps"",""content"":""Common Difference (d) || arithmetic progression mein || do consecutive terms ka difference || d = a_2 - a_1 || Example: 2, 5, 8... || d = 5 - 2 = 3"",""session_code"":""s_benchmarkbenchmarkbench""}","","","","",""
+"M1","stuck-hint","Student is stuck: should get the next hint, not the answer","Mujhe samajh nahi aa raha ma'am, kaise karun?","","write","{""content"":""a = first term || d = common difference || a_n = a + (n-1)d"",""kind"":""steps"",""session_code"":""s_benchmarkbenchmarkbench""}","","","","",""
+"M1","back-after-doubt","Doubt answered: continue the lesson where it was","Achha theek hai, samajh gaya. Aage chaliye.","","","{}","","","","",""
+"M1","new-topic-diagnostic","A brand-new topic: offer or start the quick check","Haan ma'am, shuru karte hain.","","diagnostic","{""session_code"":""s_benchmarkbenchmarkbench"",""action"":""start""}","","","","",""

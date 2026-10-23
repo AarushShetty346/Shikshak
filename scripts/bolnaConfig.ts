@@ -263,6 +263,41 @@ export interface VoiceOptions {
   telephony: string;
 }
 
+export interface LlmChoice {
+  provider: string;
+  model: string;
+  since: string;
+  evidence: string;
+}
+export interface LlmConfig {
+  note?: string;
+  current: LlmChoice;
+  previous: LlmChoice | null;
+}
+export const LLM_FILE = path.join(root, "bolna", "llm.json");
+
+/** The conversation model (bolna/llm.json), the same on every agent. */
+export function readLlmConfig(file = LLM_FILE): LlmConfig {
+  return JSON.parse(readFileSync(file, "utf8")) as LlmConfig;
+}
+function currentLlm() {
+  const { provider, model } = readLlmConfig().current;
+  return { provider, model };
+}
+
+/** Switch to a new model, keeping the current one for rollback. Needs evidence (a benchmark result). */
+export function switchLlm(cfg: LlmConfig, next: { provider: string; model: string }, evidence: string, today: string): LlmConfig {
+  if (!evidence.trim()) throw new Error("A switch needs evidence: the benchmark result that supports it.");
+  if (cfg.current.provider === next.provider && cfg.current.model === next.model) throw new Error("That model is already in use.");
+  return { ...cfg, current: { ...next, since: today, evidence }, previous: cfg.current };
+}
+
+/** Go back to the previous model. */
+export function rollbackLlm(cfg: LlmConfig, today: string): LlmConfig {
+  if (!cfg.previous) throw new Error("There is no previous model to roll back to.");
+  return { ...cfg, current: { ...cfg.previous, since: today, evidence: `Rolled back from ${cfg.current.provider}:${cfg.current.model}` }, previous: cfg.current };
+}
+
 // Defaults: Sarvam for Indian-language speech in and out (a buildathon sponsor), a fast GPT for the conversation.
 export const DEFAULT_VOICE: VoiceOptions = {
   languages: ["hi", "en"],
@@ -270,7 +305,7 @@ export const DEFAULT_VOICE: VoiceOptions = {
   // (semantic end of turn) instead of a fixed silence timer, so it doesn't cut in when they pause.
   transcriber: { provider: "soniox", model: "stt-rt-v5" },
   synthesizer: { provider: "sarvam", model: "bulbul:v3", voice: "suhani", voice_id: "suhani" },
-  llm: { provider: "openai", model: "gpt-5.4-mini" },
+  llm: currentLlm(),
   telephony: "plivo",
 };
 

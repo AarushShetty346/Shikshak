@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildAgentPayload, buildTools, readPrompt } from "./bolnaConfig";
+import { buildAgentPayload, buildTools, readLlmConfig, readPrompt, rollbackLlm, switchLlm } from "./bolnaConfig";
 
 const TOOL_NAMES = [
   "write", "draw", "highlight", "erase", "give_problem", "look_at_board", "continue_lesson", "show_section", "read_material", "show_page", "give_practice",
@@ -60,5 +60,30 @@ describe("Bolna agent config", () => {
     const router = toolsRouter() as unknown as { stack: { route?: { path: string } }[] };
     const routes = new Set(router.stack.map((l) => l.route?.path).filter(Boolean));
     for (const t of buildTools("https://x.example.org")) expect(routes.has(`/${t.name}`), t.name).toBe(true);
+  });
+});
+
+describe("conversation model choice", () => {
+  const cfg = {
+    current: { provider: "openai", model: "gpt-5.4-mini", since: "x", evidence: "calls" },
+    previous: null,
+  };
+
+  it("the live agents use the model in bolna/llm.json", () => {
+    const { current } = readLlmConfig();
+    const body = buildAgentPayload({ publicUrl: "https://x.test" });
+    expect(body.agent_config.tasks[0].tools_config.llm_agent.llm_config).toMatchObject({ provider: current.provider, model: current.model });
+  });
+
+  it("switching needs evidence and keeps the old model for rollback", () => {
+    expect(() => switchLlm(cfg, { provider: "openai", model: "gpt-5.4" }, " ", "d")).toThrow(/evidence/);
+    expect(() => switchLlm(cfg, { provider: "openai", model: "gpt-5.4-mini" }, "r.md", "d")).toThrow(/already/);
+    const next = switchLlm(cfg, { provider: "openai", model: "gpt-5.4" }, "r.md", "2026-10-24");
+    expect(next.current).toEqual({ provider: "openai", model: "gpt-5.4", since: "2026-10-24", evidence: "r.md" });
+    expect(next.previous).toEqual(cfg.current);
+    const back = rollbackLlm(next, "2026-10-25");
+    expect(back.current).toMatchObject({ provider: "openai", model: "gpt-5.4-mini" });
+    expect(back.previous?.model).toBe("gpt-5.4");
+    expect(() => rollbackLlm(cfg, "d")).toThrow(/previous/);
   });
 });

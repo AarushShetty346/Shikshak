@@ -15,7 +15,10 @@
     "typecheck": "tsc --noEmit",
     "bolna:tools": "tsx scripts/print-bolna-tools.ts",
     "bolna:setup": "tsx scripts/setup-bolna.ts",
-    "eval:checker": "tsx scripts/eval-checker.ts"
+    "eval:checker": "tsx scripts/eval-checker.ts",
+    "bolna:model": "tsx scripts/llm-model.ts",
+    "bench:calls": "tsx scripts/bench/calls.ts",
+    "bench:models": "tsx scripts/bench/models.ts"
   },
   "engines": {
     "node": ">=20"

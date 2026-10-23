@@ -48,7 +48,7 @@ for (const speed of speeds) {
   const text = await res.text();
   if (!res.ok) {
     console.error(`Bolna said ${res.status} for the ${speed} agent: ${text}`);
-    console.error("\nIf it rejected a voice or model, change DEFAULT_VOICE in scripts/bolnaConfig.ts.");
+    console.error("\nIf it rejected a voice or model, change DEFAULT_VOICE in scripts/bolnaConfig.ts (voices) or roll the model back with npm run bolna:model -- --rollback.");
     process.exit(1);
   }
   if (existing) console.log(`Updated ${speed} agent ${existing}.`);
