@@ -176,7 +176,7 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
               : sig.state === "received"
                 ? { ...cur, state: "reviewing" }
                 : sig.state === "done"
-                  ? { ...cur, state: "done", status: sig.status, summary: sig.summary }
+                  ? { ...cur, state: "done", status: sig.status, summary: sig.summary, marks: sig.marks }
                   : sig.state === "stale"
                     ? { ...cur, state: "stale", summary: sig.summary }
                     : { ...cur, state: "failed", summary: sig.summary },

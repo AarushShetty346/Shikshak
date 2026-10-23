@@ -71,7 +71,7 @@ export type Signal =
   | { type: "checking"; requestId: string }
   | { type: "unclear"; note: string }
   /** Progress of a Done submission: received by the server, read, or failed. */
-  | { type: "review"; captureId: string; questionId: string | null; state: "received" | "done" | "failed" | "stale"; status?: string; summary?: string };
+  | { type: "review"; captureId: string; questionId: string | null; state: "received" | "done" | "failed" | "stale"; status?: string; summary?: string; marks?: { got: number; of: number; provisional: boolean } };
 
 export interface HighlightState {
   id: string;

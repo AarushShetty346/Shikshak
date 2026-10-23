@@ -2472,3 +2472,11 @@ sub {
 .phone-box > button {
   justify-self: start;
 }
+
+.submission .submission-marks {
+  font-size: 13px;
+}
+
+.submission-marks b {
+  color: var(--ink);
+}

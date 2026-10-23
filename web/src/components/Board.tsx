@@ -45,7 +45,11 @@ export interface Submission {
   state: "idle" | "submitting" | "reviewing" | "done" | "failed" | "stale";
   status?: string;
   summary?: string;
+  /** Practice marks in CBSE style (checked problems only). */
+  marks?: { got: number; of: number; provisional: boolean };
 }
+
+const halves = (n: number) => `${Math.floor(n) || (n % 1 ? "" : "0")}${n % 1 ? "½" : ""}`;
 
 export type Highlight = HighlightState;
 
@@ -1035,6 +1039,12 @@ function SubmissionCard({ sub, onRetry, canRetry }: { sub: Submission; onRetry: 
     <div className="submission" data-state={sub.state} data-status={sub.status ?? ""} role="status" aria-live="polite">
       <strong>{title}</strong>
       {sub.summary && <span>{sub.summary}</span>}
+      {sub.state === "done" && sub.marks && (
+        <span className="submission-marks" title="Practice marks in the style of a CBSE marking scheme. Not an official mark.">
+          Practice marks: <b>{halves(sub.marks.got)} / {halves(sub.marks.of)}</b>
+          {sub.marks.provisional ? " (provisional: a line couldn't be read)" : " · CBSE-style, not official"}
+        </span>
+      )}
       {sub.state === "failed" && canRetry && (
         <button onClick={onRetry} className="submission-retry">
           Try again

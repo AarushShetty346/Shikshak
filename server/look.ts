@@ -2,6 +2,7 @@
 // For working, finds the first wrong line. Runs when the student presses Done (so the tutor's
 // later look is instant) and again only if the drawing changed.
 
+import { describeMarking, markWork, readingLines, type Marking } from "./marking";
 import { createHash } from "node:crypto";
 import { languageName } from "./claude";
 import { config } from "./config";
@@ -31,6 +32,10 @@ export interface LookResult {
   misconception_id?: string;
   /** Misconceptions recorded for this reading, with how sure we are (filled in after the model). */
   misconceptions?: MisconceptionEvidence[];
+  /** Practice marks in CBSE style, for library problems (see marking.ts). */
+  marks?: Marking;
+  /** The marks in one sentence, for the tutor to say. */
+  practice_marks?: string;
   /** The final answer was compared with the checked answer by the maths engine. */
   answer_checked?: "correct" | "incorrect" | "partial" | "approximate" | "not_checked";
 }
@@ -166,6 +171,13 @@ export function verifyReading(s: Session, result: LookResult): LookResult {
   const out: LookResult = { ...result, misconceptions: [], answer_checked: "not_checked" };
   const spec: AnswerSpec | undefined = s.problem?.answerSpec;
   const final = (result.final_answer ?? "").trim();
+  const libProblem = s.problem?.problemId ? libraryProblem(s.problem.problemId) : undefined;
+  if (libProblem && (result.kind === "working" || result.kind === "answer") && (result.status !== "empty" && result.status !== "not_checked")) {
+    const lines = readingLines(result.reading);
+    if (result.status === "unreadable" && result.line && lines[result.line - 1] !== undefined) lines[result.line - 1] = "[unclear]";
+    out.marks = markWork(libProblem, lines, final);
+    out.practice_marks = describeMarking(out.marks);
+  }
   if (result.status === "unreadable" || result.status === "empty" || result.status === "not_checked") return out;
   if (spec && final) {
     const cmp = compareAnswer(spec, final);
@@ -306,7 +318,15 @@ export async function reviewSubmission(s: Session, capture: Capture, onResult?: 
       return;
     }
     onResult?.(result);
-    signal(s, { type: "review", captureId: capture.id, questionId: q, state: "done", status: result.status, summary: feedbackSummary(result) });
+    signal(s, {
+      type: "review",
+      captureId: capture.id,
+      questionId: q,
+      state: "done",
+      status: result.status,
+      summary: feedbackSummary(result),
+      ...(result.marks ? { marks: { got: result.marks.got, of: result.marks.of, provisional: result.marks.provisional } } : {}),
+    });
   } catch (err) {
     console.error("[look] review failed", (err as Error).message);
     signal(s, { type: "review", captureId: capture.id, questionId: q, state: "failed", summary: (err as Error).name === "QuotaError" || (err as Error).name === "BusyError" ? (err as Error).message : "Couldn't read it just now. Tap Done again." });
