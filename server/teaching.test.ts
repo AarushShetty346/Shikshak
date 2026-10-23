@@ -50,9 +50,11 @@ describe("checked problems and solutions", () => {
     const t = await kit.openTab(srv.base, token, id);
     const r = await tool("next_problem", { session_code: id, problem_id: "ap.nth.demo" });
     expect(r).toMatchObject({ ok: true, problem: "Find the 10th term of the AP: 2, 5, 8, ..." });
-    expect(JSON.stringify(r)).not.toContain("29");
+    // Random ids can contain "29" by chance, so only the content is checked.
+    const content = (x: unknown) => JSON.stringify(x, (k, v) => (/id$|Id$|^seq$/.test(k) ? undefined : v));
+    expect(content(r)).not.toContain("29");
     await vi.waitFor(() => expect(t.events().at(-1)).toMatchObject({ type: "problem", kind: "practice" }));
-    expect(JSON.stringify(t.messages)).not.toContain("29");
+    expect(content(t.messages)).not.toContain("29");
     t.ws.close();
   });
 

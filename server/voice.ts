@@ -29,6 +29,17 @@ export function agentForSpeed(speed: unknown): string | undefined {
   return undefined;
 }
 
+/**
+ * Languages the deployed Bolna agents were set up with (BOLNA_AGENT_LANGUAGES, default "hi,en").
+ * Tamil and Telugu need the agents re-created with npm run bolna:setup first.
+ */
+export function agentLanguages(): string[] {
+  return (process.env.BOLNA_AGENT_LANGUAGES || "hi,en")
+    .split(",")
+    .map((x) => x.trim())
+    .filter(Boolean);
+}
+
 export function voiceConfigured(): boolean {
   return Boolean(process.env.BOLNA_API_KEY && process.env.BOLNA_AGENT_ID);
 }
@@ -89,6 +100,11 @@ export async function mintVoice(s: Session, opts: { speed: Speed; resuming: bool
   if (u.deviceMinutes >= config.voice.minutesPerOwnerPerDay()) return { status: 429, body: { error: "Today's voice time on this device is used up. Try again tomorrow." } };
   if (u.globalMinutes >= config.voice.minutesGlobalPerDay()) return { status: 503, body: { error: "Shikshak has reached today's voice limit. Try again tomorrow." } };
 
+  if (!agentLanguages().includes(VOICE_LANGUAGE[s.language]))
+    return {
+      status: 409,
+      body: { error: `${LANGUAGE_NAMES[s.language]} voice isn't set up on this server yet (preview). The board still works; for a voice class, pick Hindi, Hinglish or English.` },
+    };
   const agentId = agentForSpeed(opts.speed) ?? process.env.BOLNA_AGENT_ID!;
   const userData = buildUserData(s, opts);
   const lang = VOICE_LANGUAGE[s.language];

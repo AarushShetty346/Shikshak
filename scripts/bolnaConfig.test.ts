@@ -33,11 +33,11 @@ describe("Bolna agent config", () => {
     }
   });
 
-  it("is one agent that speaks Hindi and English, with Bolna's own lines in both", () => {
+  it("is one agent that speaks Hindi and English (Tamil and Telugu in preview), with Bolna's own lines in each", () => {
     const task = buildAgentPayload({ publicUrl: "https://x.example.org" }).agent_config.tasks[0];
     const ml = task.tools_config.multilingual_config;
     expect(ml.enabled).toBe(true);
-    expect(Object.keys(ml.languages)).toEqual(["hi", "en"]);
+    expect(Object.keys(ml.languages)).toEqual(["hi", "en", "ta", "te"]);
     expect(ml.languages.en.synthesizer.provider_config.language).toBe("en");
     expect(task.task_config.check_user_online_message.hi).toMatch(/[\u0900-\u097F]/);
     expect(task.task_config.trigger_user_online_message_after).toBeGreaterThanOrEqual(30);
@@ -106,5 +106,23 @@ describe("phone revision agent", () => {
     expect(body.agent_prompts.task_1.system_prompt).not.toContain("session_code");
     // The class agent is unchanged.
     expect(buildAgentPayload({ publicUrl: "https://x.test" }).agent_config.tasks[0].task_config.call_terminate).toBe(1200);
+  });
+});
+
+describe("Tamil and Telugu (preview)", () => {
+  it("every agent language has a transcriber, a voice and the prompt; every spoken line has all four languages", () => {
+    const body = buildAgentPayload({ publicUrl: "https://x.test" });
+    const cfg = body.agent_config.tasks[0].tools_config;
+    const langs = cfg.multilingual_config.languages as Record<string, { transcriber: { language: string }; synthesizer: { provider_config: { language: string } }; system_prompt: string }>;
+    expect(Object.keys(langs)).toEqual(["hi", "en", "ta", "te"]);
+    for (const [k, v] of Object.entries(langs)) {
+      expect(v.transcriber.language).toBe(k);
+      expect(v.synthesizer.provider_config.language).toBe(k);
+      expect(v.system_prompt.length).toBeGreaterThan(500);
+    }
+    for (const t of cfg.api_tools.tools as { pre_call_message: Record<string, string> }[]) expect(Object.keys(t.pre_call_message).sort()).toEqual(["en", "hi", "ta", "te"]);
+    const tc = body.agent_config.tasks[0].task_config as { check_user_online_message: Record<string, string>; call_hangup_message: Record<string, string> };
+    expect(Object.keys(tc.check_user_online_message).sort()).toEqual(["en", "hi", "ta", "te"]);
+    expect(Object.keys(tc.call_hangup_message).sort()).toEqual(["en", "hi", "ta", "te"]);
   });
 });

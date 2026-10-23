@@ -9,7 +9,10 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 /** Spoken while a tool runs. Keyed by language; Bolna plays the one matching the language the agent is speaking. */
-export type Spoken = Record<"hi" | "en", string>;
+export type Spoken = Record<"hi" | "en", string> & Partial<Record<"ta" | "te", string>>;
+
+/** Tamil and Telugu are in preview (not yet reviewed by fluent speakers): tools use a short neutral filler. */
+const PREVIEW_FILLER = { ta: "சரி.", te: "సరే." };
 
 export interface ToolDef {
   name: string;
@@ -38,7 +41,7 @@ function tool(
   return {
     name: opts.name,
     description: opts.description,
-    pre_call_message: opts.pre_call_message,
+    pre_call_message: { ...PREVIEW_FILLER, ...opts.pre_call_message },
     parameters: { type: "object", properties: all, required: [...Object.keys(id), ...opts.required] },
     key: "custom_task",
     value: {
@@ -326,7 +329,7 @@ export function readPhonePrompt(): { welcome: string; prompt: string } {
 
 export interface VoiceOptions {
   /** Languages the agent can speak, ISO 639-1. The first is the default. Hinglish runs on "hi". */
-  languages: ("hi" | "en")[];
+  languages: ("hi" | "en" | "ta" | "te")[];
   transcriber: { provider: string; model: string };
   synthesizer: { provider: string; model: string; voice: string; voice_id: string };
   llm: { provider: string; model: string };
@@ -370,7 +373,8 @@ export function rollbackLlm(cfg: LlmConfig, today: string): LlmConfig {
 
 // Defaults: Sarvam for Indian-language speech in and out (a buildathon sponsor), a fast GPT for the conversation.
 export const DEFAULT_VOICE: VoiceOptions = {
-  languages: ["hi", "en"],
+  // Tamil and Telugu: supported by Soniox (ta, te) and Sarvam bulbul:v3 (ta-IN, te-IN); preview.
+  languages: ["hi", "en", "ta", "te"],
   // Soniox: understands Hindi-English mixing and detects when the student has finished a thought
   // (semantic end of turn) instead of a fixed silence timer, so it doesn't cut in when they pause.
   transcriber: { provider: "soniox", model: "stt-rt-v5" },
@@ -391,10 +395,14 @@ const TRANSCRIBER_CONTEXT =
 const STILL_THERE: Spoken = {
   hi: "आप वहाँ हो? आराम से लिखो, हो जाए तो बताना।",
   en: "Are you still there? Take your time, and tell me when you're done.",
+  ta: "நீங்கள் இருக்கிறீர்களா? நிதானமாக எழுதுங்கள், முடிந்ததும் சொல்லுங்கள்.",
+  te: "మీరు ఉన్నారా? నెమ్మదిగా రాయండి, అయిపోయాక చెప్పండి.",
 };
 const GOODBYE: Spoken = {
   hi: "आज के लिए इतना ही। बहुत अच्छा किया, फिर मिलते हैं!",
   en: "That's all for today. Well done, see you next time!",
+  ta: "இன்றைக்கு இவ்வளவுதான். நன்றாகச் செய்தீர்கள், மீண்டும் சந்திப்போம்!",
+  te: "ఈరోజుకి ఇంతే. బాగా చేశారు, మళ్ళీ కలుద్దాం!",
 };
 
 /** Request body for POST /v2/agent (create) and PUT /v2/agent/{id} (update). */

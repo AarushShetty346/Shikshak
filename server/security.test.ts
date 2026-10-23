@@ -322,6 +322,23 @@ describe("voice limits", () => {
     expect(second.status).toBe(409); // one class at a time per device
   });
 
+  it("refuses a Tamil or Telugu voice class until the agents have that language", async () => {
+    const id = await kit.newSession(srv.base, token, { language: "ta" });
+    const r = await mintVoice(sessions.getSession(id)!, { speed: "normal", resuming: false }, okFetch as unknown as typeof fetch);
+    expect(r.status).toBe(409);
+    expect(JSON.stringify(r.body)).toMatch(/Tamil voice isn't set up/);
+    expect(okFetch).not.toHaveBeenCalled();
+    process.env.BOLNA_AGENT_LANGUAGES = "hi,en,ta,te";
+    try {
+      const ok = await mintVoice(sessions.getSession(id)!, { speed: "normal", resuming: false }, okFetch as unknown as typeof fetch);
+      expect(ok.status).toBe(200);
+      const body = JSON.parse((okFetch.mock.calls[0] as unknown as [string, { body: string }])[1].body);
+      expect(body.agent_data).toEqual({ language: "ta" });
+    } finally {
+      delete process.env.BOLNA_AGENT_LANGUAGES;
+    }
+  });
+
   it("stops minting when the day's voice minutes are used up", async () => {
     process.env.VOICE_MINUTES_PER_OWNER_PER_DAY = "0";
     try {
