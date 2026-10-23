@@ -60,7 +60,8 @@ describe("Bolna agent config", () => {
     const router = toolsRouter() as unknown as { stack: { route?: { path: string } }[] };
     const routes = new Set(router.stack.map((l) => l.route?.path).filter(Boolean));
     for (const t of buildTools("https://x.example.org")) expect(routes.has(`/${t.name}`), t.name).toBe(true);
-  });
+    // Imports the whole server on a cold cache, which can take more than the default 5 s.
+  }, 30_000);
 });
 
 describe("conversation model choice", () => {
