@@ -454,6 +454,8 @@ function unload(s: Session) {
 /** Unloads idle sessions and deletes expired ones. Runs every few minutes. */
 export function sweep(now = Date.now()) {
   const idleMs = config.limits.idleUnloadMinutes() * 60_000;
+  // Copied first: unload() deletes from the map while we loop.
+  // oxlint-disable-next-line unicorn/no-useless-spread
   for (const s of [...loaded.values()]) if (s.sockets.size === 0 && now - s.lastActive > idleMs) unload(s);
   const ttl = config.limits.sessionTtlDays() * 86_400_000;
   for (const id of store.ids("sessions")) {

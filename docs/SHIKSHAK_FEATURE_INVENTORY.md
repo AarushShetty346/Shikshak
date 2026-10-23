@@ -75,3 +75,37 @@ cannot inject text into a live call, only keypad tones (DTMF), which Bolna hands
 | 28 | Raw `[DRAW]` tags rejected; typed events | VERIFIED | All board actions are typed JSON events from validated tool calls |
 | 29 | Pedagogy engine, video ingestion | DEFERRED / BLOCKED | Needs rights-cleared media |
 | 30 | This inventory | VERIFIED | |
+
+## 3. V4 roadmap (Phases 1 to 10), status on 24 Oct 2026
+
+Status values are the same as above. VERIFIED means seen working by automated tests (unit,
+integration or Playwright) or in the running app, as marked. BLOCKED means it needs a key, money,
+people or an authorization we don't have.
+
+| Phase | Feature | Status | Evidence / what's missing |
+| --- | --- | --- | --- |
+| 1 | Device tokens (hashed), WebSocket tickets, origin check, tools token in production | VERIFIED (test) | `server/security.test.ts` |
+| 1 | Validation of every browser message, rate limits, daily quotas, model concurrency, voice caps | VERIFIED (test) | |
+| 1 | Durable store; board and hint step restored after a server restart | VERIFIED (test, browser) | Render free has no disk: data is lost on deploy (docs/DEPLOYMENT.md) |
+| 1 | Production deploy with `TOOLS_TOKEN` | BLOCKED | Needs the token on Render and `bolna:setup` re-run (authorization) |
+| 2 | Exact maths engine; library answers, steps and traps recomputed | VERIFIED (test) | `maths.test.ts`, `library.test.ts`, `solver.test.ts` |
+| 2 | `solve` verification labels; board refuses answer give-aways; `plan_next` | VERIFIED (test) | |
+| 2 | Human review of the problem library | BLOCKED | Needs a maths teacher (`LIBRARY_REVIEW` is null) |
+| 3 | Hint ladder, gated solution, misconceptions with confidence | VERIFIED (test, browser) | |
+| 4 | Learners, evidence-only memory, mastery rules, rejecting a misconception | VERIFIED (test, browser) | |
+| 4 | Adaptive quick check | VERIFIED (test, browser) | |
+| 4 | Memory spoken by the voice tutor | PARTIAL | Built and tested as prompt data; not heard in a call, because the live agents still have the old prompt |
+| 5 | Report card image, progress page, teacher share codes and revoke | VERIFIED (test, browser) | Sharing on a real phone (`navigator.share`) not tried |
+| 6 | Real-call latency and cost from Bolna records | VERIFIED | 23 calls, 201 turns (`benchmark/results/calls-*.md`) |
+| 6 | Model-only harness, scoring, blind rating sheet, model switch with rollback | VERIFIED (test; Gemini smoke run 5 of 8 before the free quota ran out) | |
+| 6 | Comparison against the live model (gpt-5.4-mini) and Claude | BLOCKED | Needs `OPENAI_API_KEY` and `ANTHROPIC_API_KEY`, plus raters for the sheet |
+| 7 | Phone revision: consent, allowlist, window, daily cap, no overlap, opt-out, keypad answers | VERIFIED (test with a mock provider, browser for the settings card) | |
+| 7 | Real phone calls | BLOCKED | Needs a Plivo or Twilio number in Bolna (paid), the phone agent created, and authorization. No calls placed |
+| 8 | CBSE-style practice marks: value points, follow-through, alternative methods, provisional | VERIFIED (test, Playwright Done flow with the fake checker) | Scheme derived automatically, not reviewed by an examiner |
+| 9 | Tamil and Telugu voice | PARTIAL / BLOCKED | Providers support both (docs checked). Agents not yet updated; the server refuses a ta/te voice class until `BOLNA_AGENT_LANGUAGES` includes them. Needs fluent-speaker review |
+| 9 | Teacher view, streaks in the learner's time zone | VERIFIED (test, browser) | |
+| 10 | Pilot tools, consent templates, anonymised export | VERIFIED (test, browser) | No pilot run; no learning-gain claims anywhere |
+| 10 | Demo script, backup plan, simulator labelled | DONE (docs) | `DEMO.md` |
+| — | Provider health (configured vs verified), lint, CI, browser tests | VERIFIED | `/api/health/providers`; oxlint clean; 10 Playwright tests on desktop and phone sizes; CI workflow added (first run happens on push) |
+
+Rows 5 (model benchmark) and 18 (Playwright) in the V3 table above are superseded by this table.

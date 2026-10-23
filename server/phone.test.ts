@@ -223,7 +223,7 @@ describe("phone revision: during the call", () => {
 
 describe("phone revision: operator endpoints", () => {
   const admin = (path: string, init: RequestInit = {}, secret = "operator-secret-for-tests") =>
-    fetch(`${srv.base}/api/admin${path}`, { ...init, headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json", ...(init.headers ?? {}) } });
+    fetch(`${srv.base}/api/admin${path}`, { ...init, headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json", ...init.headers } });
 
   it("are closed without ADMIN_TOKEN, and need the right secret", async () => {
     expect((await admin("/phone", {}, "wrong")).status).toBe(401);

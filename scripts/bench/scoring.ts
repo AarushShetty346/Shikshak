@@ -53,7 +53,7 @@ export function scoreReply(s: Scenario, r: Reply, enums: Record<string, Record<s
   let argsValid = true;
   if (r.tool && s.expectArgs) for (const [k, re] of Object.entries(s.expectArgs)) if (!re.test(String(r.args[k] ?? ""))) argsValid = false;
   if (r.tool) for (const [k, allowedValues] of Object.entries(enums[r.tool] ?? {})) if (r.args[k] !== undefined && !allowedValues.includes(String(r.args[k]))) argsValid = false;
-  if (r.tool && r.args.session_code !== undefined && !/^s_benchmark/.test(String(r.args.session_code))) argsValid = false;
+  if (r.tool && r.args.session_code !== undefined && !String(r.args.session_code).startsWith("s_benchmark")) argsValid = false;
   const said = `${r.text} ${JSON.stringify(r.args)}`;
   const hintPolicy = !s.mustNotReveal || (!new RegExp(`(^|[^0-9])${s.mustNotReveal}([^0-9]|$)`).test(said) && r.tool !== "show_solution");
   return { toolCorrect, argsValid, hintPolicy, language: languageOk(r.text, s.language), failed: false };

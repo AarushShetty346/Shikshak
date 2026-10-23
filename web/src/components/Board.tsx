@@ -166,7 +166,6 @@ export function Board(props: Props) {
   const [view, setView] = useState({ w: 0, h: 0 });
   const [tool, setTool] = useState<"pen" | "eraser" | "hand">("pen");
   const [newBelow, setNewBelow] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
   const [lastDone, setLastDone] = useState<string>("");
   const [revealed, setRevealed] = useState<Record<string, number>>({});
   const [held, setHeld] = useState<Set<string>>(new Set());
@@ -761,7 +760,6 @@ export function Board(props: Props) {
           New on the board <ArrowDown />
         </button>
       )}
-      {toast && <div className="board-toast" role="status">{toast}</div>}
       {sub.state !== "idle" && <SubmissionCard sub={sub} onRetry={done} canRetry={response.length > 0} />}
 
       <div className="board-tools" role="toolbar" aria-label="Board tools">

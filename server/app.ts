@@ -55,6 +55,7 @@ import { reportFor } from "./report";
 import { answerItem, createParticipant, deleteParticipant, exportCsv, listParticipants, noteIssue, participantFor, PilotError, publicForm, saveFeedback, startForm, summary, type FormId } from "./pilot";
 import { claimShareCode, createShareCode, grantsFor, revokeAllFor, revokeGrant, ShareError, teacherGrant } from "./shares";
 import { toolsRouter } from "./tools";
+import { checkProviders } from "./health";
 import { adminPhoneList, bolnaPhoneProvider, enrolPhone, optOut, PhoneError, placeRevisionCall, publicPhone, removePhone, type PhoneProvider } from "./phone";
 import { endVoice, mintVoice, voiceConfigured, voiceUsage, type Speed } from "./voice";
 
@@ -180,6 +181,11 @@ export function createApp(opts: { devTools?: boolean; phoneProvider?: PhoneProvi
       bolna: voiceConfigured(),
       publicUrl: Boolean(process.env.PUBLIC_URL && !process.env.PUBLIC_URL.includes("example.com")),
     });
+  });
+
+  // Whether each provider accepts its key right now (free metadata requests, cached 10 minutes).
+  app.get("/api/health/providers", rateLimit((req) => `health:${ipOf(req)}`, 6, 6), async (_req, res) => {
+    res.json(await checkProviders());
   });
 
   // ---------- operator (ADMIN_TOKEN) ----------

@@ -43,6 +43,8 @@ const mb = (n: number) => `${Math.round(n / 1024 / 1024)} MB`;
 
 /** Checks one uploaded file. Returns the cleaned file or a clear reason. */
 export function checkFile(f: UploadedFile): { ok: true; file: Omit<SessionDoc, "uploadedAt"> } | { ok: false; error: string } {
+  // Control characters are stripped from file names on purpose.
+  // oxlint-disable-next-line no-control-regex
   const name = String(f.name ?? "material").replace(/[\u0000-\u001f]/g, "").slice(0, 80) || "material";
   const mediaType = String(f.mediaType ?? "");
   if (!(TYPES as readonly string[]).includes(mediaType)) return { ok: false, error: `${name}: only PDF, JPG, PNG or WebP files` };

@@ -9,3 +9,8 @@ data/
 # Handwriting samples saved for checker tests are students' work: keep them out of git.
 eval/samples/
 eval/cases.json
+
+# Browser test runs
+e2e/.data/
+test-results/
+playwright-report/

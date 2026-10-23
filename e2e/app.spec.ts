@@ -1,0 +1,70 @@
+import { expect, test, type Page } from "@playwright/test";
+
+async function addLearner(page: Page, name: string) {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Add learner" }).click();
+  await page.getByPlaceholder("Asha").fill(name);
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(page.getByRole("button", { name: `${name}'s progress` })).toBeVisible();
+}
+
+test("a learner can be added and a class created and opened, with no horizontal scrolling", async ({ page }) => {
+  await addLearner(page, "Asha");
+  await page.getByRole("button", { name: /New session/ }).first().click();
+  await page.getByPlaceholder("e.g. Quadratic equations").fill("Arithmetic progressions");
+  await page.getByRole("button", { name: "Create session" }).click();
+  await expect(page.locator("canvas").first()).toBeVisible({ timeout: 20_000 });
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+});
+
+test("the progress page is honest with no evidence and shows phone revision as off", async ({ page }) => {
+  await addLearner(page, "Ravi");
+  await page.getByRole("button", { name: "Ravi's progress" }).click();
+  await expect(page.getByRole("heading", { name: "Phone revision" })).toBeVisible();
+  await expect(page.getByText("Phone calls are switched off on this server")).toBeVisible();
+  await expect(page.getByText(/mastered|excellent/i)).toHaveCount(0);
+});
+
+test("teacher view asks for a code; pilot tools require consent", async ({ page }) => {
+  await page.goto("/#/teacher");
+  await expect(page.getByText(/code/i).first()).toBeVisible();
+  await page.goto("/#/pilot");
+  await expect(page.getByText(/consent/i).first()).toBeVisible();
+});
+
+test("health says what is configured without claiming providers work", async ({ request }) => {
+  const h = await (await request.get("/api/health")).json();
+  expect(h.configured).toMatchObject({ checker: false, voice: false, phone: false });
+  const p = await (await request.get("/api/health/providers")).json();
+  expect(p.checker.gemini).toMatchObject({ configured: false, verified: false });
+  expect(p.voice.bolna).toMatchObject({ configured: false, verified: false });
+});
+
+test("practice question, write on the board, press Done: marked, with practice marks labelled as not official", async ({ page }) => {
+  await addLearner(page, "Meera");
+  await page.getByRole("button", { name: /New session/ }).first().click();
+  await page.getByPlaceholder("e.g. Quadratic equations").fill("Arithmetic progressions");
+  await page.getByRole("button", { name: "Create session" }).click();
+  const ink = page.locator("canvas.board-ink");
+  await expect(ink).toBeVisible({ timeout: 20_000 });
+  await page.getByRole("button", { name: "Session menu" }).click();
+  await page.getByRole("menuitem", { name: /Give me a practice question/ }).click();
+  await expect(page.locator(".submission, .btn-done").first()).toBeVisible();
+  await expect(page.getByText(/term|AP/).first()).toBeVisible();
+  // Three lines of "working" (the test server's fake checker reads any two or more lines as working).
+  const box = (await ink.boundingBox())!;
+  for (let i = 0; i < 3; i++) {
+    const y = box.y + box.height * (0.45 + i * 0.08);
+    await page.mouse.move(box.x + box.width * 0.2, y);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width * 0.35, y + 6, { steps: 8 });
+    await page.mouse.move(box.x + box.width * 0.5, y, { steps: 8 });
+    await page.mouse.up();
+  }
+  await page.locator("button.btn-done").click();
+  const card = page.locator(".submission");
+  await expect(card).toHaveAttribute("data-state", "done", { timeout: 20_000 });
+  await expect(card.locator(".submission-marks")).toContainText("Practice marks");
+  await expect(card.locator(".submission-marks")).toContainText(/not official|provisional/);
+});

@@ -18,7 +18,10 @@
     "eval:checker": "tsx scripts/eval-checker.ts",
     "bolna:model": "tsx scripts/llm-model.ts",
     "bench:calls": "tsx scripts/bench/calls.ts",
-    "bench:models": "tsx scripts/bench/models.ts"
+    "bench:models": "tsx scripts/bench/models.ts",
+    "lint": "oxlint server shared web/src scripts e2e --deny-warnings",
+    "test:e2e": "playwright test",
+    "check": "npm run typecheck && npm run lint && npm test && npm run build"
   },
   "engines": {
     "node": ">=20"
@@ -40,12 +43,14 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@types/express": "^5.0.6",
     "@types/node": "^26.6.5",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@types/ws": "^8.18.2",
     "@vitejs/plugin-react": "^6.1.2",
+    "oxlint": "^1.89.0",
     "typescript": "^7.0.2",
     "vite": "^8.3.5",
     "vitest": "^5.0.5"
