@@ -10,13 +10,13 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { diagramPieces, type Diagram } from "../../../shared/diagram";
 import { groupIntoLines, strokeBox } from "../../../shared/lines";
-import type { ClientMessage, MarkStyle, Place, Point, SectionInfo, Stroke, WriteStyle, WrittenLine } from "../../../shared/types";
+import type { Box, ClientMessage, CorrectState, HighlightState, HintLevel, MarkState, Place, Point, SectionInfo, Stroke, WriteStyle } from "../../../shared/types";
 import { makeSnapshot } from "../lib/snapshot";
 import { getDoc } from "../lib/docStore";
 import { renderPdfPage } from "../lib/files";
 import { DiagramView, diagramHeight } from "./DiagramView";
 import { MathText } from "./MathText";
-import { ArrowCounterClockwise, ArrowDown, BookOpenText, Check, CheckCircle, Eraser, HandGrabbing, PauseCircle, PencilSimple, Trash } from "@phosphor-icons/react";
+import { ArrowCounterClockwise, ArrowDown, BookOpenText, Check, CheckCircle, Eraser, HandGrabbing, Lightbulb, PauseCircle, PencilSimple, SealCheck, Trash } from "@phosphor-icons/react";
 
 const PAD_L = 38; // room for the student's line numbers
 const PAD_R = 22;
@@ -32,27 +32,22 @@ const SPEECH_PER_PIECE = 1.4;
 export type TutorBlock =
   | { kind: "write"; id: string; label: string; style: WriteStyle; lines: string[]; place: Place; replaces: string | null; instant: boolean }
   | { kind: "draw"; id: string; label: string; diagram: Diagram; caption: string; place: Place; replaces: string | null; instant: boolean }
-  | { kind: "steps"; id: string; label?: string; title: string; steps: string[]; section?: SectionInfo; instant: boolean }
-  | { kind: "problem"; id: string; label?: string; problem: string; instant: boolean }
+  | { kind: "steps"; id: string; label?: string; title: string; steps: string[]; section?: SectionInfo; checked?: boolean; instant: boolean }
+  | { kind: "problem"; id: string; label?: string; problem: string; questionKind?: "practice" | "diagnostic" | "transfer"; instant: boolean }
   | { kind: "plan"; id: string; label?: string; title: string; items: string[]; instant: boolean }
   | { kind: "page"; id: string; instant: boolean }
-  | { kind: "source"; id: string; label: string; docId: string; docName: string; page: number | null; caption: string; instant: boolean };
+  | { kind: "source"; id: string; label: string; docId: string; docName: string; page: number | null; caption: string; instant: boolean }
+  | { kind: "hint"; id: string; label: string; level: HintLevel; rung: number; of: number; text: string; instant: boolean };
 
 /** Where the student's latest Done submission is. */
 export interface Submission {
   captureId: string | null;
-  state: "idle" | "submitting" | "reviewing" | "done" | "failed";
+  state: "idle" | "submitting" | "reviewing" | "done" | "failed" | "stale";
   status?: string;
   summary?: string;
 }
 
-export interface Highlight {
-  id: string;
-  target: string;
-  line: number | null;
-  style: MarkStyle;
-  note: string;
-}
+export type Highlight = HighlightState;
 
 export type BoardStatus = "idle" | "checking" | "correct";
 
@@ -62,11 +57,14 @@ interface Props {
   highlights: Highlight[];
   erased: string[];
   currentSection: number | null;
-  mark: { captureId: string; line: number; note: string } | null;
-  correctCapture: string | null;
+  /** The red circle on the student's work, with where it is (so it survives a reload). */
+  mark: MarkState | null;
+  correct: CorrectState | null;
+  /** The question on the board now; work is sent with it so it can't be graded against another. */
+  questionId: string | null;
   status: BoardStatus;
-  /** Increments when the server asks for the student's latest work. */
-  captureTick: number;
+  /** The server asked for the student's latest work (n changes on every request). */
+  captureRequest: { id: string; n: number } | null;
   /** Voice state, to pace the writing with the tutor's speech. */
   callActive: boolean;
   teacherSpeaking: boolean;
@@ -111,6 +109,16 @@ function loadSaved(code: string): Saved {
   return { strokes: [], floors: {} };
 }
 
+const round1 = (n: number) => Math.round(n * 10) / 10;
+
+function writeBoard(code: string, saved: Saved) {
+  try {
+    localStorage.setItem(`shikshak.board.${code}`, JSON.stringify(saved));
+  } catch {
+    // storage full or blocked: the board still works, it just won't survive a reload
+  }
+}
+
 function inkBottom(strokes: Stroke[], x0 = -Infinity, x1 = Infinity): number {
   let bottom = 0;
   for (const s of strokes) {
@@ -138,7 +146,7 @@ function piecesOf(b: TutorBlock): number {
 const blockLabel = (b: TutorBlock) => ("label" in b ? b.label : undefined);
 
 export function Board(props: Props) {
-  const { sessionCode, blocks, highlights, erased, currentSection, mark, correctCapture, status, captureTick, send, onDone, toolbarExtra } = props;
+  const { sessionCode, blocks, highlights, erased, currentSection, mark, correct, questionId, status, captureRequest, send, onDone, toolbarExtra } = props;
   const wrapRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const pageRef = useRef<HTMLDivElement>(null);
@@ -168,7 +176,6 @@ export function Board(props: Props) {
   const panning = useRef<{ y: number } | null>(null);
   const lastPenAt = useRef(0);
   const lastDrawAt = useRef(0);
-  const captures = useRef(new Map<string, WrittenLine[]>());
   const blockEls = useRef(new Map<string, HTMLElement>());
 
   // ---------- size and scale ----------
@@ -256,6 +263,32 @@ export function Board(props: Props) {
   const responseKey = response.map((s) => s.id).join(",");
 
   // ---------- measuring tutor blocks ----------
+  // Heights are re-measured whenever a block changes size (a book page finishing loading, a line
+  // being revealed), so blocks below move down instead of overlapping it.
+  const scaleRef = useRef(scale);
+  scaleRef.current = scale;
+  const observed = useRef(new Map<Element, string>());
+  const sizeObserver = useMemo(
+    () =>
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver((entries) => {
+            setHeights((prev) => {
+              let next = prev;
+              for (const entry of entries) {
+                const id = observed.current.get(entry.target);
+                if (!id || !scaleRef.current) continue;
+                const h = (entry.target as HTMLElement).offsetHeight / scaleRef.current;
+                if (Math.abs((next[id] ?? 0) - h) < 1) continue;
+                if (next === prev) next = { ...prev };
+                next[id] = h;
+              }
+              return next;
+            });
+          }),
+    [],
+  );
+  useEffect(() => () => sizeObserver?.disconnect(), [sizeObserver]);
   const measure = useCallback(
     (b: TutorBlock) => (el: HTMLElement | null) => {
       const label = blockLabel(b);
@@ -263,11 +296,16 @@ export function Board(props: Props) {
         if (el) blockEls.current.set(label, el);
         else blockEls.current.delete(label);
       }
-      if (!el || !scale) return;
+      if (!el) return;
+      if (!observed.current.has(el)) {
+        observed.current.set(el, b.id);
+        sizeObserver?.observe(el);
+      }
+      if (!scale) return;
       const h = el.offsetHeight / scale;
       setHeights((prev) => (Math.abs((prev[b.id] ?? 0) - h) < 1 ? prev : { ...prev, [b.id]: h }));
     },
-    [scale],
+    [scale, sizeObserver],
   );
 
   // ---------- pacing the writing with the tutor's voice ----------
@@ -363,19 +401,26 @@ export function Board(props: Props) {
   }, [highlights, layout, heights, revealed, view, erased]);
 
   // ---------- persistence ----------
+  // Always writes the latest strokes (from the ref, not a copy from when an effect ran), soon
+  // after a change and immediately when the page is hidden or the class is left, so the last
+  // stroke, undo or clear is never lost to a quick navigation.
+  const saveNow = useCallback(() => {
+    writeBoard(sessionCode, { strokes: strokesRef.current, floors: floors.current, w: unitsW.current, arrivals: arrivals.current, lastDoneAt: lastDoneAt.current });
+  }, [sessionCode]);
   useEffect(() => {
-    const t = setTimeout(() => {
-      try {
-        localStorage.setItem(
-          `shikshak.board.${sessionCode}`,
-          JSON.stringify({ strokes, floors: floors.current, w: unitsW.current, arrivals: arrivals.current, lastDoneAt: lastDoneAt.current }),
-        );
-      } catch {
-        // storage full or blocked: the board still works, it just won't survive a reload
-      }
-    }, 400);
+    const t = setTimeout(saveNow, 250);
     return () => clearTimeout(t);
-  }, [strokes, blocks, sessionCode]);
+  }, [strokes, blocks, saveNow]);
+  useEffect(() => {
+    const onHide = () => document.visibilityState === "hidden" && saveNow();
+    window.addEventListener("pagehide", saveNow);
+    document.addEventListener("visibilitychange", onHide);
+    return () => {
+      window.removeEventListener("pagehide", saveNow);
+      document.removeEventListener("visibilitychange", onHide);
+      saveNow();
+    };
+  }, [saveNow]);
 
   // ---------- drawing the visible ink ----------
   const redraw = useCallback(() => {
@@ -460,19 +505,18 @@ export function Board(props: Props) {
 
   // ---------- capture: the student's latest work as a numbered image ----------
   const capture = useCallback(
-    (reason: "done" | "request") => {
+    (reason: "done" | "request", requestId: string | null = null) => {
       const id = newId();
-      captures.current.set(id, lines);
-      if (captures.current.size > 20) captures.current.delete(captures.current.keys().next().value!);
-      send({ kind: "capture", id, reason, png: makeSnapshot(response, lines), lineCount: lines.length });
+      const boxes: Box[] = lines.map((l) => ({ x: round1(l.box.x), y: round1(l.box.y), w: round1(l.box.w), h: round1(l.box.h) }));
+      send({ kind: "capture", id, reason, requestId, questionId, png: lines.length ? makeSnapshot(response, lines) : null, lineCount: lines.length, lines: boxes });
       return id;
     },
-    [lines, response, send],
+    [lines, response, send, questionId],
   );
   useEffect(() => {
-    if (captureTick > 0) capture("request");
+    if (captureRequest) capture("request", captureRequest.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [captureTick]);
+  }, [captureRequest?.n]);
 
   const done = () => {
     const id = capture("done");
@@ -609,15 +653,14 @@ export function Board(props: Props) {
   };
 
   // ---------- marks on the student's work ----------
-  const markLines = mark ? captures.current.get(mark.captureId) : undefined;
-  const markedLine = markLines?.find((l) => l.index === mark!.line);
+  // The circle's position comes with the mark itself, so it reappears after a reload.
+  const markedLine = mark?.box ? { box: mark.box, index: mark.line } : undefined;
   // Fade the circle once the student starts fixing their work.
   const markBase = useRef({ key: "", count: 0 });
   const markKey = mark ? `${mark.captureId}:${mark.line}` : "";
   if (markBase.current.key !== markKey) markBase.current = { key: markKey, count: strokes.length };
   const drewSinceMark = strokes.length > markBase.current.count;
-  const correctLines = correctCapture ? captures.current.get(correctCapture) : undefined;
-  const correctAt = correctLines?.length ? correctLines[correctLines.length - 1].box : null;
+  const correctAt = correct?.box ?? null;
 
   const erasedSet = useMemo(() => {
     const set = new Set(erased);
@@ -785,7 +828,7 @@ function BlockBody({ block, shown, width, currentSection, sessionCode }: { block
     case "problem":
       return (
         <>
-          <span className="problem-tag">Your turn</span>
+          <span className="problem-tag">{block.questionKind === "diagnostic" ? "Quick check" : block.questionKind === "transfer" ? "New one, on your own" : "Your turn"}</span>
           <p className="problem-line" data-line={1}>
             <span className="hl-text">
               <MathText text={block.problem} />
@@ -795,6 +838,19 @@ function BlockBody({ block, shown, width, currentSection, sessionCode }: { block
       );
     case "source":
       return <SourcePage block={block} sessionCode={sessionCode} />;
+    case "hint":
+      return (
+        <div className="hint-card" data-level={block.level}>
+          <span className="hint-tag">
+            <Lightbulb weight="fill" /> {block.level === "nudge" ? "Nudge" : block.level === "hint" ? "Hint" : "One step"} {block.rung} of {block.of}
+          </span>
+          <p className="hint-text" data-line={1}>
+            <span className="hl-text">
+              <MathText text={block.text} />
+            </span>
+          </p>
+        </div>
+      );
     case "draw":
       return (
         <>
@@ -836,8 +892,13 @@ function BlockBody({ block, shown, width, currentSection, sessionCode }: { block
     default:
       return (
         <>
-          {(block.title || block.section) && (
+          {(block.title || block.section || block.checked) && (
             <h3 className="chalk-title">
+              {block.checked && (
+                <span className="checked-chip" title="Every step here was checked by the maths engine">
+                  <SealCheck weight="fill" /> checked
+                </span>
+              )}
               {block.section && (
                 <span className="section-chip">
                   {block.section.n}/{block.section.of}
@@ -906,7 +967,7 @@ function drawStroke(ctx: CanvasRenderingContext2D, pts: Point[]) {
 }
 
 /** A hand-drawn red circle around one line of the student's work, like a teacher's pen. */
-function MarkCircle({ box, index, note, scale, faded }: { box: WrittenLine["box"]; index: number; note: string; scale: number; faded: boolean }) {
+function MarkCircle({ box, index, note, scale, faded }: { box: Box; index: number; note: string; scale: number; faded: boolean }) {
   const cx = (box.x + box.w / 2) * scale;
   const cy = (box.y + box.h / 2) * scale;
   const rx = (box.w / 2 + 22) * scale;
@@ -965,6 +1026,8 @@ function SubmissionCard({ sub, onRetry, canRetry }: { sub: Submission; onRetry: 
         ? "Your teacher has it and is reading it…"
         : sub.state === "failed"
           ? "Didn't reach your teacher"
+          : sub.state === "stale"
+            ? "Not marked: there's something newer"
           : sub.status === "correct"
             ? "Your teacher checked it"
             : "Your teacher has read it";

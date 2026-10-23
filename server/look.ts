@@ -2,9 +2,12 @@
 // For working, finds the first wrong line. Runs when the student presses Done (so the tutor's
 // later look is instant) and again only if the drawing changed.
 
+import { createHash } from "node:crypto";
 import { languageName } from "./claude";
+import { config } from "./config";
+import { chargeModelCall, withModelSlot } from "./limits";
 import { askJson, dataUrlToAttachment, hasModel } from "./llm";
-import { emit, type Capture, type Session } from "./sessions";
+import { emit, signal, type Capture, type Session } from "./sessions";
 
 export interface LookResult {
   /** What the student put on the board. */
@@ -109,40 +112,79 @@ export const EMPTY_LOOK: LookResult = {
   say: "",
 };
 
-/** Analysis for this capture, shared by everyone who asks for the same drawing. */
+/**
+ * Everything a reading depends on. The same image means something different under a different
+ * question, expected answer, language or spoken context, so all of it is part of the cache key.
+ */
+export function analysisKey(s: Session, capture: Capture, studentSaid?: string): string {
+  const parts = [
+    capture.hash,
+    capture.questionId ?? "",
+    s.problem?.id ?? "",
+    s.problem?.text ?? "",
+    s.problem?.answer ?? "",
+    s.language,
+    String(capture.lineCount),
+    (studentSaid ?? "").trim().toLowerCase().replace(/\s+/g, " "),
+  ];
+  return createHash("sha1").update(parts.join("\u241f")).digest("hex");
+}
+
+/** Analysis for this capture in its current context, shared by everyone who asks for the same thing. */
 export function analyze(s: Session, capture: Capture, studentSaid?: string): Promise<LookResult> {
   if (!capture.png || capture.lineCount === 0) return Promise.resolve(EMPTY_LOOK);
-  const cached = s.analyses.get(capture.hash);
+  const key = analysisKey(s, capture, studentSaid);
+  const cached = s.analyses.get(key);
   if (cached) return cached;
+  const problem = s.problem;
   const job = (async () => {
     if (!hasModel()) return fakeLook(capture.lineCount);
-    return lookAtWork({
-      png: capture.png!,
-      lineCount: capture.lineCount,
-      problem: s.problem?.text ?? null,
-      answer: s.problem?.answer,
-      boardContext: s.recentBoard,
-      studentSaid,
-      language: s.language,
-    });
+    chargeModelCall(s.deviceId, "check");
+    return withModelSlot(() =>
+      lookAtWork({
+        png: capture.png!,
+        lineCount: capture.lineCount,
+        problem: problem?.text ?? null,
+        answer: problem?.answer,
+        boardContext: s.recentBoard,
+        studentSaid,
+        language: s.language,
+      }),
+    );
   })();
-  s.analyses.set(capture.hash, job);
+  s.analyses.set(key, job);
   // A failed analysis shouldn't stay cached; the next request retries.
-  job.catch(() => s.analyses.delete(capture.hash));
-  if (s.analyses.size > 30) s.analyses.delete(s.analyses.keys().next().value!);
+  job.catch(() => s.analyses.delete(key));
+  while (s.analyses.size > config.limits.maxAnalysesPerSession()) s.analyses.delete(s.analyses.keys().next().value!);
   return job;
 }
 
-/** Puts a reading on the board: circle the wrong line, stamp a correct answer, or explain. */
-export function publishResult(s: Session, capture: Capture, result: LookResult) {
+/** True if this capture is still the student's latest answer to the question on the board now. */
+export function isCurrent(s: Session, capture: Capture): boolean {
+  if ((capture.questionId ?? null) !== (s.problem?.id ?? null)) return false;
+  for (const c of s.captures.values()) if (c.questionId === capture.questionId && c.at > capture.at && c.lineCount > 0) return false;
+  return true;
+}
+
+/**
+ * Puts a reading on the board: circle the wrong line, stamp a correct answer. Only for the
+ * student's current work on the current question; a late result for older work is dropped.
+ */
+export function publishResult(s: Session, capture: Capture, result: LookResult): boolean {
+  if (!isCurrent(s, capture)) return false;
   if ((result.status === "mistake" || result.status === "unreadable") && result.line) {
     emit(s, {
       type: "mark",
       captureId: capture.id,
+      questionId: capture.questionId,
       line: result.line,
       note: result.status === "unreadable" ? "Can't read this line" : result.what_went_wrong,
+      box: capture.lines[result.line - 1] ?? null,
     });
-  } else if (result.status === "correct") emit(s, { type: "correct", captureId: capture.id, note: result.what_went_wrong });
+  } else if (result.status === "correct") {
+    emit(s, { type: "correct", captureId: capture.id, questionId: capture.questionId, note: result.what_went_wrong, box: capture.lines[capture.lines.length - 1] ?? null });
+  }
+  return true;
 }
 
 /** One-line summary of a reading for the student's feedback card. */
@@ -168,18 +210,23 @@ export function feedbackSummary(result: LookResult): string {
  * The Done protocol on the server: acknowledge receipt at once, read the work, publish the result
  * to the board (so the student sees it even before the tutor speaks), and report failure clearly.
  */
-export async function reviewSubmission(s: Session, capture: Capture) {
-  emit(s, { type: "review", captureId: capture.id, state: "received" });
+export async function reviewSubmission(s: Session, capture: Capture, onResult?: (result: LookResult) => void) {
+  const q = capture.questionId;
+  signal(s, { type: "review", captureId: capture.id, questionId: q, state: "received" });
   if (!canLook()) {
-    emit(s, { type: "review", captureId: capture.id, state: "failed", summary: "The board reader isn't set up on the server." });
+    signal(s, { type: "review", captureId: capture.id, questionId: q, state: "failed", summary: "The board reader isn't set up on the server." });
     return;
   }
   try {
     const result = await analyze(s, capture);
-    publishResult(s, capture, result);
-    emit(s, { type: "review", captureId: capture.id, state: "done", status: result.status, summary: feedbackSummary(result) });
+    if (!publishResult(s, capture, result)) {
+      signal(s, { type: "review", captureId: capture.id, questionId: q, state: "stale", summary: "There's a newer question or newer work on the board, so this one wasn't marked." });
+      return;
+    }
+    onResult?.(result);
+    signal(s, { type: "review", captureId: capture.id, questionId: q, state: "done", status: result.status, summary: feedbackSummary(result) });
   } catch (err) {
-    console.error("[look] review failed", err);
-    emit(s, { type: "review", captureId: capture.id, state: "failed", summary: "Couldn't read it just now. Tap Done again." });
+    console.error("[look] review failed", (err as Error).message);
+    signal(s, { type: "review", captureId: capture.id, questionId: q, state: "failed", summary: (err as Error).name === "QuotaError" || (err as Error).name === "BusyError" ? (err as Error).message : "Couldn't read it just now. Tap Done again." });
   }
 }

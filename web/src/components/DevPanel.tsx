@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
+import { apiFetch } from "../lib/api";
 
-// Fires the same tool calls the Bolna agent makes, so the board can be built and demoed without voice.
+// SIMULATOR (development only): fires the same tool calls the Bolna agent makes, so the board can be
+// built and demoed without voice. Anything shown through it is labelled as simulated, not a real tutor.
 
 const SAMPLES: { label: string; tool: string; params: Record<string, string> }[] = [
   { label: "Heading", tool: "write", params: { kind: "heading", content: "Arithmetic Progression (AP)" } },
@@ -15,7 +17,7 @@ const SAMPLES: { label: string; tool: string; params: Record<string, string> }[]
   { label: "Next section", tool: "show_section", params: { section: "next" } },
 ];
 
-export function DevPanel({ sessionCode }: { sessionCode: string }) {
+export function DevPanel({ sessionId }: { sessionId: string }) {
   const [out, setOut] = useState("");
   const [open, setOpen] = useState(true);
   const [health, setHealth] = useState<Record<string, boolean | string> | null>(null);
@@ -29,7 +31,7 @@ export function DevPanel({ sessionCode }: { sessionCode: string }) {
     const r = await fetch(`/tools/${tool}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ session_code: sessionCode, ...params }),
+      body: JSON.stringify({ session_code: sessionId, ...params }),
     });
     setOut(`${tool} → ${JSON.stringify(await r.json(), null, 1)}`);
   };
@@ -39,19 +41,15 @@ export function DevPanel({ sessionCode }: { sessionCode: string }) {
     const answer = window.prompt("Which line has the first mistake? Enter 0 if the work is correct.", "0");
     if (answer === null) return;
     const line = Number(answer);
-    const r = await fetch("/api/dev/save-sample", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ session_code: sessionCode, expected_line: line > 0 ? line : null }),
-    });
-    setOut(`save-sample → ${JSON.stringify(await r.json())}`);
+    const r = await apiFetch("/dev/save-sample", { body: { session_id: sessionId, expected_line: line > 0 ? line : null } }).catch((e: Error) => ({ error: e.message }));
+    setOut(`save-sample → ${JSON.stringify(r)}`);
   };
 
   if (!open) return <button className="dev-toggle" onClick={() => setOpen(true)}>Tools</button>;
   return (
     <aside className="dev-panel">
       <header>
-        <span>Tool simulator</span>
+        <span>Tool simulator (simulated tutor)</span>
         <button onClick={() => setOpen(false)} aria-label="Hide">×</button>
       </header>
       {health && (

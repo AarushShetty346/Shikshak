@@ -1,82 +1,97 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { DocMeta, Language } from "../../../shared/types";
+import { apiFetch } from "../lib/api";
 import { putDoc } from "../lib/docStore";
 import { prepareFile, type PreparedFile } from "../lib/files";
+import type { PublicPlan } from "../lib/session";
 import { ArrowLeft, Sparkle, UploadSimple } from "@phosphor-icons/react";
 import { MathText } from "./MathText";
 
-/** What /api/plan returns: the study plan (shown on the board section by section) and a short outline for the tutor. */
-export interface PlanResult {
-  plan: {
-    readable: "yes" | "partly" | "no" | "no_notes";
-    readable_note: string;
-    topic: string;
-    title: string;
-    goal: string;
-    sections: { title: string; board: string[]; from_notes: boolean }[];
-    practice: { problem: string }[];
-  };
-  outline: string;
-}
-
+/** What the new class needs from setup. The plan's answers stay on the server. */
 export interface StudentSetup {
+  serverId: string;
   name: string;
   grade: string;
   language: Language;
   topic: string;
-  plan: PlanResult | null;
+  plan: PublicPlan | null;
   docs: DocMeta[];
 }
 
-const LANGS: { id: Language; label: string }[] = [
+const LANGS: { id: Language; label: string; preview?: boolean }[] = [
   { id: "hinglish", label: "Hinglish" },
   { id: "hi", label: "हिन्दी" },
   { id: "en", label: "English" },
+  { id: "ta", label: "தமிழ்", preview: true },
+  { id: "te", label: "తెలుగు", preview: true },
 ];
 
 const TOPICS = ["Quadratic equations", "Linear equations in two variables", "Arithmetic progressions", "Trigonometric ratios"];
 const MAX_PHOTOS = 6;
 
-export function Setup({ sessionCode, onStart, onCancel }: { sessionCode: string; onStart: (s: StudentSetup) => void; onCancel?: () => void }) {
-  const [name, setName] = useState("");
-  const [grade, setGrade] = useState("10");
-  const [language, setLanguage] = useState<Language>("hinglish");
+type Prepared = PreparedFile & { id: string };
+
+/**
+ * Setting up a new class. Everything here is a draft until "Create session": the plan is made as a
+ * draft on the server, and any change to the topic, class, language or notes throws it away (it
+ * would no longer match). A plan reply that arrives after such a change is ignored.
+ */
+export function Setup({
+  sessionCode,
+  onStart,
+  onCancel,
+  learner,
+}: {
+  sessionCode: string;
+  onStart: (s: StudentSetup) => void;
+  onCancel?: () => void;
+  learner?: { id: string; name: string; grade: string; language: Language } | null;
+}) {
+  const [name, setName] = useState(learner?.name ?? "");
+  const [grade, setGrade] = useState(learner?.grade ?? "10");
+  const [language, setLanguage] = useState<Language>(learner?.language ?? "hinglish");
   const [topic, setTopic] = useState("");
   const [files, setFiles] = useState<File[]>([]);
-  const [plan, setPlan] = useState<PlanResult | null>(null);
+  const [plan, setPlan] = useState<{ draftId: string; plan: PublicPlan } | null>(null);
   const [planning, setPlanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [prepared, setPrepared] = useState<(PreparedFile & { id: string })[] | null>(null);
+  const prepared = useRef<{ files: File[]; out: Prepared[] } | null>(null);
   const [saving, setSaving] = useState(false);
+  /** Bumped on every change that invalidates a plan; replies for an older value are dropped. */
+  const version = useRef(0);
 
-  /** Shrinks photos / counts PDF pages once, and gives each file an id that stays with it. */
-  const prepare = async () => {
-    if (prepared) return prepared;
-    const out = await Promise.all(files.map(async (f) => ({ ...(await prepareFile(f)), id: crypto.randomUUID().slice(0, 8) })));
-    setPrepared(out);
+  /** Shrinks photos / counts PDF pages once per set of files, and gives each file an id that stays with it. */
+  const prepare = async (): Promise<Prepared[]> => {
+    if (prepared.current && prepared.current.files === files) return prepared.current.out;
+    const list = files;
+    const out = await Promise.all(list.map(async (f) => ({ ...(await prepareFile(f)), id: crypto.randomUUID().slice(0, 8) })));
+    prepared.current = { files: list, out };
     return out;
   };
 
-  /** Keeps the files with this session: on this device (to show pages) and on the server (for the tutor). */
-  const storeDocs = async (list: (PreparedFile & { id: string })[]): Promise<DocMeta[]> => {
-    if (!list.length) return [];
-    const r = await fetch("/api/documents", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ session_code: sessionCode, files: list }),
-    });
-    const data = await r.json();
-    if (!r.ok) throw new Error(data.error || "Couldn't upload the files");
-    for (const f of list) await putDoc({ sessionId: sessionCode, docId: f.id, name: f.name, mediaType: f.mediaType, data: f.data, pages: f.pages });
-    return data.docs as DocMeta[];
+  const invalidate = () => {
+    version.current++;
+    setPlan(null);
+    setPlanning(false);
+    setError(null);
   };
 
   const create = async () => {
     setSaving(true);
     setError(null);
     try {
-      const docs = await storeDocs(await prepare());
-      onStart({ name: name.trim() || "student", grade, language, topic: topic.trim(), plan, docs });
+      const list = await prepare();
+      const r = await apiFetch<{ session: { id: string } }>("/sessions", {
+        body: { draftId: plan?.draftId, label: plan?.plan.title || topic.trim() || undefined, language, grade, topic: topic.trim(), studentName: name.trim(), learnerId: learner?.id ?? null },
+      });
+      const serverId = r.session.id;
+      let docs: DocMeta[] = [];
+      if (list.length) {
+        const up = await apiFetch<{ docs: DocMeta[] }>(`/sessions/${serverId}/documents`, { body: { files: list, replace: true } });
+        docs = up.docs;
+        for (const f of list) await putDoc({ sessionId: sessionCode, docId: f.id, name: f.name, mediaType: f.mediaType, data: f.data, pages: f.pages });
+      }
+      onStart({ serverId, name: name.trim() || "student", grade, language, topic: topic.trim(), plan: plan?.plan ?? null, docs });
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -84,28 +99,19 @@ export function Setup({ sessionCode, onStart, onCancel }: { sessionCode: string;
     }
   };
 
-  const reset = () => {
-    setPlan(null);
-    setError(null);
-  };
-
   const makePlan = async () => {
+    const mine = ++version.current;
     setPlanning(true);
     setError(null);
     try {
       const attachments = await prepare();
-      const r = await fetch("/api/plan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_code: sessionCode, topic, grade, language, files: attachments }),
-      });
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.error || "Could not make a plan");
+      const data = await apiFetch<{ draftId: string; plan: PublicPlan }>("/plans", { body: { topic, grade, language, files: attachments } });
+      if (mine !== version.current) return; // something changed while planning: this plan is stale
       setPlan(data);
     } catch (e) {
-      setError((e as Error).message);
+      if (mine === version.current) setError((e as Error).message);
     } finally {
-      setPlanning(false);
+      if (mine === version.current) setPlanning(false);
     }
   };
 
@@ -113,8 +119,8 @@ export function Setup({ sessionCode, onStart, onCancel }: { sessionCode: string;
     const picked = Array.from(list ?? []);
     const pdf = picked.find((f) => f.type === "application/pdf");
     setFiles(pdf ? [pdf] : picked.filter((f) => f.type.startsWith("image/")).slice(0, MAX_PHOTOS));
-    setPrepared(null);
-    reset();
+    prepared.current = null;
+    invalidate();
   };
 
   const canPlan = (topic.trim() || files.length > 0) && !planning;
@@ -143,7 +149,10 @@ export function Setup({ sessionCode, onStart, onCancel }: { sessionCode: string;
           </label>
           <label className="field field-small">
             <span>Class</span>
-            <select value={grade} onChange={(e) => setGrade(e.target.value)}>
+            <select value={grade} onChange={(e) => {
+                setGrade(e.target.value);
+                invalidate(); // the plan is pitched at the class
+              }}>
               {["8", "9", "10", "11", "12"].map((g) => (
                 <option key={g}>{g}</option>
               ))}
@@ -161,10 +170,12 @@ export function Setup({ sessionCode, onStart, onCancel }: { sessionCode: string;
                 className={language === l.id ? "on" : ""}
                 onClick={() => {
                   setLanguage(l.id);
-                  reset(); // the plan is written in the chosen language
+                  invalidate(); // the plan is written in the chosen language
                 }}
+                title={l.preview ? "Preview: not yet checked by a fluent speaker" : undefined}
               >
                 {l.label}
+                {l.preview && <small className="preview-mark"> preview</small>}
               </button>
             ))}
           </div>
@@ -176,7 +187,7 @@ export function Setup({ sessionCode, onStart, onCancel }: { sessionCode: string;
             value={topic}
             onChange={(e) => {
               setTopic(e.target.value);
-              reset();
+              invalidate();
             }}
             placeholder="e.g. Quadratic equations"
           />
@@ -189,7 +200,7 @@ export function Setup({ sessionCode, onStart, onCancel }: { sessionCode: string;
               className="chip"
               onClick={() => {
                 setTopic(t);
-                reset();
+                invalidate();
               }}
             >
               {t}

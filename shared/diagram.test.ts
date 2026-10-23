@@ -34,3 +34,39 @@ describe("diagram language", () => {
     expect(compileExpr("sin(30)")(0)).toBeCloseTo(0.5);
   });
 });
+
+import { graphSegments } from "./diagram";
+
+describe("graphs with breaks", () => {
+  const maxStep = (seg: [number, number][]) => Math.max(...seg.slice(1).map(([, y], i) => Math.abs(y - seg[i][1])));
+
+  it("splits y = 1/x at x = 0 instead of drawing a vertical line", () => {
+    const segs = graphSegments(compileExpr("1/x"), -4, 4, -5, 5);
+    expect(segs.length).toBe(2);
+    expect(segs[0].every(([x]) => x < 0)).toBe(true);
+    expect(segs[1].every(([x]) => x > 0)).toBe(true);
+    for (const s of segs) expect(maxStep(s)).toBeLessThan(5);
+  });
+
+  it("splits tan at its asymptotes (degrees, as in class 10)", () => {
+    const segs = graphSegments(compileExpr("tan(x)"), 0, 360, -10, 10, 720);
+    expect(segs.length).toBe(3); // 0..90, 90..270, 270..360
+    for (const s of segs) for (const [, y] of s) expect(Math.abs(y)).toBeLessThanOrEqual(10);
+  });
+
+  it("leaves out where sqrt is undefined", () => {
+    const segs = graphSegments(compileExpr("sqrt(x)"), -4, 4, -1, 3);
+    expect(segs).toHaveLength(1);
+    expect(segs[0][0][0]).toBeGreaterThanOrEqual(0);
+  });
+
+  it("clips a curve exactly at the edge of the box", () => {
+    const segs = graphSegments(compileExpr("x^2"), -4, 4, -1, 4);
+    expect(segs).toHaveLength(1);
+    const s = segs[0];
+    expect(s[0][1]).toBeCloseTo(4);
+    expect(s.at(-1)![1]).toBeCloseTo(4);
+    expect(s[0][0]).toBeCloseTo(-2, 1);
+    expect(s.at(-1)![0]).toBeCloseTo(2, 1);
+  });
+});

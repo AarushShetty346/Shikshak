@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BolnaWebCall } from "@bolna/web-call";
+import { BolnaWebCall, type Session as BolnaSession } from "@bolna/web-call";
+import { deviceToken } from "./api";
+import { CallController, type CallState } from "./callController";
 
-export type CallState = "idle" | "connecting" | "ringing" | "active" | "ended";
+export type { CallState };
 
 /** The bits of SIP.js's session we use for keypad tones. */
 interface SipSession {
@@ -9,20 +11,79 @@ interface SipSession {
   info?: (options: unknown) => Promise<unknown>;
 }
 
-/** Wraps Bolna's Web Call SDK: start from a click, track state, expose the tutor's voice volume. */
-export function useVoiceCall() {
-  const callRef = useRef<BolnaWebCall | null>(null);
+export interface StartOptions {
+  speed: "slower" | "normal" | "faster";
+  resuming: boolean;
+  handsFree: boolean;
+}
+
+/**
+ * React wrapper around CallController (callController.ts has the lifecycle rules): Bolna's web-call
+ * SDK with our authenticated minting, the tutor's volume for pacing, and the "Stop" duck.
+ */
+export function useVoiceCall(serverId: string | null) {
   const [state, setState] = useState<CallState>("idle");
   const [error, setError] = useState<string | null>(null);
   const [volume, setVolume] = useState(0);
-  // Our own audio element for the tutor's voice, so "Ask doubt" can silence her instantly.
+  const [talking, setTalking] = useState(false);
+  // Our own audio element for the tutor's voice, so "Stop" can silence her instantly.
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const ducked = useRef(false);
   const quietSince = useRef(0);
 
-  const [talking, setTalking] = useState(false);
-  const handsFree = useRef(false);
-  const releaseTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const ctrlRef = useRef<CallController | null>(null);
+  if (!ctrlRef.current && serverId) {
+    const id = serverId;
+    ctrlRef.current = new CallController({
+      createCall: (mint) => {
+        if (!audioRef.current) {
+          audioRef.current = new Audio();
+          audioRef.current.autoplay = true;
+        }
+        audioRef.current.volume = 1;
+        ducked.current = false;
+        return new BolnaWebCall({ getSession: async () => (await mint()).session as BolnaSession, audioElement: audioRef.current });
+      },
+      mint: async ({ speed, resuming }) => {
+        const r = await fetch(`/api/sessions/${id}/voice`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${await deviceToken()}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ speed, resuming }),
+        });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error((data as { error?: string }).error || "Couldn't start the class. Try again in a moment.");
+        return { session: data, callId: r.headers.get("X-Shikshak-Call") };
+      },
+      reportEnd: (callId) => {
+        void deviceToken()
+          .then((token) =>
+            fetch(`/api/sessions/${id}/voice/end`, {
+              method: "POST",
+              keepalive: true,
+              headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+              body: JSON.stringify({ callId }),
+            }),
+          )
+          .catch(() => {});
+      },
+      onState: setState,
+      onVolume: (v) => {
+        setVolume(v);
+        // After "Stop", stay silent until the tutor's current sentence has finished, then bring her back.
+        if (!ducked.current) return;
+        if (v > 0.02) quietSince.current = 0;
+        else if (!quietSince.current) quietSince.current = Date.now();
+        else if (Date.now() - quietSince.current > 700 && audioRef.current) {
+          ducked.current = false;
+          audioRef.current.volume = 1;
+        }
+      },
+      onTalking: setTalking,
+      onError: (m) => setError(friendlyError(m)),
+    });
+  }
+
+  useEffect(() => () => ctrlRef.current?.dispose(), []);
 
   /** Silence the tutor on this screen now; her voice returns once her current sentence has ended. */
   const duck = useCallback(() => {
@@ -33,46 +94,12 @@ export function useVoiceCall() {
     }
   }, []);
 
-  const start = useCallback(async (userData: Record<string, unknown>, opts: { handsFree?: boolean } = {}) => {
-    handsFree.current = Boolean(opts.handsFree);
+  const start = useCallback(async (opts: StartOptions) => {
     setError(null);
-    try {
-      callRef.current?.stop();
-      if (!audioRef.current) {
-        audioRef.current = new Audio();
-        audioRef.current.autoplay = true;
-      }
-      audioRef.current.volume = 1;
-      ducked.current = false;
-      const call = new BolnaWebCall({ sessionUrl: "/api/bolna-session", userData, audioElement: audioRef.current });
-      call.on("state-change", (s) => setState(s as CallState));
-      call.on("volume-level", (v) => {
-        setVolume(v);
-        // After "Ask doubt", stay silent until the tutor's current sentence has finished, then
-        // bring her voice back for her reply.
-        if (!ducked.current) return;
-        if (v > 0.02) quietSince.current = 0;
-        else if (!quietSince.current) quietSince.current = Date.now();
-        else if (Date.now() - quietSince.current > 700 && audioRef.current) {
-          ducked.current = false;
-          audioRef.current.volume = 1;
-        }
-      });
-      call.on("call-end", () => setVolume(0));
-      call.on("error", (e) => setError(friendlyError(e.code, e.message)));
-      call.on("call-start", () => {
-        // Push-to-talk: the mic stays off until the student holds Talk, so room noise never reaches the tutor.
-        if (!handsFree.current) call.setMuted(true);
-      });
-      callRef.current = call;
-      await call.start();
-      if (!handsFree.current) call.setMuted(true);
-    } catch (err) {
-      const e = err as { code?: string; message?: string };
-      setError(friendlyError(e.code, e.message));
-      setState("idle");
-    }
+    await ctrlRef.current?.start(opts);
   }, []);
+
+  const stop = useCallback(() => ctrlRef.current?.stop(), []);
 
   /**
    * Sends keypad tones (DTMF) on the call. Bolna hands keypad digits to the tutor's LLM as
@@ -80,7 +107,7 @@ export function useVoiceCall() {
    * private, so we reach in carefully. Returns false if no call is live or tones couldn't be sent.
    */
   const sendTones = useCallback((tones: string): boolean => {
-    const inviter = (callRef.current as unknown as { inviter?: SipSession } | null)?.inviter;
+    const inviter = (ctrlRef.current?.current as unknown as { inviter?: SipSession } | null)?.inviter;
     if (!inviter) return false;
     try {
       if (inviter.sessionDescriptionHandler?.sendDtmf?.(tones)) return true;
@@ -104,10 +131,7 @@ export function useVoiceCall() {
   /** Student pressed Done: "dtmf_number: 1" reaches the tutor. */
   const sendDone = useCallback(() => sendTones("1#"), [sendTones]);
 
-  /**
-   * Stop the teacher: she goes quiet at once on this screen, and "dtmf_number: 2" tells her to
-   * stop and listen.
-   */
+  /** Stop the teacher: she goes quiet at once on this screen, and "dtmf_number: 2" tells her to stop and listen. */
   const askDoubt = useCallback((): boolean => {
     duck();
     return sendTones("2#");
@@ -116,51 +140,21 @@ export function useVoiceCall() {
   /** Push-to-talk: open the mic while held (and silence the tutor), close it shortly after release. */
   const talk = useCallback(
     (on: boolean) => {
-      const call = callRef.current;
-      if (!call) return;
-      clearTimeout(releaseTimer.current);
-      if (on) {
-        duck();
-        call.setMuted(false);
-        setTalking(true);
-      } else {
-        setTalking(false);
-        // Keep the mic open a moment so the last word isn't cut off.
-        releaseTimer.current = setTimeout(() => {
-          if (!handsFree.current) call.setMuted(true);
-        }, 350);
-      }
+      if (on) duck();
+      ctrlRef.current?.talk(on);
     },
     [duck],
   );
 
-  const setHandsFree = useCallback((on: boolean) => {
-    handsFree.current = on;
-    callRef.current?.setMuted(!on);
-  }, []);
+  const setHandsFree = useCallback((on: boolean) => ctrlRef.current?.setHandsFree(on), []);
+  const isTalking = useCallback(() => Boolean(ctrlRef.current?.isTalking()), []);
 
-  const stop = useCallback(() => {
-    callRef.current?.stop();
-  }, []);
-
-  useEffect(() => () => void callRef.current?.stop(), []);
-
-  return { state, error, volume, talking, start, stop, sendDone, askDoubt, talk, setHandsFree, sendTones };
+  return { state, error, volume, talking, start, stop, sendDone, askDoubt, talk, setHandsFree, sendTones, isTalking };
 }
 
-function friendlyError(code?: string, message?: string): string {
-  switch (code) {
-    case "microphone_denied":
-      return "Microphone is blocked. Allow it in the address bar, then try again.";
-    case "at_capacity":
-      return "All lines are busy. Try again in a minute.";
-    case "autoplay_blocked":
-      return "The browser blocked audio. Click Start again.";
-    case "mint_failed":
-      return message?.includes("503") || message?.includes("not set up")
-        ? "Voice isn't set up on the server yet (Bolna keys missing)."
-        : "Couldn't start the call. Check the server's Bolna settings.";
-    default:
-      return message || "Something went wrong with the call.";
-  }
+function friendlyError(message: string): string {
+  if (/microphone|NotAllowed|Permission/i.test(message)) return "Microphone is blocked. Allow it in the address bar, then try again.";
+  if (/at_capacity|busy/i.test(message)) return "All lines are busy. Try again in a minute.";
+  if (/autoplay/i.test(message)) return "The browser blocked audio. Click Start again.";
+  return message || "Something went wrong with the call.";
 }

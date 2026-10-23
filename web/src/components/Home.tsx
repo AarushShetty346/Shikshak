@@ -3,6 +3,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Archive, ArrowCounterClockwise, BookOpenText, DotsThree, PencilSimpleLine, Plus, Trash } from "@phosphor-icons/react";
+import { emptySnapshot } from "../../../shared/boardState";
 import { LANGUAGE_NAMES } from "../../../shared/types";
 import { deleteSession, listSessions, loadData, newCode, saveData, saveSession, updateSession, type SessionMeta } from "../lib/session";
 import { Setup } from "./Setup";
@@ -56,18 +57,19 @@ export function Home({ onOpen }: { onOpen: (id: string) => void }) {
           const now = Date.now();
           const meta: SessionMeta = {
             id: creating,
-            name: s.plan?.plan.title || s.topic || "New session",
+            serverId: s.serverId,
+            name: s.plan?.title || s.topic || "New session",
             studentName: s.name,
             grade: s.grade,
             language: s.language,
-            topic: s.topic || s.plan?.plan.topic || "",
+            topic: s.topic || s.plan?.topic || "",
             createdAt: now,
             updatedAt: now,
             archived: false,
             started: false,
           };
           saveSession(meta);
-          saveData(creating, { events: [], plan: s.plan, docs: s.docs, speed: "normal", handsFree: false });
+          saveData(creating, { snapshot: emptySnapshot(), plan: s.plan, docs: s.docs, speed: "normal", handsFree: false });
           onOpen(creating);
         }}
       />
@@ -171,8 +173,12 @@ export function Home({ onOpen }: { onOpen: (id: string) => void }) {
                           role="menuitem"
                           className="danger"
                           onClick={async () => {
-                            if (!window.confirm(`Delete "${s.name}"? Its board, notes and files on this device are removed. This can't be undone.`)) return;
-                            await deleteSession(s.id);
+                            if (!window.confirm(`Delete "${s.name}"? Its board, notes and files are removed from this device and the server. This can't be undone.`)) return;
+                            try {
+                              await deleteSession(s.id);
+                            } catch (err) {
+                              window.alert(`Couldn't delete it right now: ${(err as Error).message}`);
+                            }
                             done();
                           }}
                         >

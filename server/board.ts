@@ -6,7 +6,10 @@ import { randomUUID } from "node:crypto";
 import { DIAGRAM_EXAMPLES, parseDiagram } from "../shared/diagram";
 import { splitSteps } from "../shared/mathText";
 import type { MarkStyle, Place, WriteStyle } from "../shared/types";
+import { randomId } from "./auth";
 import { boardMap, emit, findBlock, nextLabel, recordBlock, type Session } from "./sessions";
+
+export const newQuestionId = () => `q_${randomId(9)}`;
 
 type Params = Record<string, unknown>;
 type Reply = Record<string, unknown>;
@@ -44,8 +47,10 @@ export function write(s: Session, p: Params): Reply {
   if (rep.error) return { ok: false, error: rep.error };
   const label = nextLabel(s);
   recordBlock(s, { label, kind: style, summary: lines.join(" / ").slice(0, 120), lines: lines.length });
-  emit(s, { type: "write", id: randomUUID(), label, style, lines: lines.slice(0, 8), place: place(p.place), replaces: rep.label });
-  if (style === "your_turn") s.problem = s.problem ?? { text: lines.join(" ") };
+  // A new "your turn" question always replaces the previous one (and its answer key and marks).
+  const questionId = style === "your_turn" ? newQuestionId() : null;
+  if (questionId) s.problem = { id: questionId, text: lines.join(" "), kind: "tutor", askedAt: Date.now(), rung: 0 };
+  emit(s, { type: "write", id: randomUUID(), label, style, lines: lines.slice(0, 8), place: place(p.place), replaces: rep.label, questionId });
   return {
     ok: true,
     label,

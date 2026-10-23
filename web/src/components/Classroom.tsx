@@ -2,38 +2,44 @@
 // push-to-talk, Done submissions, uploads and settings. Mounted fresh for each session (keyed by
 // id), so nothing from another session can survive into it; leaving stops the call and closes the
 // socket before anything else is shown.
+//
+// The board is one snapshot (shared/boardState.ts). The server sends it whole on connect and then
+// numbered events; this device keeps a copy, saved promptly and flushed whenever the page is
+// hidden or the class is left, so a reload or a server restart restores exactly what was there.
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { greetingFor, LANGUAGE_NAMES, type BoardEvent, type DocMeta } from "../../../shared/types";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { applySeq } from "../../../shared/boardState";
+import { LANGUAGE_STATUS, type BlockEvent, type BoardEvent, type BoardSnapshot, type DocMeta, type Signal } from "../../../shared/types";
+import { apiFetch } from "../lib/api";
 import { putDoc, sessionDocs } from "../lib/docStore";
 import { prepareFile } from "../lib/files";
-import { getSession, isDev, loadData, saveData, updateSession, type Speed } from "../lib/session";
+import { ensureServerSession, getSession, isDev, loadData, onStorageFailure, saveData, updateSession, type Speed } from "../lib/session";
 import { useBoardSocket } from "../lib/useBoardSocket";
 import { useMicLevel } from "../lib/useMicLevel";
 import { useVoiceCall } from "../lib/useVoiceCall";
-import { Board, type BoardStatus, type Highlight, type Submission, type TutorBlock } from "./Board";
+import { Board, type BoardStatus, type Submission, type TutorBlock } from "./Board";
 import { DevPanel } from "./DevPanel";
 import { VoiceOrb, type VoiceState } from "./VoiceOrb";
 import { ArrowLeft, FileText, HandPalm, List, Microphone, MicrophoneSlash, Pause, PencilSimpleLine, Play, SignOut, UploadSimple } from "@phosphor-icons/react";
 
-function toBlock(e: BoardEvent, instant: boolean): TutorBlock | null {
+function toBlock(e: BlockEvent & { erased?: boolean }, instant: boolean): TutorBlock {
   switch (e.type) {
     case "write":
       return { kind: "write", id: e.id, label: e.label, style: e.style, lines: e.lines, place: e.place, replaces: e.replaces, instant };
     case "draw":
       return { kind: "draw", id: e.id, label: e.label, diagram: e.diagram, caption: e.caption, place: e.place, replaces: e.replaces, instant };
     case "steps":
-      return { kind: "steps", id: e.id, label: e.label, title: e.title, steps: e.steps, section: e.section, instant };
+      return { kind: "steps", id: e.id, label: e.label, title: e.title, steps: e.steps, section: e.section, checked: e.checked, instant };
     case "problem":
-      return { kind: "problem", id: e.id, label: e.label, problem: e.problem, instant };
+      return { kind: "problem", id: e.id, label: e.label, problem: e.problem, questionKind: e.kind, instant };
     case "plan":
       return { kind: "plan", id: e.id, label: e.label, title: e.title, items: e.items, instant };
     case "page":
       return { kind: "page", id: e.id, instant };
     case "source":
       return { kind: "source", id: e.id, label: e.label, docId: e.docId, docName: e.docName, page: e.page, caption: e.caption, instant };
-    default:
-      return null;
+    case "hint":
+      return { kind: "hint", id: e.id, label: e.label, level: e.level, rung: e.rung, of: e.of, text: e.text, instant };
   }
 }
 
@@ -44,14 +50,13 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
   const meta = getSession(sessionId)!;
   const initial = useRef(loadData(sessionId)).current;
 
-  const [blocks, setBlocks] = useState<TutorBlock[]>([]);
-  const [highlights, setHighlights] = useState<Highlight[]>([]);
-  const [erased, setErased] = useState<string[]>([]);
-  const [currentSection, setCurrentSection] = useState<number | null>(null);
-  const [mark, setMark] = useState<{ captureId: string; line: number; note: string } | null>(null);
-  const [correctCapture, setCorrectCapture] = useState<string | null>(null);
+  const [serverId, setServerId] = useState<string | null>(null);
+  const [setupError, setSetupError] = useState<string | null>(null);
+  const [snapshot, setSnapshot] = useState<BoardSnapshot>(initial.snapshot);
+  const snapRef = useRef(snapshot);
+  const liveIds = useRef(new Set<string>());
   const [status, setStatus] = useState<BoardStatus>("idle");
-  const [captureTick, setCaptureTick] = useState(0);
+  const [captureRequest, setCaptureRequest] = useState<{ id: string; n: number } | null>(null);
   const [holdTick, setHoldTick] = useState(0);
   const [resumeTick, setResumeTick] = useState(0);
   const [submission, setSubmission] = useState<Submission>({ captureId: null, state: "idle" });
@@ -62,9 +67,8 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
   const [menuOpen, setMenuOpen] = useState(false);
   const [started, setStarted] = useState(meta.started);
   const [uploading, setUploading] = useState(false);
-  const events = useRef<BoardEvent[]>([]);
   const fileInput = useRef<HTMLInputElement>(null);
-  const voice = useVoiceCall();
+  const voice = useVoiceCall(serverId);
   const active = voice.state === "active";
   const live = voice.state === "connecting" || voice.state === "ringing" || active;
   const paused = started && !live;
@@ -72,114 +76,136 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
 
   const showToast = useCallback((text: string) => {
     setToast(text);
-    setTimeout(() => setToast(null), 4500);
+    setTimeout(() => setToast((t) => (t === text ? null : t)), 4500);
   }, []);
   useEffect(() => {
     if (voice.error) showToast(voice.error);
   }, [voice.error, showToast]);
+  useEffect(() => onStorageFailure(() => showToast("This device can't save the board (storage is full or blocked). The class still works, but won't be kept after you leave.")), [showToast]);
 
-  // ---------- board events for THIS session ----------
-  const persist = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const remember = (e: BoardEvent) => {
-    if (e.type === "checking" || e.type === "unclear" || e.type === "review") return;
-    events.current.push(e);
-    clearTimeout(persist.current);
-    persist.current = setTimeout(() => {
-      saveData(sessionId, { events: events.current.slice(-150) });
-      updateSession(sessionId, {});
-    }, 500);
-  };
+  // ---------- the session on the server ----------
+  useEffect(() => {
+    let cancelled = false;
+    ensureServerSession(meta)
+      .then((r) => {
+        if (cancelled) return;
+        setServerId(r.serverId);
+        if (r.plan) saveData(sessionId, { plan: r.plan });
+      })
+      .catch((err) => !cancelled && setSetupError((err as Error).message));
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId]);
+
+  // ---------- saving the board on this device ----------
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const dirty = useRef(false);
+  const flush = useCallback(() => {
+    clearTimeout(saveTimer.current);
+    if (!dirty.current) return;
+    dirty.current = false;
+    saveData(sessionId, { snapshot: snapRef.current });
+    updateSession(sessionId, {});
+  }, [sessionId]);
+  const setBoard = useCallback(
+    (next: BoardSnapshot) => {
+      snapRef.current = next;
+      setSnapshot(next);
+      dirty.current = true;
+      clearTimeout(saveTimer.current);
+      saveTimer.current = setTimeout(flush, 300);
+    },
+    [flush],
+  );
+  useEffect(() => {
+    const onHide = () => document.visibilityState === "hidden" && flush();
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", onHide);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", onHide);
+      flush(); // leaving the class
+    };
+  }, [flush]);
+
+  // ---------- board messages for THIS session ----------
+  const onSnapshot = useCallback(
+    (snap: BoardSnapshot) => {
+      setBoard(snap);
+      setStatus(snap.correct ? "correct" : "idle");
+    },
+    [setBoard],
+  );
 
   const onEvent = useCallback(
-    (e: BoardEvent, replay: boolean) => {
-      remember(e);
-      const block = toBlock(e, replay);
-      if (block) {
-        setBlocks((b) => (b.some((x) => x.id === block.id) ? b : [...b, block]));
-        if (e.type === "steps" && e.section) setCurrentSection(e.section.n);
-        if (e.type === "problem" || (e.type === "write" && e.style === "your_turn")) {
-          setMark(null);
-          setStatus("idle");
-        }
-        return;
-      }
-      switch (e.type) {
-        case "highlight":
-          setHighlights((h) => [...h.filter((x) => x.id !== e.id), { id: e.id, target: e.target, line: e.line, style: e.style, note: e.note }].slice(-6));
-          break;
-        case "erase":
-          setErased((x) => [...x, e.target]);
-          setHighlights((h) => h.filter((x) => x.target !== e.target));
-          break;
-        case "resume":
-          setResumeTick((n) => n + 1);
-          break;
+    (seq: number, e: BoardEvent): "ok" | "dup" | "gap" => {
+      const next = applySeq(snapRef.current, seq, e);
+      if (next === "dup" || next === "gap") return next;
+      if ("id" in e && (e.type === "write" || e.type === "draw" || e.type === "steps" || e.type === "problem" || e.type === "plan" || e.type === "page" || e.type === "source" || e.type === "hint")) liveIds.current.add(e.id);
+      if (e.type === "problem" || (e.type === "write" && e.style === "your_turn")) setStatus("idle");
+      if (e.type === "mark") setStatus("idle");
+      if (e.type === "correct") setStatus("correct");
+      if (e.type === "resume") setResumeTick((n) => n + 1);
+      setBoard(next);
+      return "ok";
+    },
+    [setBoard],
+  );
+
+  const onSignal = useCallback(
+    (sig: Signal) => {
+      switch (sig.type) {
         case "checking":
           setStatus("checking");
-          setCaptureTick((n) => n + 1);
-          break;
-        case "mark":
-          setStatus("idle");
-          setMark({ captureId: e.captureId, line: e.line, note: e.note });
-          break;
-        case "correct":
-          setStatus("correct");
-          setMark(null);
-          setCorrectCapture(e.captureId);
+          setCaptureRequest((r) => ({ id: sig.requestId, n: (r?.n ?? 0) + 1 }));
           break;
         case "unclear":
           setStatus("idle");
-          if (!replay) showToast(e.note);
+          showToast(sig.note);
           break;
         case "review":
           setSubmission((cur) =>
-            cur.captureId !== e.captureId
+            cur.captureId !== sig.captureId
               ? cur
-              : e.state === "received"
+              : sig.state === "received"
                 ? { ...cur, state: "reviewing" }
-                : e.state === "done"
-                  ? { ...cur, state: "done", status: e.status, summary: e.summary }
-                  : { ...cur, state: "failed", summary: e.summary },
+                : sig.state === "done"
+                  ? { ...cur, state: "done", status: sig.status, summary: sig.summary }
+                  : sig.state === "stale"
+                    ? { ...cur, state: "stale", summary: sig.summary }
+                    : { ...cur, state: "failed", summary: sig.summary },
           );
+          if (sig.state === "done" || sig.state === "failed" || sig.state === "stale") setStatus((st) => (st === "checking" ? "idle" : st));
           break;
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [showToast],
   );
-
-  const onReset = useCallback(() => {
-    events.current = [];
-    setBlocks([]);
-    setHighlights([]);
-    setErased([]);
-    setCurrentSection(null);
-  }, []);
 
   // After a server restart the server has no files for this session: send back the ones kept here.
   const onDocs = useCallback(
     async (serverDocs: DocMeta[]) => {
       if (serverDocs.length) return setDocs(serverDocs);
+      if (!serverId) return;
       const local = await sessionDocs(sessionId).catch(() => []);
       if (!local.length) return;
-      await fetch("/api/documents", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_code: sessionId, files: local.map((d) => ({ id: d.docId, name: d.name, mediaType: d.mediaType, data: d.data, pages: d.pages })) }),
+      await apiFetch(`/sessions/${serverId}/documents`, {
+        body: { files: local.map((d) => ({ id: d.docId, name: d.name, mediaType: d.mediaType, data: d.data, pages: d.pages })) },
       }).catch(() => {});
     },
-    [sessionId],
+    [sessionId, serverId],
   );
 
-  const { connected, send } = useBoardSocket(sessionId, {
+  const { connected, send } = useBoardSocket(serverId, {
+    snapshot: () => snapRef.current,
+    onSnapshot,
     onEvent,
-    onReset,
+    onSignal,
     onDocs,
-    saved: () => ({ events: initial.events, study: initial.plan?.plan ?? null }),
+    onGone: () => setSetupError("This class was deleted on the server."),
   });
-
-  // Leaving this session: stop the call first.
-  useEffect(() => () => void voice.stop(), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // A call that ends on its own (silence timeout, network) leaves the class paused, not lost.
   useEffect(() => {
@@ -193,33 +219,18 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
   }, []);
 
   // ---------- class controls ----------
-  const userData = (resuming: boolean): Record<string, unknown> => {
-    const plan = initial.plan;
-    const topic = meta.topic || plan?.plan.topic || "maths";
-    return {
-      session_code: sessionId,
-      greeting: greetingFor(meta.language, meta.studentName, plan?.plan.title || topic, resuming),
-      student_name: meta.studentName,
-      grade: meta.grade,
-      language: meta.language,
-      language_name: LANGUAGE_NAMES[meta.language],
-      topic,
-      speed,
-      lesson_plan: plan ? plan.outline : "No prepared plan. Ask the student what they are stuck on, then teach it on the board with write and draw.",
-    };
-  };
-
   const startOrResume = () => {
+    if (!serverId) return;
     const resuming = started;
     setStarted(true);
     updateSession(sessionId, { started: true });
     setResumeTick((n) => n + 1);
-    void voice.start(userData(resuming), { handsFree });
+    void voice.start({ speed, resuming, handsFree });
   };
 
   const pause = () => {
     setHoldTick((n) => n + 1);
-    void voice.stop();
+    voice.stop();
   };
 
   const stopTeacher = () => {
@@ -228,7 +239,8 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
     voice.askDoubt();
   };
 
-  // Push-to-talk: hold the Talk button or the Space bar.
+  // Push-to-talk: hold the Talk button or the Space bar. Released on key up, pointer up/cancel,
+  // and whenever the window loses focus or the page is hidden (no stuck open mic).
   const talkDown = useCallback(() => {
     if (!active || handsFree) return;
     if (voice.volume > 0.03) {
@@ -237,7 +249,7 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
     }
     voice.talk(true);
   }, [active, handsFree, voice, send]);
-  const talkUp = useCallback(() => voice.talking && voice.talk(false), [voice]);
+  const talkUp = useCallback(() => voice.isTalking() && voice.talk(false), [voice]);
   useEffect(() => {
     const typing = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || /INPUT|TEXTAREA|SELECT/.test(t.tagName));
     const down = (e: KeyboardEvent) => {
@@ -249,13 +261,23 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
     const up = (e: KeyboardEvent) => {
       if (e.code === "Space" && !typing(e.target)) talkUp();
     };
+    const lost = () => talkUp();
+    const hidden = () => document.visibilityState === "hidden" && talkUp();
     window.addEventListener("keydown", down);
     window.addEventListener("keyup", up);
+    window.addEventListener("blur", lost);
+    document.addEventListener("visibilitychange", hidden);
     return () => {
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
+      window.removeEventListener("blur", lost);
+      document.removeEventListener("visibilitychange", hidden);
     };
   }, [talkDown, talkUp]);
+  // Leaving a live call (Pause, call end) always closes the mic.
+  useEffect(() => {
+    if (!active) talkUp();
+  }, [active, talkUp]);
 
   const toggleHandsFree = () => {
     const next = !handsFree;
@@ -275,33 +297,28 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
 
   // ---------- Done ----------
   const submitTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(submitTimer.current), []);
   const onDone = (captureId: string) => {
-    setSubmission({ captureId, state: "submitting" });
     clearTimeout(submitTimer.current);
-    submitTimer.current = setTimeout(() => {
-      setSubmission((cur) => (cur.captureId === captureId && cur.state === "submitting" ? { ...cur, state: "failed", summary: "No answer from the server. Check your connection." } : cur));
-    }, 6000);
     if (!connected) {
       setSubmission({ captureId, state: "failed", summary: "Not connected. Try again in a moment." });
       return;
     }
+    setSubmission({ captureId, state: "submitting" });
+    submitTimer.current = setTimeout(() => {
+      setSubmission((cur) => (cur.captureId === captureId && cur.state === "submitting" ? { ...cur, state: "failed", summary: "No answer from the server. Check your connection." } : cur));
+    }, 8000);
     if (active) voice.sendDone(); // the tutor looks as soon as it's read
   };
 
   // ---------- upload in the lesson ----------
   const upload = async (list: FileList | null) => {
     const files = Array.from(list ?? []).slice(0, 6);
-    if (!files.length) return;
+    if (!files.length || !serverId) return;
     setUploading(true);
     try {
       const prepared = await Promise.all(files.map(async (f) => ({ ...(await prepareFile(f)), id: crypto.randomUUID().slice(0, 8) })));
-      const r = await fetch("/api/documents", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_code: sessionId, files: prepared }),
-      });
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.error || "Upload failed");
+      const data = await apiFetch<{ docs: DocMeta[] }>(`/sessions/${serverId}/documents`, { body: { files: prepared } });
       for (const f of prepared) await putDoc({ sessionId, docId: f.id, name: f.name, mediaType: f.mediaType, data: f.data, pages: f.pages });
       setDocs(data.docs);
       saveData(sessionId, { docs: data.docs });
@@ -309,7 +326,7 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
       if (active) voice.sendTones("4#");
       showToast(`Uploaded ${files.map((f) => f.name).join(", ")}. ${active ? "Your teacher can read it now." : "Your teacher will have it when the class starts."}`);
     } catch (e) {
-      showToast(`Upload failed: ${(e as Error).message}. Try again.`);
+      showToast(`Upload failed: ${(e as Error).message}`);
     } finally {
       setUploading(false);
       if (fileInput.current) fileInput.current.value = "";
@@ -343,6 +360,10 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
               ? "thinking"
               : "listening";
 
+  // ---------- what the board shows ----------
+  const blocks = useMemo(() => snapshot.blocks.map((b) => toBlock(b, !liveIds.current.has(b.id))), [snapshot.blocks]);
+  const erased = useMemo(() => snapshot.blocks.filter((b) => b.erased && "label" in b && b.label).map((b) => (b as { label: string }).label), [snapshot.blocks]);
+
   const classControls = (
     <>
       {active && !handsFree && (
@@ -355,6 +376,7 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
           }}
           onPointerUp={talkUp}
           onPointerCancel={talkUp}
+          onLostPointerCapture={talkUp}
           onContextMenu={(e) => e.preventDefault()}
           title="Hold to talk (or hold Space)"
         >
@@ -366,7 +388,7 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
           <HandPalm /> Stop
         </button>
       )}
-      <button onClick={() => fileInput.current?.click()} disabled={uploading} aria-label="Upload material" title="Upload a PDF or photos of your book or notes">
+      <button onClick={() => fileInput.current?.click()} disabled={uploading || !serverId} aria-label="Upload material" title="Upload a PDF or photos of your book or notes">
         {uploading ? <span className="spin" /> : <UploadSimple />}
       </button>
       <button className="btn-speed" onClick={cycleSpeed} title="Teacher's speaking speed">
@@ -385,7 +407,7 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
           )}
         </button>
       ) : (
-        <button className="btn-start" onClick={startOrResume} title={started ? "Resume the class" : "Start the class"}>
+        <button className="btn-start" onClick={startOrResume} disabled={!serverId} title={started ? "Resume the class" : "Start the class"}>
           <Play weight="fill" /> {started ? "Resume" : "Start"}
         </button>
       )}
@@ -397,13 +419,14 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
       <Board
         sessionCode={sessionId}
         blocks={blocks}
-        highlights={highlights}
+        highlights={snapshot.highlights}
         erased={erased}
-        currentSection={currentSection}
-        mark={mark}
-        correctCapture={correctCapture}
+        currentSection={snapshot.section}
+        mark={snapshot.mark}
+        correct={snapshot.correct}
+        questionId={snapshot.question?.id ?? null}
         status={status}
-        captureTick={captureTick}
+        captureRequest={captureRequest}
         callActive={active}
         teacherSpeaking={teacherSpeaking}
         holdTick={holdTick}
@@ -419,7 +442,8 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
         <button className="menu-button" onClick={() => setMenuOpen((o) => !o)} aria-expanded={menuOpen} aria-label="Session menu">
           <List className="menu-icon" />
           <span className="menu-name">{meta.name}</span>
-          {!connected && <span className="offline">offline</span>}
+          {serverId && !connected && <span className="offline">offline</span>}
+          {LANGUAGE_STATUS[meta.language] === "preview" && <span className="offline">preview language</span>}
         </button>
         {menuOpen && (
           <div className="menu" role="menu">
@@ -430,7 +454,10 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
               role="menuitem"
               onClick={() => {
                 const name = window.prompt("Rename this session", meta.name)?.trim();
-                if (name) updateSession(sessionId, { name });
+                if (name) {
+                  updateSession(sessionId, { name });
+                  if (serverId) void apiFetch(`/sessions/${serverId}`, { method: "PATCH", body: { label: name } }).catch(() => {});
+                }
                 setMenuOpen(false);
               }}
             >
@@ -448,7 +475,7 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
               className="danger"
               onClick={() => {
                 if (window.confirm("End this class? The board is saved and you can resume it from All sessions.")) {
-                  void voice.stop();
+                  voice.stop();
                   onHome();
                 }
               }}
@@ -461,8 +488,18 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
       <VoiceOrb state={orb} level={orb === "teacher" ? Math.min(1, voice.volume * 3) : orb === "student" ? mic : 0} />
 
       <input ref={fileInput} type="file" accept="application/pdf,image/*" multiple hidden onChange={(e) => void upload(e.target.files)} />
-      {toast && <div className="toast" role="status">{toast}</div>}
-      {isDev && <DevPanel sessionCode={sessionId} />}
+      {setupError && (
+        <div className="toast" role="alert">
+          {setupError}
+        </div>
+      )}
+      {toast && !setupError && (
+        <div className="toast" role="status">
+          {toast}
+        </div>
+      )}
+      {isDev && serverId && <DevPanel sessionId={serverId} />}
     </div>
   );
 }
+

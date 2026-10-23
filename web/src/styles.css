@@ -389,7 +389,7 @@ sub {
 
 .segmented {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(76px, 1fr));
   gap: 4px;
   padding: 4px;
   background: var(--surface-2);
@@ -1934,6 +1934,58 @@ sub {
   .actions .btn-secondary {
     flex: 1 1 auto;
   }
+}
+
+/* ---------- Hint ladder, checked work, preview languages ---------- */
+
+.hint-card {
+  border-left: 3px solid var(--chalk-yellow);
+  padding: calc(var(--s) * 6px) 0 calc(var(--s) * 4px) calc(var(--s) * 14px);
+}
+
+.hint-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: max(12px, calc(var(--s) * 15px));
+  color: var(--chalk-yellow);
+}
+
+.hint-text {
+  margin: calc(var(--s) * 4px) 0 0;
+  font-size: calc(var(--s) * 24px);
+  line-height: 1.35;
+}
+
+.hint-card[data-level="step"] .hint-tag {
+  color: var(--chalk-blue);
+}
+
+.checked-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: 10px;
+  padding: 1px 9px;
+  border-radius: 999px;
+  font-family: var(--font-ui);
+  font-size: max(11px, calc(var(--s) * 13px));
+  font-weight: 600;
+  vertical-align: middle;
+  color: #1b2a23;
+  background: #9fe0b8;
+}
+
+.preview-mark {
+  margin-left: 4px;
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.submission[data-state="stale"] {
+  border-left-color: var(--chalk-yellow);
 }
 
 /* Motion off when the student asks for it: everything lands in its final state at once. */

@@ -1,8 +1,5 @@
-import { createServer, type Server } from "node:http";
-import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import WebSocket from "ws";
-import type { BoardEvent, ServerMessage } from "../shared/types";
+import type { ServerMessage } from "../shared/types";
 
 // Stand-in for the vision model and planner, so tests are free and deterministic.
 const askJson = vi.fn();
@@ -14,141 +11,140 @@ vi.mock("./llm", () => ({
   dataUrlToAttachment: (url: string) => ({ mediaType: "image/png", data: url.split(",")[1] }),
 }));
 
-const { createApp } = await import("./app");
 const { resetSessions } = await import("./sessions");
+const { store } = await import("./store");
+const { resetLimits } = await import("./limits");
+const kit = await import("./testkit");
+const { PNG } = kit;
 
-let server: Server;
-let base: string;
+let srv: Awaited<ReturnType<typeof kit.startServer>>;
+let token: string;
+const post = (name: string, body: Record<string, unknown>) => kit.tool(srv.base, name, body);
+const tab = (id: string, d: Parameters<typeof kit.openTab>[3] = null) => kit.openTab(srv.base, token, id, d);
+const session = (body: Record<string, unknown> = {}) => kit.newSession(srv.base, token, body);
 
 beforeAll(async () => {
-  const { app, attachWebSocket } = createApp();
-  server = createServer(app);
-  attachWebSocket(server);
-  await new Promise<void>((r) => server.listen(0, r));
-  base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  srv = await kit.startServer();
 });
-afterAll(() => new Promise<void>((r) => server.close(() => r())));
-beforeEach(() => {
+afterAll(() => srv.close());
+beforeEach(async () => {
   resetSessions();
+  store.reset();
+  resetLimits();
   askJson.mockReset();
   modelOn = true;
   delete process.env.TOOLS_TOKEN;
   delete process.env.FAKE_CHECKER;
+  token = await kit.newDevice(srv.base);
 });
 
 const MISTAKE = { kind: "working", reading: "1) ...", status: "mistake", line: 2, what_went_wrong: "Sign error", say: "Step 2 mein sign dekho." };
-
-/** Opens a "browser tab" for a session. It answers "checking" with the given drawing, like the real board. */
-async function openTab(code: string, drawing: { png: string; lineCount: number } | null = null) {
-  const ws = new WebSocket(`${base.replace("http", "ws")}/ws?code=${code}`);
-  const messages: ServerMessage[] = [];
-  let captures = 0;
-  ws.on("message", (d) => {
-    const m = JSON.parse(String(d)) as ServerMessage;
-    messages.push(m);
-    if (m.kind === "board" && m.event.type === "checking" && drawing) {
-      ws.send(JSON.stringify({ kind: "capture", id: `req${++captures}`, reason: "request", ...drawing }));
-    }
-  });
-  await new Promise((r) => ws.on("open", r));
-  await vi.waitFor(() => expect(messages[0]?.kind).toBe("welcome"));
-  const events = () => messages.filter((m) => m.kind === "board").map((m) => (m as { event: BoardEvent }).event);
-  const done = (id: string) => ws.send(JSON.stringify({ kind: "capture", id, reason: "done", ...drawing }));
-  return { ws, messages, events, done };
-}
-
-const post = (tool: string, body: unknown) =>
-  fetch(`${base}/tools/${tool}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then((r) =>
-    r.json(),
-  );
+const CORRECT = { ...MISTAKE, status: "correct", line: null, what_went_wrong: "" };
 
 describe("board tools", () => {
   it("show_steps writes steps to the right tab", async () => {
-    const tab = await openTab("ABC123");
-    const res = await post("show_steps", { session_code: "abc123", title: "Factorise", steps: "x^2 - 5x + 6 = 0 || (x-2)(x-3) = 0" });
+    const id = await session();
+    const t = await tab(id);
+    const res = await post("show_steps", { session_code: id, title: "Factorise", steps: "x^2 - 5x + 6 = 0 || (x-2)(x-3) = 0" });
     expect(res.ok).toBe(true);
-    await vi.waitFor(() => expect(tab.events()).toHaveLength(1));
-    expect(tab.events()[0]).toMatchObject({ type: "steps", title: "Factorise", steps: ["x^2 - 5x + 6 = 0", "(x-2)(x-3) = 0"] });
-    tab.ws.close();
+    await vi.waitFor(() => expect(t.events()).toHaveLength(1));
+    expect(t.events()[0]).toMatchObject({ type: "steps", title: "Factorise", steps: ["x^2 - 5x + 6 = 0", "(x-2)(x-3) = 0"] });
+    t.ws.close();
   });
 
-  it("never routes a tool call to another session (no fallback for a wrong code)", async () => {
-    const maths = await openTab("MATH01");
-    const res = await post("give_problem", { session_code: "PHYS01", problem: "Solve: 2x + 3 = 7" });
+  it("never routes a tool call to another session (no fallback for a wrong id)", async () => {
+    const maths = await session();
+    const t = await tab(maths);
+    const res = await post("give_problem", { session_code: "s_doesnotexist0000000000", problem: "Solve: 2x + 3 = 7" });
     expect(res.ok).toBe(false);
-    await new Promise((r) => setTimeout(r, 150));
-    expect(maths.events()).toHaveLength(0);
-    maths.ws.close();
+    const short = await post("give_problem", { session_code: maths.slice(0, 8), problem: "x" });
+    expect(short.ok).toBe(false);
+    await new Promise((r) => setTimeout(r, 100));
+    expect(t.events()).toHaveLength(0);
+    t.ws.close();
   });
 
-  it("tags every board message with its session, so a browser can drop strays", async () => {
-    const tab = await openTab("TAG001");
-    await post("write", { session_code: "TAG001", kind: "text", content: "hi" });
-    await vi.waitFor(() => expect(tab.messages.some((m) => m.kind === "board")).toBe(true));
-    expect(tab.messages.filter((m) => m.kind === "board").every((m) => (m as { sessionCode: string }).sessionCode === "TAG001")).toBe(true);
-    tab.ws.close();
+  it("tags every board message with its session and a sequence number", async () => {
+    const id = await session();
+    const t = await tab(id);
+    await post("write", { session_code: id, kind: "text", content: "hi" });
+    await post("write", { session_code: id, kind: "text", content: "there" });
+    await vi.waitFor(() => expect(t.events()).toHaveLength(2));
+    const evs = t.messages.filter((m) => m.kind === "event") as Extract<ServerMessage, { kind: "event" }>[];
+    expect(evs.every((m) => m.sessionId === id)).toBe(true);
+    expect(evs.map((m) => m.seq)).toEqual([1, 2]);
+    t.ws.close();
   });
 
   it("clear_board opens a new page instead of wiping (GET query string works too)", async () => {
-    const tab = await openTab("QRY111");
-    const r = await fetch(`${base}/tools/clear_board?session_code=QRY111`).then((x) => x.json());
+    const id = await session();
+    const t = await tab(id);
+    const r = await fetch(`${srv.base}/tools/clear_board?session_code=${id}`).then((x) => x.json());
     expect(r.ok).toBe(true);
-    await vi.waitFor(() => expect(tab.events()[0]).toMatchObject({ type: "page" }));
-    tab.ws.close();
+    await vi.waitFor(() => expect(t.events()[0]).toMatchObject({ type: "page" }));
+    t.ws.close();
   });
 
-  it("look_at_board asks for the latest work, reads it, and circles the wrong line of that capture", async () => {
-    const tab = await openTab("CHK222", { png: "data:image/png;base64,AAAA", lineCount: 3 });
-    await post("give_problem", { session_code: "CHK222", problem: "Solve: x^2 - 7x + 12 = 0", answer: "x = 3 or x = 4" });
+  it("look_at_board asks for the latest work, reads it, and circles the wrong line with its position", async () => {
+    const id = await session();
+    const t = await tab(id, { png: PNG("a"), lineCount: 3 });
+    await post("give_problem", { session_code: id, problem: "Solve: x^2 - 7x + 12 = 0", answer: "x = 3 or x = 4" });
+    await vi.waitFor(() => expect(t.question()).not.toBeNull());
     askJson.mockResolvedValue(MISTAKE);
-
-    const res = await post("look_at_board", { session_code: "CHK222", student_said: "is this right?" });
+    const res = await post("look_at_board", { session_code: id, student_said: "is this right?" });
     expect(res).toMatchObject({ status: "mistake", line: 2, say: "Step 2 mein sign dekho." });
     const req = askJson.mock.calls[0][0] as { text: string };
     expect(req.text).toContain("Solve: x^2 - 7x + 12 = 0");
+    expect(req.text).toContain("Expected final answer: x = 3 or x = 4");
     expect(req.text).toContain("is this right?");
-    await vi.waitFor(() => expect(tab.events().map((e) => e.type)).toEqual(["problem", "checking", "mark"]));
-    expect(tab.events()[2]).toMatchObject({ type: "mark", captureId: "req1", line: 2 });
-    tab.ws.close();
+    await vi.waitFor(() => expect(t.events().map((e) => e.type)).toEqual(["problem", "mark"]));
+    expect(t.events()[1]).toMatchObject({ type: "mark", captureId: "req1", line: 2, questionId: t.question(), box: { x: 40, y: 250, w: 300, h: 40 } });
+    expect(t.signals().map((s) => s.type)).toContain("checking");
+    t.ws.close();
   });
 
   it("pressing Done starts reading right away, so the tutor's look reuses it", async () => {
-    const tab = await openTab("DONE01", { png: "data:image/png;base64,BBBB", lineCount: 2 });
+    const id = await session();
+    const t = await tab(id, { png: PNG("b"), lineCount: 2 });
     let finish: (v: unknown) => void = () => {};
     askJson.mockReturnValue(new Promise((r) => (finish = r)));
-    tab.done("done1");
+    t.done("done1");
     await vi.waitFor(() => expect(askJson).toHaveBeenCalledTimes(1)); // started before the tutor asked
     finish(MISTAKE);
-    const res = await post("look_at_board", { session_code: "DONE01" });
+    const res = await post("look_at_board", { session_code: id });
     expect(res.status).toBe("mistake");
-    expect(askJson).toHaveBeenCalledTimes(1); // same drawing, same analysis
-    tab.ws.close();
+    expect(askJson).toHaveBeenCalledTimes(1); // same drawing, same context, same analysis
+    t.ws.close();
   });
 
   it("an empty board says so without calling the model", async () => {
-    const tab = await openTab("EMP333", { png: "", lineCount: 0 });
-    const res = await post("look_at_board", { session_code: "EMP333" });
+    const id = await session();
+    const t = await tab(id, { png: "", lineCount: 0 });
+    const res = await post("look_at_board", { session_code: id });
     expect(res.status).toBe("empty");
     expect(askJson).not.toHaveBeenCalled();
-    tab.ws.close();
+    t.ws.close();
   });
 
   it("check_work still works for older agents", async () => {
-    const tab = await openTab("OLD444", { png: "data:image/png;base64,CCCC", lineCount: 2 });
-    askJson.mockResolvedValue({ ...MISTAKE, status: "correct", line: null });
-    const res = await post("check_work", { session_code: "OLD444" });
+    const id = await session();
+    const t = await tab(id, { png: PNG("c"), lineCount: 2 });
+    askJson.mockResolvedValue(CORRECT);
+    const res = await post("check_work", { session_code: id });
     expect(res.status).toBe("correct");
-    await vi.waitFor(() => expect(tab.events().at(-1)).toMatchObject({ type: "correct", captureId: "req1" }));
-    tab.ws.close();
+    await vi.waitFor(() => expect(t.events().at(-1)).toMatchObject({ type: "correct", captureId: "req1", box: { y: 250 } }));
+    t.ws.close();
   });
 
-  it("without a model it clears the checking state and says so", async () => {
+  it("without a model it says so and shows nothing on the board", async () => {
     modelOn = false;
-    const tab = await openTab("NOK555", { png: "data:image/png;base64,DDDD", lineCount: 2 });
-    const res = await post("look_at_board", { session_code: "NOK555" });
+    const id = await session();
+    const t = await tab(id, { png: PNG("d"), lineCount: 2 });
+    const res = await post("look_at_board", { session_code: id });
     expect(res.ok).toBe(false);
-    await vi.waitFor(() => expect(tab.events().map((e) => e.type)).toEqual(["checking", "unclear"]));
-    tab.ws.close();
+    await vi.waitFor(() => expect(t.signals().map((s) => s.type)).toEqual(["checking", "unclear"]));
+    expect(t.events()).toHaveLength(0);
+    t.ws.close();
   });
 
   it("reports a missing screen instead of failing", async () => {
@@ -156,22 +152,116 @@ describe("board tools", () => {
     expect(res.ok).toBe(false);
   });
 
-  it("rejects calls without the token when TOOLS_TOKEN is set", async () => {
-    process.env.TOOLS_TOKEN = "secret";
-    const r = await fetch(`${base}/tools/clear_board`, { method: "POST" });
-    expect(r.status).toBe(401);
-    const ok = await fetch(`${base}/tools/clear_board`, { method: "POST", headers: { Authorization: "Bearer secret" } });
+  it("rejects calls without the token when TOOLS_TOKEN is set (constant-time check)", async () => {
+    process.env.TOOLS_TOKEN = "secret-token";
+    expect((await fetch(`${srv.base}/tools/clear_board`, { method: "POST" })).status).toBe(401);
+    expect((await fetch(`${srv.base}/tools/clear_board`, { method: "POST", headers: { Authorization: "Bearer secret-tokeX" } })).status).toBe(401);
+    const ok = await fetch(`${srv.base}/tools/clear_board`, { method: "POST", headers: { Authorization: "Bearer secret-token" } });
     expect(ok.status).toBe(200);
   });
 
-  it("replays the board to a tab that reconnects", async () => {
-    const first = await openTab("RPL444");
-    await post("show_steps", { session_code: "RPL444", steps: "a || b" });
+  it("refuses all tool calls in production when no TOOLS_TOKEN is configured", async () => {
+    process.env.NODE_ENV = "production";
+    try {
+      const r = await fetch(`${srv.base}/tools/clear_board`, { method: "POST" });
+      expect(r.status).toBe(503);
+    } finally {
+      process.env.NODE_ENV = "test";
+    }
+  });
+
+  it("gives a reconnecting tab the whole board as one snapshot", async () => {
+    const id = await session();
+    const first = await tab(id);
+    await post("show_steps", { session_code: id, steps: "a || b" });
+    await post("highlight", { session_code: id, target: "B1 line 2", style: "circle" });
     first.ws.close();
-    const again = await openTab("RPL444");
+    const again = await tab(id);
     const welcome = again.messages[0] as Extract<ServerMessage, { kind: "welcome" }>;
-    expect(welcome.replay.map((e) => e.type)).toEqual(["steps"]);
+    expect(welcome.snapshot.seq).toBe(2);
+    expect(welcome.snapshot.blocks.map((b) => b.type)).toEqual(["steps"]);
+    expect(welcome.snapshot.highlights).toHaveLength(1);
     again.ws.close();
+  });
+});
+
+describe("grading the right work", () => {
+  it("a new your_turn question replaces the old problem and its answer key", async () => {
+    const id = await session();
+    const t = await tab(id, { png: PNG("e"), lineCount: 2 });
+    await post("give_problem", { session_code: id, problem: "Solve 2x = 6", answer: "x = 3" });
+    await post("write", { session_code: id, kind: "your_turn", content: "Find a_10 of 2, 5, 8" });
+    await vi.waitFor(() => expect(t.events()).toHaveLength(2));
+    askJson.mockResolvedValue(MISTAKE);
+    await post("look_at_board", { session_code: id });
+    const req = askJson.mock.calls[0][0] as { text: string };
+    expect(req.text).toContain("Current problem: Find a_10 of 2, 5, 8");
+    expect(req.text).not.toContain("x = 3");
+    t.ws.close();
+  });
+
+  it("caches a reading only for the same image AND the same question context", async () => {
+    const id = await session();
+    const t = await tab(id, { png: PNG("same"), lineCount: 2 });
+    await post("give_problem", { session_code: id, problem: "Q1", answer: "1" });
+    await vi.waitFor(() => expect(t.question()).not.toBeNull());
+    askJson.mockResolvedValue(MISTAKE);
+    await post("look_at_board", { session_code: id });
+    await post("look_at_board", { session_code: id });
+    expect(askJson).toHaveBeenCalledTimes(1);
+    await post("give_problem", { session_code: id, problem: "Q2", answer: "2" });
+    await vi.waitFor(() => expect(t.events().filter((e) => e.type === "problem")).toHaveLength(2));
+    await post("look_at_board", { session_code: id });
+    expect(askJson).toHaveBeenCalledTimes(2); // same picture, different question: read again
+    await post("look_at_board", { session_code: id, student_said: "why is step 2 wrong?" });
+    expect(askJson).toHaveBeenCalledTimes(3); // different spoken context
+    t.ws.close();
+  });
+
+  it("never grades old work when the screen doesn't answer in time", async () => {
+    const id = await session();
+    const t = await tab(id, { png: PNG("old"), lineCount: 2 });
+    askJson.mockResolvedValue(CORRECT);
+    t.done("old-done");
+    await vi.waitFor(() => expect(t.signals().some((s) => s.type === "review" && s.state === "done")).toBe(true));
+    t.draw(null); // the tab stops answering "checking"
+    const silent = t.ws;
+    silent.removeAllListeners("message");
+    askJson.mockClear();
+    const res = await post("look_at_board", { session_code: id });
+    expect(res.ok).toBe(false);
+    expect(String(res.note)).toContain("didn't send their work in time");
+    expect(askJson).not.toHaveBeenCalled();
+    t.ws.close();
+  }, 10_000);
+
+  it("drops a late result for work that has been replaced, and says so", async () => {
+    const id = await session();
+    const t = await tab(id, { png: PNG("v1"), lineCount: 2 });
+    let finishFirst: (v: unknown) => void = () => {};
+    askJson.mockReturnValueOnce(new Promise((r) => (finishFirst = r))).mockResolvedValueOnce(CORRECT);
+    t.done("first");
+    await vi.waitFor(() => expect(askJson).toHaveBeenCalledTimes(1));
+    t.done("second", { png: PNG("v2"), lineCount: 3 });
+    await vi.waitFor(() => expect(t.events().some((e) => e.type === "correct" && e.captureId === "second")).toBe(true));
+    finishFirst(MISTAKE); // the first, older reading finishes last
+    await vi.waitFor(() => expect(t.signals().some((s) => s.type === "review" && s.captureId === "first" && s.state === "stale")).toBe(true));
+    expect(t.events().some((e) => e.type === "mark")).toBe(false);
+    t.ws.close();
+  });
+
+  it("drops a Done result if a new question arrived while it was being read", async () => {
+    const id = await session();
+    const t = await tab(id, { png: PNG("q"), lineCount: 2 });
+    let finish: (v: unknown) => void = () => {};
+    askJson.mockReturnValueOnce(new Promise((r) => (finish = r)));
+    t.done("w1");
+    await vi.waitFor(() => expect(askJson).toHaveBeenCalledTimes(1));
+    await post("give_problem", { session_code: id, problem: "New question" });
+    finish(MISTAKE);
+    await vi.waitFor(() => expect(t.signals().some((s) => s.type === "review" && s.state === "stale")).toBe(true));
+    expect(t.events().map((e) => e.type)).toEqual(["problem"]);
+    t.ws.close();
   });
 });
 
@@ -189,175 +279,143 @@ describe("study plan", () => {
     ],
     practice: [{ problem: "Solve: x^2 - 7x + 12 = 0", answer: "x = 3 or x = 4", hint: "12 ke factors socho" }],
   };
+  const JPEG = "/9j/4AAQSkZJRg==";
 
-  async function makePlanFor(code: string) {
+  async function sessionWithPlan() {
     askJson.mockResolvedValueOnce(PLAN);
-    const r = await fetch(`${base}/api/plan`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ session_code: code, topic: "Quadratic equations", language: "hinglish", files: [{ mediaType: "image/jpeg", data: "QUJD" }] }),
-    });
-    return r.json();
+    const draft = await kit.api(srv.base, token).post("/plans", { topic: "Quadratic equations", language: "hinglish", files: [{ mediaType: "image/jpeg", data: JPEG }] });
+    expect(draft.status).toBe(200);
+    expect(JSON.stringify(draft.json)).not.toContain("x = 3 or x = 4"); // answers stay on the server
+    expect(JSON.stringify(draft.json)).not.toContain("12 ke factors");
+    return session({ draftId: draft.json.draftId, topic: "Quadratic equations" });
   }
 
-  it("makes a plan from notes, keeps the answers on the server, and puts the plan on the board", async () => {
-    const data = await makePlanFor("PLN001");
-    expect(data.outline).toContain("1 Standard form | 2 Middle term");
-    expect(data.outline).not.toContain("x = 3 or x = 4");
+  it("makes a plan draft from notes and attaches it when the class is created", async () => {
+    const id = await sessionWithPlan();
     const req = askJson.mock.calls[0][0] as { attachments: unknown[] };
     expect(req.attachments).toHaveLength(1);
-    const tab = await openTab("PLN001");
-    const welcome = tab.messages[0] as Extract<ServerMessage, { kind: "welcome" }>;
-    expect(welcome.replay[0]).toMatchObject({ type: "plan", items: ["Standard form", "Middle term"] });
-    tab.ws.close();
+    const s = await kit.api(srv.base, token).get(`/sessions/${id}`);
+    expect(s.json.session).toMatchObject({ plan: { title: "Quadratic ko factorise karna", sections: [{ title: "Standard form" }, { title: "Middle term" }] } });
+  });
+
+  it("refuses a plan draft made for another language or another device", async () => {
+    askJson.mockResolvedValueOnce(PLAN);
+    const draft = await kit.api(srv.base, token).post("/plans", { topic: "x", language: "hinglish" });
+    const wrongLang = await kit.api(srv.base, token).post("/sessions", { draftId: draft.json.draftId, language: "en" });
+    expect(wrongLang.status).toBe(409);
+    const other = await kit.newDevice(srv.base);
+    const stolen = await kit.api(srv.base, other).post("/sessions", { draftId: draft.json.draftId, language: "hinglish" });
+    expect(stolen.status).toBe(409);
   });
 
   it("show_section writes sections in order and doesn't skip on a double call", async () => {
-    await makePlanFor("PLN002");
-    const tab = await openTab("PLN002");
-    const a = await post("show_section", { session_code: "PLN002", section: "next" });
-    const twice = await post("show_section", { session_code: "PLN002", section: "next" });
+    const id = await sessionWithPlan();
+    const t = await tab(id);
+    const a = await post("show_section", { session_code: id, section: "next" });
+    const twice = await post("show_section", { session_code: id, section: "next" });
     expect(a).toMatchObject({ section: 1, of: 2, say: "Yeh standard form hai." });
     expect(twice.section).toBe(1);
-    const jump = await post("show_section", { session_code: "PLN002", section: "२" });
+    const jump = await post("show_section", { session_code: id, section: "२" });
     expect(jump).toMatchObject({ section: 2, ask: "6 ke factors?" });
-    await vi.waitFor(() => expect(tab.events().filter((e) => e.type === "steps")).toHaveLength(2));
-    const end = await post("show_section", { session_code: "PLN002", section: "3" });
-    expect(end.done).toBe(true);
-    tab.ws.close();
+    await vi.waitFor(() => expect(t.events().filter((e) => e.type === "steps")).toHaveLength(2));
+    expect((await post("show_section", { session_code: id, section: "3" })).done).toBe(true);
+    t.ws.close();
   });
 
   it("give_practice puts the problem on the board and keeps its answer for checking", async () => {
-    await makePlanFor("PLN003");
-    const tab = await openTab("PLN003", { png: "data:image/png;base64,EEEE", lineCount: 3 });
-    const res = await post("give_practice", { session_code: "PLN003", number: "next" });
+    const id = await sessionWithPlan();
+    const t = await tab(id, { png: PNG("p"), lineCount: 3 });
+    const res = await post("give_practice", { session_code: id, number: "next" });
     expect(res).toMatchObject({ practice: 1, of: 1, problem: "Solve: x^2 - 7x + 12 = 0" });
     expect(JSON.stringify(res)).not.toContain("x = 3 or x = 4");
+    await vi.waitFor(() => expect(t.question()).not.toBeNull());
     askJson.mockResolvedValueOnce(MISTAKE);
-    await post("look_at_board", { session_code: "PLN003" });
+    await post("look_at_board", { session_code: id });
     const req = askJson.mock.calls.at(-1)![0] as { text: string };
     expect(req.text).toContain("Expected final answer: x = 3 or x = 4");
-    tab.ws.close();
+    t.ws.close();
   });
 
   it("refuses unreadable notes with a clear message", async () => {
     askJson.mockResolvedValueOnce({ ...PLAN, readable: "no", readable_note: "blurry photo" });
-    const r = await fetch(`${base}/api/plan`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ session_code: "PLN004", files: [{ mediaType: "image/jpeg", data: "QUJD" }] }),
-    });
+    const r = await kit.api(srv.base, token).post("/plans", { files: [{ mediaType: "image/jpeg", data: JPEG }] });
     expect(r.status).toBe(422);
-    expect((await r.json()).error).toContain("blurry photo");
+    expect(String(r.json.error)).toContain("blurry photo");
   });
 
   it("tools explain when there is no plan", async () => {
-    const tab = await openTab("PLN005");
-    const res = await post("show_section", { session_code: "PLN005", section: "next" });
+    const id = await session();
+    const res = await post("show_section", { session_code: id, section: "next" });
     expect(res.ok).toBe(false);
-    tab.ws.close();
-  });
-});
-
-describe("phone call fallback", () => {
-  it("explains what's missing when Bolna isn't configured", async () => {
-    const saved = { k: process.env.BOLNA_API_KEY, a: process.env.BOLNA_AGENT_ID };
-    delete process.env.BOLNA_API_KEY;
-    delete process.env.BOLNA_AGENT_ID;
-    const r = await fetch(`${base}/api/phone-call`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone: "9876543210" }) });
-    expect(r.status).toBe(503);
-    if (saved.k) process.env.BOLNA_API_KEY = saved.k;
-    if (saved.a) process.env.BOLNA_AGENT_ID = saved.a;
-  });
-
-  it("rejects a bad number before calling Bolna", async () => {
-    process.env.BOLNA_API_KEY ||= "test";
-    process.env.BOLNA_AGENT_ID ||= "test";
-    const r = await fetch(`${base}/api/phone-call`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone: "123" }) });
-    expect(r.status).toBe(400);
   });
 });
 
 describe("Done protocol", () => {
   it("acknowledges at once, reads the work, circles the line and reports back", async () => {
-    const tab = await openTab("SUB001", { png: "data:image/png;base64,SSSS", lineCount: 2 });
+    const id = await session();
+    const t = await tab(id, { png: PNG("s"), lineCount: 2 });
     askJson.mockResolvedValue(MISTAKE);
-    tab.done("work1");
-    await vi.waitFor(() => {
-      const types = tab.events().map((e) => e.type + ("state" in e ? `:${(e as { state: string }).state}` : ""));
-      expect(types).toEqual(["review:received", "mark", "review:done"]);
-    });
-    const done = tab.events().at(-1) as { summary: string; status: string; captureId: string };
+    t.done("work1");
+    await vi.waitFor(() => expect(t.signals().map((s) => (s.type === "review" ? `review:${s.state}` : s.type))).toEqual(["review:received", "review:done"]));
+    expect(t.events().map((e) => e.type)).toEqual(["mark"]);
+    const done = t.signals().at(-1) as { summary: string; status: string; captureId: string };
     expect(done).toMatchObject({ captureId: "work1", status: "mistake" });
     expect(done.summary).toContain("Step 2");
-    tab.ws.close();
+    t.ws.close();
   });
 
   it("says clearly when the work couldn't be read", async () => {
-    const tab = await openTab("SUB002", { png: "data:image/png;base64,TTTT", lineCount: 1 });
+    const id = await session();
+    const t = await tab(id, { png: PNG("t"), lineCount: 1 });
     askJson.mockRejectedValue(new Error("model down"));
-    tab.done("work2");
-    await vi.waitFor(() => expect(tab.events().at(-1)).toMatchObject({ type: "review", state: "failed" }));
-    tab.ws.close();
-  });
-});
-
-describe("sessions survive a server restart", () => {
-  it("adopts the board a browser saved when the server has nothing, but never overwrites a live one", async () => {
-    const tab = await openTab("HYD001");
-    const saved = [
-      { type: "write", id: "w1", label: "B1", style: "heading", lines: ["AP"], place: "next", replaces: null },
-      { type: "problem", id: "p1", label: "B2", problem: "Find a_10 of 2, 5, 8" },
-    ];
-    tab.ws.send(JSON.stringify({ kind: "hydrate", events: saved, study: null }));
-    await new Promise((r) => setTimeout(r, 100));
-    const r = await post("highlight", { session_code: "HYD001", target: "B2" });
-    expect(r.ok).toBe(true); // the restored board map knows B2
-    tab.ws.send(JSON.stringify({ kind: "hydrate", events: [{ type: "page", id: "x" }], study: null }));
-    await new Promise((r2) => setTimeout(r2, 100));
-    const again = await openTab("HYD001");
-    const welcome = again.messages[0] as Extract<ServerMessage, { kind: "welcome" }>;
-    expect(welcome.replay.map((e) => e.type)).toEqual(["write", "problem", "highlight"]);
-    tab.ws.close();
-    again.ws.close();
+    t.done("work2");
+    await vi.waitFor(() => expect(t.signals().at(-1)).toMatchObject({ type: "review", state: "failed" }));
+    t.ws.close();
   });
 });
 
 describe("uploaded material", () => {
-  const upload = (code: string, files: unknown[]) =>
-    fetch(`${base}/api/documents`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ session_code: code, files }) }).then(async (r) => ({ status: r.status, body: await r.json() }));
+  const PDF = "JVBERi0xLjQK"; // "%PDF-1.4\n"
+  const JPEG = "/9j/4AAQSkZJRg==";
+  const upload = (id: string, files: unknown[], replace = false) => kit.api(srv.base, token).post(`/sessions/${id}/documents`, { files, replace });
 
-  it("stores files per session and refuses other types", async () => {
-    const ok = await upload("DOC001", [{ id: "chap12", name: "Ch12 Electricity.pdf", mediaType: "application/pdf", data: "JVBERi0=", pages: 20 }]);
+  it("stores files per session and never sends contents back", async () => {
+    const id = await session();
+    const ok = await upload(id, [{ id: "chap12", name: "Ch12 Electricity.pdf", mediaType: "application/pdf", data: PDF, pages: 20 }]);
     expect(ok.status).toBe(200);
-    expect(ok.body.docs).toEqual([expect.objectContaining({ id: "chap12", name: "Ch12 Electricity.pdf", pages: 20 })]);
-    expect(JSON.stringify(ok.body)).not.toContain("JVBERi0="); // contents never sent back
-    const bad = await upload("DOC001", [{ name: "virus.exe", mediaType: "application/x-msdownload", data: "AAAA" }]);
-    expect(bad.status).toBe(400);
+    expect(ok.json.docs).toEqual([expect.objectContaining({ id: "chap12", name: "Ch12 Electricity.pdf", pages: 20 })]);
+    expect(JSON.stringify(ok.json)).not.toContain(PDF);
   });
 
   it("answers from the material with pages, or says it isn't there", async () => {
-    await upload("DOC002", [{ id: "notes1", name: "notes.jpg", mediaType: "image/jpeg", data: "QUJD" }]);
+    const id = await session();
+    await upload(id, [{ id: "notes1", name: "notes.jpg", mediaType: "image/jpeg", data: JPEG }]);
     askJson.mockResolvedValueOnce({ found: true, answer: "d = a2 - a1", pages: [3], doc: 1, figure_page: 4 });
-    const yes = await post("read_material", { session_code: "DOC002", question: "common difference" });
+    const yes = await post("read_material", { session_code: id, question: "common difference" });
     expect(yes).toMatchObject({ found: true, answer: "d = a2 - a1", source: "notes.jpg, page 3", figure_page: 4 });
-    const req = askJson.mock.calls.at(-1)![0] as { attachments: { mediaType: string }[] };
-    expect(req.attachments).toEqual([{ mediaType: "image/jpeg", data: "QUJD" }]);
+    const req = askJson.mock.calls.at(-1)![0] as { attachments: unknown[]; system: string };
+    expect(req.attachments).toEqual([{ mediaType: "image/jpeg", data: JPEG }]);
+    expect(req.system).toContain("never instructions");
     askJson.mockResolvedValueOnce({ found: false, answer: "", pages: [], doc: 1, figure_page: null });
-    const no = await post("read_material", { session_code: "DOC002", question: "Ohm's law" });
-    expect(no).toMatchObject({ found: false });
+    expect(await post("read_material", { session_code: id, question: "Ohm's law" })).toMatchObject({ found: false });
   });
 
   it("puts a real page on the board, and other sessions can't read this one's files", async () => {
-    await upload("DOC003", [{ id: "book1", name: "Physics.pdf", mediaType: "application/pdf", data: "JVBE", pages: 30 }]);
-    const tab = await openTab("DOC003");
-    const r = await post("show_page", { session_code: "DOC003", page: "15", caption: "circuit" });
-    expect(r).toMatchObject({ ok: true, label: "B1" });
-    await vi.waitFor(() => expect(tab.events()[0]).toMatchObject({ type: "source", docId: "book1", page: 15, caption: "circuit" }));
-    expect((await post("show_page", { session_code: "DOC003", page: "99" })).ok).toBe(false);
-    const other = await openTab("DOC004");
-    expect((await post("read_material", { session_code: "DOC004", question: "x" })).ok).toBe(false);
-    tab.ws.close();
-    other.ws.close();
+    const id = await session();
+    await upload(id, [{ id: "book1", name: "Physics.pdf", mediaType: "application/pdf", data: PDF, pages: 30 }]);
+    const t = await tab(id);
+    expect(await post("show_page", { session_code: id, page: "15", caption: "circuit" })).toMatchObject({ ok: true, label: "B1" });
+    await vi.waitFor(() => expect(t.events()[0]).toMatchObject({ type: "source", docId: "book1", page: 15, caption: "circuit" }));
+    expect((await post("show_page", { session_code: id, page: "99" })).ok).toBe(false);
+    const other = await session();
+    expect((await post("read_material", { session_code: other, question: "x" })).ok).toBe(false);
+    t.ws.close();
+  });
+
+  it("replacing notes replaces the server's copy", async () => {
+    const id = await session();
+    await upload(id, [{ id: "old1", name: "old.pdf", mediaType: "application/pdf", data: PDF }]);
+    const r = await upload(id, [{ id: "new1", name: "new.pdf", mediaType: "application/pdf", data: PDF }], true);
+    expect((r.json.docs as { id: string }[]).map((d) => d.id)).toEqual(["new1"]);
   });
 });
