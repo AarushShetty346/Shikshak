@@ -87,3 +87,24 @@ describe("conversation model choice", () => {
     expect(() => rollbackLlm(cfg, "d")).toThrow(/previous/);
   });
 });
+
+describe("phone revision agent", () => {
+  it("has its own four tools keyed by call code, a short call limit and the keypad on", async () => {
+    const { buildPhoneAgentPayload, buildPhoneTools } = await import("./bolnaConfig");
+    const tools = buildPhoneTools("https://x.test", "tok");
+    expect(tools.map((t) => t.name)).toEqual(["phone_question", "phone_answer", "phone_opt_out", "phone_end"]);
+    for (const t of tools) {
+      expect(t.parameters.required[0]).toBe("call_code");
+      expect(t.parameters.properties).not.toHaveProperty("session_code");
+      expect(t.value.url).toBe(`https://x.test/tools/${t.name}`);
+    }
+    const body = buildPhoneAgentPayload({ publicUrl: "https://x.test", toolsToken: "tok", maxCallSeconds: 240 });
+    const task = body.agent_config.tasks[0];
+    expect(task.task_config).toMatchObject({ call_terminate: 240, dtmf_enabled: true });
+    expect(task.tools_config.api_tools.tools.map((t: { name: string }) => t.name)).toEqual(tools.map((t) => t.name));
+    expect(body.agent_prompts.task_1.system_prompt).toContain("{{call_code}}");
+    expect(body.agent_prompts.task_1.system_prompt).not.toContain("session_code");
+    // The class agent is unchanged.
+    expect(buildAgentPayload({ publicUrl: "https://x.test" }).agent_config.tasks[0].task_config.call_terminate).toBe(1200);
+  });
+});

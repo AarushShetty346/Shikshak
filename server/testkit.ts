@@ -14,7 +14,7 @@ export interface TestServer {
   close: () => Promise<void>;
 }
 
-export async function startServer(opts: { devTools?: boolean } = {}): Promise<TestServer> {
+export async function startServer(opts: Parameters<typeof createApp>[0] = {}): Promise<TestServer> {
   const { app, attachWebSocket } = createApp(opts);
   const server = createServer(app);
   attachWebSocket(server);
@@ -49,6 +49,7 @@ export function api(base: string, token: string | null) {
     get: (p: string) => call("GET", p),
     post: (p: string, b?: unknown) => call("POST", p, b ?? {}),
     patch: (p: string, b?: unknown) => call("PATCH", p, b ?? {}),
+    put: (p: string, b?: unknown) => call("PUT", p, b ?? {}),
     del: (p: string) => call("DELETE", p),
   };
 }

@@ -9,7 +9,7 @@ import { getDevice, randomId, updateDevice } from "./auth";
 import { config } from "./config";
 import { CHAPTER_NAMES, problem, PROBLEMS, skill as skillById, SKILLS } from "./curriculum/library";
 import { misconception } from "./curriculum/misconceptions";
-import type { ChapterId } from "./curriculum/types";
+import type { ChapterId, Problem } from "./curriculum/types";
 import { isLanguage, type Language } from "../shared/types";
 import type { Session } from "./sessions";
 import { store } from "./store";
@@ -31,6 +31,8 @@ export interface Learner {
   rejectedMisconceptions: { id: string; at: number }[];
   /** Streak bookkeeping (Phase 9): learning days in the learner's own time zone. */
   activeDays: string[];
+  /** Phone revision calls with recorded answers (their attempt logs are "ph_<callId>"). */
+  phoneCalls?: string[];
 }
 
 export class LearnerError extends Error {
@@ -108,7 +110,8 @@ export function attachSession(l: Learner, sessionId: string) {
 
 /** Forgets everything recorded about a learner (attempts, memory) but keeps the profile. */
 export function resetLearnerMemory(l: Learner) {
-  for (const sid of l.sessions) store.delete("attempts", sid);
+  for (const sid of logIds(l)) store.delete("attempts", sid);
+  l.phoneCalls = [];
   l.rejectedMisconceptions = [];
   l.activeDays = [];
   saveLearner(l);
@@ -116,6 +119,7 @@ export function resetLearnerMemory(l: Learner) {
 
 /** Deletes the learner and their records. Their sessions stay on the device but are unlinked. */
 export function deleteLearner(l: Learner, unlink: (sessionId: string) => void) {
+  for (const id of l.phoneCalls ?? []) store.delete("attempts", id);
   for (const sid of l.sessions) {
     store.delete("attempts", sid);
     unlink(sid);
@@ -186,9 +190,47 @@ export function recordAttempt(s: Session, a: Omit<Attempt, "sessionId" | "learne
   return true;
 }
 
-/** All attempts of a learner across their sessions, oldest first. */
+const logIds = (l: Learner) => [...l.sessions, ...(l.phoneCalls ?? [])];
+
+/** All attempts of a learner across their sessions and phone calls, oldest first. */
 export function learnerAttempts(l: Learner): Attempt[] {
-  return l.sessions.flatMap((sid) => sessionAttempts(sid)).sort((a, b) => a.at - b.at);
+  return logIds(l).flatMap((sid) => sessionAttempts(sid)).sort((a, b) => a.at - b.at);
+}
+
+/** Records a keypad answer from a phone revision call (once per key). */
+export function recordPhoneAttempt(
+  l: Learner,
+  callId: string,
+  a: { key: string; problem: Problem; outcome: "correct" | "incorrect"; answer: string; misconceptions: string[]; at: number },
+): boolean {
+  const id = `ph_${callId}`;
+  const log = store.get<AttemptLog>("attempts", id) ?? { sessionId: id, learnerId: l.id, items: [] };
+  if (log.items.some((x) => x.key === a.key)) return false;
+  log.items.push({
+    key: a.key,
+    sessionId: id,
+    learnerId: l.id,
+    questionId: a.key,
+    problemId: a.problem.id,
+    questionText: a.problem.statement.slice(0, 200),
+    skill: a.problem.skill,
+    chapter: a.problem.chapter,
+    kind: "practice",
+    source: "phone",
+    at: a.at,
+    outcome: a.outcome,
+    hints: 0,
+    revealed: false,
+    line: null,
+    answer: a.answer,
+    misconceptions: a.misconceptions.map((m) => ({ id: m, confidence: "high", note: "The keypad answer is exactly what this mistake produces." })),
+    note: "Phone revision call (keypad)",
+  });
+  store.put("attempts", id, log);
+  if (!(l.phoneCalls ?? []).includes(id)) l.phoneCalls = [...(l.phoneCalls ?? []), id].slice(-60);
+  markActiveDay(l, a.at);
+  saveLearner(l);
+  return true;
 }
 
 /** Fills in the question details for an attempt on the current question. */

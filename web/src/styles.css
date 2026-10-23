@@ -2435,3 +2435,40 @@ sub {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Phone revision (learner page) */
+.phone-box {
+  display: grid;
+  gap: 10px;
+}
+
+.phone-form {
+  display: grid;
+  gap: 12px;
+  max-width: 520px;
+}
+
+.phone-window {
+  display: flex;
+  gap: 12px;
+}
+
+.phone-status p {
+  margin: 0 0 6px;
+}
+
+.phone-status svg {
+  vertical-align: -2px;
+}
+
+.note-line {
+  font-size: 14px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  margin: 0;
+}
+
+.phone-box > button {
+  justify-self: start;
+}

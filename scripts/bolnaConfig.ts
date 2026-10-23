@@ -24,17 +24,22 @@ const SESSION = {
   session_code: { type: "string", description: "The session code from the prompt. Always pass it exactly." },
 };
 
+const CALL = {
+  call_code: { type: "string", description: "The call code from the prompt. Always pass it exactly." },
+};
+
 function tool(
   base: string,
   token: string | null,
   opts: { name: string; description: string; pre_call_message: Spoken; properties: ToolDef["parameters"]["properties"]; required: string[] },
+  id: typeof SESSION | typeof CALL = SESSION,
 ): ToolDef {
-  const all = { ...SESSION, ...opts.properties };
+  const all = { ...id, ...opts.properties };
   return {
     name: opts.name,
     description: opts.description,
     pre_call_message: opts.pre_call_message,
-    parameters: { type: "object", properties: all, required: ["session_code", ...opts.required] },
+    parameters: { type: "object", properties: all, required: [...Object.keys(id), ...opts.required] },
     key: "custom_task",
     value: {
       method: "POST",
@@ -245,13 +250,78 @@ export function buildTools(publicUrl: string, toolsToken?: string): ToolDef[] {
   ];
 }
 
-/** Reads bolna/agent-prompt.md: the welcome message line, and the prompt below the "---" line. */
-export function readPrompt(): { welcome: string; prompt: string } {
-  const text = readFileSync(path.join(root, "bolna", "agent-prompt.md"), "utf8").replace(/\r\n/g, "\n");
+/** The phone revision agent's tools (Phase 7): keyed by a call code, not a class session. */
+export function buildPhoneTools(publicUrl: string, toolsToken?: string): ToolDef[] {
+  const base = publicUrl.replace(/\/$/, "");
+  const token = toolsToken ? `Bearer ${toolsToken}` : null;
+  const number = { type: "string", description: "The question number, 1, 2 or 3." };
+  return [
+    tool(
+      base,
+      token,
+      {
+        name: "phone_question",
+        description: "Gets question number N of this revision call, to read aloud. Says done when there are no more.",
+        pre_call_message: { hi: "अगला सवाल।", en: "Next question." },
+        properties: { number },
+        required: ["number"],
+      },
+      CALL,
+    ),
+    tool(
+      base,
+      token,
+      {
+        name: "phone_answer",
+        description: "Checks the student's keypad answer to question N exactly. Pass the digits from 'dtmf_number: <digits>'. Returns correct, or a hint for one more try.",
+        pre_call_message: { hi: "देखते हैं।", en: "Let's see." },
+        properties: { number, digits: { type: "string", description: "The digits they typed, e.g. 29." } },
+        required: ["number", "digits"],
+      },
+      CALL,
+    ),
+    tool(
+      base,
+      token,
+      {
+        name: "phone_opt_out",
+        description: "The student or family doesn't want these calls (said so, or pressed 9). Stops all future calls to this number.",
+        pre_call_message: { hi: "ठीक है।", en: "Okay." },
+        properties: { how: { type: "string", description: "keypad | voice" } },
+        required: [],
+      },
+      CALL,
+    ),
+    tool(
+      base,
+      token,
+      {
+        name: "phone_end",
+        description: "Call at the end of the call (all questions done, or they need to go). Records how it went.",
+        pre_call_message: { hi: "ठीक है।", en: "Okay." },
+        properties: {},
+        required: [],
+      },
+      CALL,
+    ),
+  ];
+}
+
+function readPromptFile(file: string): { welcome: string; prompt: string } {
+  const text = readFileSync(path.join(root, "bolna", file), "utf8").replace(/\r\n/g, "\n");
   const welcome = /^Welcome message:\s*`([^`]+)`/m.exec(text)?.[1];
   const split = text.indexOf("\n---\n");
-  if (!welcome || split < 0) throw new Error("bolna/agent-prompt.md is missing the welcome message line or the --- separator");
+  if (!welcome || split < 0) throw new Error(`bolna/${file} is missing the welcome message line or the --- separator`);
   return { welcome, prompt: text.slice(split + 5).trim() };
+}
+
+/** Reads bolna/agent-prompt.md: the welcome message line, and the prompt below the "---" line. */
+export function readPrompt(): { welcome: string; prompt: string } {
+  return readPromptFile("agent-prompt.md");
+}
+
+export function readPhonePrompt(): { welcome: string; prompt: string } {
+  return readPromptFile("phone-prompt.md");
 }
 
 export interface VoiceOptions {
@@ -421,4 +491,31 @@ export function buildAgentPayload(opts: { publicUrl: string; toolsToken?: string
     },
     agent_prompts: { task_1: { system_prompt: prompt } },
   };
+}
+
+/** The phone revision agent: same voices and model, its own prompt and tools, short calls, keypad on. */
+export function buildPhoneAgentPayload(opts: { publicUrl: string; toolsToken?: string; maxCallSeconds?: number; voice?: VoiceOptions }) {
+  const body = buildAgentPayload({ publicUrl: opts.publicUrl, toolsToken: opts.toolsToken, voice: opts.voice });
+  const { welcome, prompt } = readPhonePrompt();
+  const tools = buildPhoneTools(opts.publicUrl, opts.toolsToken);
+  const task = body.agent_config.tasks[0];
+  const cfg = task.tools_config;
+  body.agent_config.agent_name = "Shikshak phone revision";
+  body.agent_config.agent_welcome_message = welcome;
+  cfg.api_tools = {
+    tools: tools.map(({ value: _value, ...def }) => def),
+    tools_params: Object.fromEntries(
+      tools.map((t) => [t.name, { method: t.value.method, url: t.value.url, api_token: t.value.api_token, param: JSON.stringify(t.value.param) }]),
+    ),
+  };
+  for (const lang of Object.values(cfg.multilingual_config.languages)) lang.system_prompt = prompt;
+  body.agent_prompts.task_1.system_prompt = prompt;
+  Object.assign(task.task_config, {
+    // A revision call is short; the server also caps it (PHONE_MAX_CALL_SECONDS).
+    call_terminate: opts.maxCallSeconds ?? 300,
+    hangup_after_silence: 30,
+    trigger_user_online_message_after: 15,
+    dtmf_enabled: true,
+  });
+  return body;
 }

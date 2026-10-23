@@ -15,6 +15,7 @@ import { config } from "./config";
 import { allow } from "./limits";
 import { analyze, canLook, EMPTY_LOOK, isCurrent, publishResult } from "./look";
 import { readMaterial, showPage } from "./material";
+import { endPhoneCall, phoneAnswer, phoneOptOut, phoneQuestion } from "./phone";
 import { awaitCapture, boardMap, emit, nextLabel, recordBlock, resolve, signal, touch, type Session } from "./sessions";
 import { afterReview, revealsAnswer, teachingTools } from "./teaching";
 
@@ -173,12 +174,30 @@ export function toolsRouter() {
   // Per-session rate limit: a confused LLM in a loop can't flood a board or burn model calls.
   router.use((req, res, next) => {
     const p = readParams(req);
-    const key = `tool:${String(p.session_code ?? "none").slice(0, 60)}`;
+    const key = `tool:${String(p.session_code ?? p.call_code ?? "none").slice(0, 60)}`;
     if (!allow(key, 90, 30)) {
       res.status(429).json({ ok: false, error: "Too many board actions in a short time. Slow down and explain before writing more." });
       return;
     }
     next();
+  });
+
+  // Phone revision calls (the separate phone agent). Keyed by the call code, not a class session.
+  router.all("/phone_question", (req, res) => {
+    const p = readParams(req);
+    res.json(phoneQuestion(p.call_code, p.number));
+  });
+  router.all("/phone_answer", (req, res) => {
+    const p = readParams(req);
+    res.json(phoneAnswer(p.call_code, p.number, p.digits));
+  });
+  router.all("/phone_opt_out", (req, res) => {
+    const p = readParams(req);
+    res.json(phoneOptOut(p.call_code, p.how === "keypad" ? "keypad" : "voice"));
+  });
+  router.all("/phone_end", (req, res) => {
+    const p = readParams(req);
+    res.json(endPhoneCall(p.call_code));
   });
 
   router.all("/show_steps", (req: Request, res: Response) => {

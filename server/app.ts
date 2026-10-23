@@ -4,7 +4,7 @@ import type { Duplex } from "node:stream";
 import { WebSocketServer, type WebSocket } from "ws";
 import { parseClientMessage } from "../shared/protocol";
 import { isLanguage, type Language } from "../shared/types";
-import { issueTicket, redeemTicket, registerDevice, requireDevice } from "./auth";
+import { issueTicket, redeemTicket, registerDevice, requireDevice, sameSecret } from "./auth";
 import { noteInterrupt } from "./board";
 import { config } from "./config";
 import { allow, BusyError, chargeModelCall, QuotaError, withModelSlot } from "./limits";
@@ -55,6 +55,7 @@ import { reportFor } from "./report";
 import { answerItem, createParticipant, deleteParticipant, exportCsv, listParticipants, noteIssue, participantFor, PilotError, publicForm, saveFeedback, startForm, summary, type FormId } from "./pilot";
 import { claimShareCode, createShareCode, grantsFor, revokeAllFor, revokeGrant, ShareError, teacherGrant } from "./shares";
 import { toolsRouter } from "./tools";
+import { adminPhoneList, bolnaPhoneProvider, enrolPhone, optOut, PhoneError, placeRevisionCall, publicPhone, removePhone, type PhoneProvider } from "./phone";
 import { endVoice, mintVoice, voiceConfigured, voiceUsage, type Speed } from "./voice";
 
 export { agentForSpeed } from "./voice";
@@ -138,7 +139,7 @@ function sendLimitError(res: Response, err: unknown) {
   return false;
 }
 
-export function createApp(opts: { devTools?: boolean } = {}) {
+export function createApp(opts: { devTools?: boolean; phoneProvider?: PhoneProvider } = {}) {
   const app = express();
   setSessionLookup((id) => {
     const s = getSession(id);
@@ -180,6 +181,27 @@ export function createApp(opts: { devTools?: boolean } = {}) {
       publicUrl: Boolean(process.env.PUBLIC_URL && !process.env.PUBLIC_URL.includes("example.com")),
     });
   });
+
+  // ---------- operator (ADMIN_TOKEN) ----------
+  const admin = express.Router();
+  admin.use(rateLimit((req) => `admin:${ipOf(req)}`, 30, 10));
+  admin.use((req, res, next) => {
+    const token = config.phone.adminToken();
+    if (!token) return void res.status(503).json({ error: "Operator endpoints are off: ADMIN_TOKEN is not set." });
+    const h = req.headers.authorization ?? "";
+    if (!sameSecret(h.startsWith("Bearer ") ? h.slice(7) : undefined, token)) return void res.status(401).json({ error: "unauthorized" });
+    next();
+  });
+  admin.get("/phone", (_req, res) => void res.json({ enabled: config.phone.enabled(), enrolments: adminPhoneList() }));
+  // One call, triggered by a person. There is deliberately no automatic schedule.
+  admin.post("/phone/:learnerId/call", express.json({ limit: "4kb" }), async (req, res) => {
+    if (req.body?.confirm !== true) return void res.status(400).json({ error: 'Send {"confirm": true} to place a real call.' });
+    const l = getLearnerSafe(req.params.learnerId);
+    if (!l) return void res.status(404).json({ error: "No such learner." });
+    const r = await placeRevisionCall(l, opts.phoneProvider ?? bolnaPhoneProvider());
+    res.status(r.ok ? 202 : 409).json(r.ok ? { ok: true, callId: r.call.id, questions: r.call.items.length } : r);
+  });
+  app.use("/api/admin", admin);
 
   // ---------- devices ----------
   app.post("/api/devices", rateLimit((req) => `dev:${ipOf(req)}`, 6, 10), (_req, res) => {
@@ -349,10 +371,41 @@ export function createApp(opts: { devTools?: boolean } = {}) {
     res.json({ learner: publicLearner(l) });
   });
 
+  // ---------- phone revision (Phase 7): consent and settings, per learner ----------
+  api.get("/learners/:id/phone", (req, res) => {
+    const l = ownLearner(req, res);
+    if (!l) return;
+    res.json({ phone: publicPhone(l) });
+  });
+  api.put("/learners/:id/phone", small, (req, res) => {
+    const l = ownLearner(req, res);
+    if (!l) return;
+    try {
+      enrolPhone(l, req.body ?? {});
+      res.json({ phone: publicPhone(l) });
+    } catch (err) {
+      if (err instanceof PhoneError) return void res.status(400).json({ error: err.message });
+      throw err;
+    }
+  });
+  api.post("/learners/:id/phone/opt-out", (req, res) => {
+    const l = ownLearner(req, res);
+    if (!l) return;
+    optOut(l.id, "app");
+    res.json({ phone: publicPhone(l) });
+  });
+  api.delete("/learners/:id/phone", (req, res) => {
+    const l = ownLearner(req, res);
+    if (!l) return;
+    removePhone(l.id);
+    res.json({ phone: publicPhone(l) });
+  });
+
   api.delete("/learners/:id", (req, res) => {
     const l = ownLearner(req, res);
     if (!l) return;
     revokeAllFor(l.id);
+    removePhone(l.id);
     deleteLearner(l, (sid) => {
       const s = getSession(sid);
       if (s && s.deviceId === req.device!.id) {

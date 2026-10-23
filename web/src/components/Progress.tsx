@@ -7,6 +7,7 @@ import { ArrowLeft, CheckCircle, Trash, ArrowCounterClockwise, ShareNetwork } fr
 import { deleteLearner, learnerMemory, rejectMisconception, resetMemory, STATUS_LABEL, type Learner, type Memory } from "../lib/learners";
 import { selectLearner } from "../lib/learners";
 import { ShareWithTeacher } from "./Teacher";
+import { PhoneRevision } from "./PhoneRevision";
 
 const when = (t: number) => new Date(t).toLocaleDateString(undefined, { day: "numeric", month: "short" });
 
@@ -139,6 +140,11 @@ export function Progress({ learnerId, onBack }: { learnerId: string; onBack: () 
           </section>
         </>
       )}
+
+      <section className="panel panel-quiet">
+        <h2>Phone revision</h2>
+        <PhoneRevision learnerId={learner.id} learnerName={learner.name} />
+      </section>
 
       <section className="panel panel-quiet">
         <h2>Privacy and sharing</h2>
