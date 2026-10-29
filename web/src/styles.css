@@ -2002,7 +2002,7 @@ sub {
 .preview-mark {
   margin-left: 4px;
   font-size: 11px;
-  opacity: 0.7;
+  color: var(--ink-soft);
 }
 
 .submission[data-state="stale"] {

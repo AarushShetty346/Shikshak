@@ -5,6 +5,7 @@
 import { useEffect, useState } from "react";
 import { DownloadSimple, ShareNetwork, X } from "@phosphor-icons/react";
 import { sessionReport, type Report } from "../lib/learners";
+import { MathText } from "./MathText";
 
 type View = "student" | "parent";
 
@@ -145,7 +146,9 @@ function ReportBody({ report, view }: { report: Report; view: View }) {
           <h3>{sec.heading}</h3>
           <ul>
             {sec.items.map((x) => (
-              <li key={x}>{x}</li>
+              <li key={x}>
+                <MathText text={x} />
+              </li>
             ))}
           </ul>
         </section>
@@ -203,7 +206,7 @@ export function drawReport(r: Report, opts: { view: View; showName: boolean }): 
     ctx.font = "400 32px Mukta, sans-serif";
     for (const item of sec.items) {
       if (y > H - 200) break;
-      wrap(`• ${item}`, 92, W - 180, 44);
+      wrap(`• ${item.replace(/\^2\b/g, "²").replace(/\^3\b/g, "³")}`, 92, W - 180, 44);
     }
     y += 24;
   }
