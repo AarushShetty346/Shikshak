@@ -987,6 +987,27 @@ sub {
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
 }
 
+.board-pill-question {
+  top: 58px;
+  max-width: min(720px, calc(100% - 32px));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: rgba(28, 47, 38, 0.94);
+  border: 1px dashed var(--chalk-yellow);
+  font-family: var(--font-hand);
+  font-size: 17px;
+  cursor: pointer;
+}
+
+.board-pill-question-tag {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--chalk-yellow);
+}
+
 .board-pill-new {
   top: auto;
   bottom: 80px;
@@ -2479,4 +2500,11 @@ sub {
 
 .submission-marks b {
   color: var(--ink);
+}
+
+.board-pill-question sup {
+  font-size: 0.65em;
+  line-height: 0;
+  vertical-align: 0.6em;
+  margin-left: 1px;
 }
