@@ -331,3 +331,56 @@ describe("streaks", () => {
     expect(learners.streakOf(l, later)).toMatchObject({ current: 0, best: 3 });
   });
 });
+
+// Regression BUG-05 from the Oct 2026 audit: paraphrased or split answers got onto the board.
+describe("audit regression: the board doesn't give the answer away in other words", () => {
+  const written = async (id: string, content: string) => (await tool("write", { session_code: id, kind: "text", content })).ok;
+
+  it("refuses the answer in words, spread over lines, factored, or in Hindi number words", async () => {
+    const { id } = await learnerSession();
+    await tool("next_problem", { session_code: id, problem_id: "quad.fact.01" });
+    for (const leak of ["roots are 3 and 4", "The answers: 3 and 4", "x=4 || x=3", "(x - 3)(x - 4) = 0", "x - 3 = 0 or x - 4 = 0", "teen aur chaar", "x ∈ {3, 4}", "x = 3, 4"])
+      expect(await written(id, leak), leak).toBe(false);
+    await tool("next_problem", { session_code: id, problem_id: "ap.nth.demo" });
+    expect(await written(id, "The 10th term is 29")).toBe(false);
+    await tool("next_problem", { session_code: id, problem_id: "lin.one.01" });
+    expect(await written(id, "x is four")).toBe(false);
+  });
+
+  it("still allows the question, the method, steps that rearrange the question, and other examples", async () => {
+    const { id } = await learnerSession();
+    await tool("next_problem", { session_code: id, problem_id: "quad.fact.01" });
+    for (const fine of [
+      "x^2 - 7x + 12 = 0",
+      "Find two numbers that multiply to 12 and add to -7",
+      "x^2 - 3x - 4x + 12 = 0",
+      "x(x - 3) - 4(x - 3) = 0",
+      "Example: x^2 - 5x + 6 = 0 || (x - 2)(x - 3) = 0 || x = 2 or x = 3",
+      "Product = 12, sum = -7",
+      "Check your answer by putting it back in",
+    ])
+      expect(await written(id, fine), fine).toBe(true);
+    await tool("next_problem", { session_code: id, problem_id: "lin.one.01" });
+    expect(await written(id, "2x = 8")).toBe(true); // the third hint's step: the question rearranged
+    expect(await written(id, "Solve: 2x + 3 = 11")).toBe(true);
+  });
+
+  it("allows the full answer once the student asked for the solution", async () => {
+    const { id } = await learnerSession();
+    await tool("next_problem", { session_code: id, problem_id: "quad.fact.01" });
+    await tool("show_solution", { session_code: id, student_asked: "true" });
+    expect(await written(id, "roots are 3 and 4")).toBe(true);
+  });
+});
+
+describe("audit regression: no library hint is mistaken for the answer", () => {
+  it("every hint of every library problem can still be written while it's open", async () => {
+    const { revealsAnswer } = await import("./teaching");
+    const { PROBLEMS } = await import("./curriculum/library");
+    for (const p of PROBLEMS) {
+      const s = { problem: { id: "q", text: p.statement, problemId: p.id, answerSpec: p.answer, kind: "practice", askedAt: 0, rung: 0 }, solutions: [] } as never;
+      for (const h of p.hints) expect(revealsAnswer(s, [h]), `${p.id}: ${h}`).toBe(false);
+      expect(revealsAnswer(s, [p.statement]), `${p.id} statement`).toBe(false);
+    }
+  });
+});
