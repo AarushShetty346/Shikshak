@@ -185,12 +185,16 @@ export function Home({ onOpen, onProgress }: { onOpen: (id: string) => void; onP
       ) : sessions.length === 0 ? (
         <section className="home-empty">
           <div className="empty-board" aria-hidden="true">
-            <span>Maths: AP</span>
-            <span>Physics: Electricity</span>
+            <span>x² − 7x + 12 = 0</span>
+            <span>(x − 3)(x − 4) = 0</span>
           </div>
           <div>
-            <h2>Start your first class</h2>
-            <p>Make one session per chapter. Each keeps its own board, notes and progress, so you can pick up where you stopped.</p>
+            <h2>Learn maths out loud</h2>
+            <p>
+              Shikshak is a voice maths tutor for classes 8 to 12. It talks you through a topic in Hinglish, Hindi or English while writing on a shared
+              chalkboard. You solve on the board, press Done, and it reads your handwritten steps and circles the one that went wrong.
+            </p>
+            <p>Start with one class per chapter. Each keeps its own board, notes and progress.</p>
             <button className="btn-primary" onClick={() => setCreating(newCode())}>
               <Plus weight="bold" /> New session
             </button>
@@ -306,6 +310,7 @@ export function Home({ onOpen, onProgress }: { onOpen: (id: string) => void; onP
         </section>
       )}
       <footer className="home-foot">
+        <span>For teachers:</span>
         <a href="#/teacher">Teacher view</a>
         <a href="#/pilot">Pilot tools</a>
       </footer>

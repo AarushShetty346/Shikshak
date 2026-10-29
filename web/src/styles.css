@@ -2095,7 +2095,8 @@ sub {
   font-size: 14px;
 }
 
-.home-foot a {
+.home-foot a,
+.home-foot span {
   color: var(--ink-soft);
 }
 
@@ -2507,4 +2508,39 @@ sub {
   line-height: 0;
   vertical-align: 0.6em;
   margin-left: 1px;
+}
+
+/* Phones turned sideways: one row of controls along the bottom, so the board keeps its height. */
+@media (max-height: 500px) and (orientation: landscape) {
+  .board-tools {
+    right: 8px;
+    bottom: 6px;
+    padding: 3px;
+  }
+
+  .board-tools button {
+    min-width: 36px;
+    height: 36px;
+  }
+
+  .question-bar {
+    left: 8px;
+    right: auto;
+    bottom: 6px;
+    padding: 3px;
+  }
+
+  .question-bar button {
+    padding: 6px 10px;
+    font-size: 13px;
+  }
+
+  .quick-card {
+    bottom: 52px;
+  }
+
+  .board-pill-question {
+    top: 8px;
+    font-size: 15px;
+  }
 }

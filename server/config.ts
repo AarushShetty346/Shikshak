@@ -39,6 +39,8 @@ export const config = {
     /** Files held in memory across all sessions; least recently used sessions' files are dropped first. */
     maxTotalDocBytes: () => num("MAX_TOTAL_DOC_BYTES", 200 * 1024 * 1024),
     maxDocsPerSession: () => num("MAX_DOCS_PER_SESSION", 6),
+    /** New browsers that may sign up per minute from one IP address (a whole classroom can share one). */
+    deviceSignupsPerMinute: () => num("DEVICE_SIGNUPS_PER_MINUTE", 6),
     /** A Done/requested capture image, decoded. */
     maxCaptureBytes: () => num("MAX_CAPTURE_BYTES", 2 * 1024 * 1024),
     /** Largest WebSocket message (hydration with a long lesson is the biggest). */

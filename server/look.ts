@@ -114,17 +114,21 @@ export async function lookAtWork(input: {
   return result;
 }
 
-/** FAKE_CHECKER=1 and no model key: always flags line 2 (or says correct for one line). For UI work. */
+/**
+ * FAKE_CHECKER=1 and no model key: always flags line 2 (or says correct for one line). For UI work.
+ * Everything it says is labelled as simulated, so it can't be mistaken for a real check on camera.
+ */
+export const SIMULATED = "Simulated check (no handwriting reader on this server):";
 function fakeLook(lineCount: number): LookResult {
   if (lineCount < 2)
-    return { kind: "answer", reading: "1) (fake)", status: "correct", line: null, what_went_wrong: "", say: "Bilkul sahi! Shabash." };
+    return { kind: "answer", reading: "1) (simulated)", status: "correct", line: null, what_went_wrong: `${SIMULATED} marked correct.`, say: "(Simulated check) Bilkul sahi!" };
   return {
     kind: "working",
-    reading: "(fake checker)",
+    reading: "(simulated check)",
     status: "mistake",
     line: 2,
-    what_went_wrong: "The -3 should become +3 when it moves to the other side.",
-    say: "Step 2 mein negative sign chhoot gaya. Dobara dekho.",
+    what_went_wrong: `${SIMULATED} line 2 is always circled.`,
+    say: "(Simulated check) Line 2 dobara dekho.",
   };
 }
 

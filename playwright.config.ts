@@ -25,6 +25,8 @@ export default defineConfig({
       BOLNA_AGENT_ID: "",
       FAKE_CHECKER: "1",
       PHONE_CALLS_ENABLED: "",
+      // Every test is a new browser from 127.0.0.1; the production sign-up limit would throttle the suite.
+      DEVICE_SIGNUPS_PER_MINUTE: "600",
     },
   },
   projects: [

@@ -31,7 +31,7 @@ don't add claims on the day.
 | | line 2: `x(x - 3) + 4(x - 3) = 0` (should be **- 4**) | |
 | | line 3: `(x - 3)(x + 4) = 0` | |
 | | line 4: `x = 3 or x = -4` | |
-| 7 | Press **Done**. | "Your teacher has it…", then a **red circle on line 2**, and the card shows practice marks of ½ / 2½ (CBSE-style, not official). The tutor names the slip without giving the answer. |
+| 7 | Press **Done**. | "Your teacher has it…", then a **red circle on line 2**, and the card shows practice marks of 2 / 2½ (CBSE-style, not official): the slip loses its ½, and lines 3 and 4, which follow correctly from it, keep theirs. The tutor names the slip without giving the answer. |
 | 8 | Fix line 2 to `x(x - 3) - 4(x - 3)`, fix the rest, press **Done**. | Green **Shabash!**, practice marks of 2½ / 2½. |
 | 9 | Menu: **Report**. | The class report card (solved alone or with hints, the mistake that was fixed) with Share or Download. |
 | 10 | Open **Asha's progress**. | Skills with the evidence behind each status, the observed mistake with the questions it came from, and phone revision (off on this server). |
@@ -45,7 +45,7 @@ don't add claims on the day.
 - **Everything is down:** open the class with `?dev=1` in the URL. The panel is a **simulator**
   that sends the same tool calls the voice agent would. Say so on camera; don't present it as the
   live tutor. With no model key and `FAKE_CHECKER=1`, the check always circles line 2, which
-  matches this script. That is also labelled in the app.
+  matches this script. The card says "Simulated check" so it can't be mistaken for a real one.
 
 ## Backup recording
 

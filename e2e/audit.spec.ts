@@ -83,3 +83,56 @@ test("BUG-06: after three hints the question is still on screen", async ({ page 
     await expect(pinned).toBeHidden();
   }
 });
+
+test("BUG-07: the first screen says what Shikshak is", async ({ page }) => {
+  await page.goto("/");
+  const pitch = page.locator(".home-empty");
+  await expect(pitch).toContainText(/voice maths tutor/i);
+  await expect(pitch).toContainText(/handwritten/i);
+  await expect(page.getByText(/Physics/)).toHaveCount(0);
+});
+
+test("BUG-11: a class can't be created without a topic", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: /New session/ }).first().click();
+  const create = page.getByRole("button", { name: "Create session" });
+  await expect(create).toBeDisabled();
+  await page.getByPlaceholder("e.g. Quadratic equations").fill("Quadratic equations");
+  await expect(create).toBeEnabled();
+});
+
+test("BUG-09: Start with no voice on the server stays Start, never 'Paused' or 'Resume'", async ({ page }) => {
+  await openClass(page);
+  await page.getByRole("button", { name: "Start", exact: true }).click();
+  await expect(page.getByText(/Voice isn't set up/)).toBeVisible();
+  await page.waitForTimeout(1000);
+  await expect(page.getByRole("button", { name: "Start", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Resume" })).toHaveCount(0);
+  await expect(page.getByText("Paused", { exact: true })).toHaveCount(0);
+});
+
+test("BUG-03 + BUG-12: the quick check wants an expanded answer and shows an example of the right shape", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: /New session/ }).first().click();
+  await page.getByPlaceholder("e.g. Quadratic equations").fill("Quadratic equations");
+  await page.getByRole("button", { name: "Create session" }).click();
+  await page.getByRole("button", { name: "Start quick check" }).click();
+  await expect(page.getByText(/Expand/).first()).toBeVisible();
+  const box = page.getByRole("textbox", { name: "Your answer" });
+  await expect(box).toHaveAttribute("placeholder", /x\^2/);
+  await expect(page.getByText("Rough work here; type your answer in the box below")).toBeVisible();
+  await box.fill("(x+3)(x+3)");
+  await page.getByRole("button", { name: "Check", exact: true }).click();
+  await expect(page.getByText(/not expanded yet/)).toBeVisible();
+});
+
+test("BUG-18: a fake check is labelled as simulated on the student's screen", async ({ page }) => {
+  const id = await openClass(page);
+  await tool(page, "next_problem", { session_code: id, problem_id: "quad.fact.01" });
+  const at = (await page.getByText("Write here, one step per line").boundingBox())!;
+  for (let i = 0; i < 3; i++) await scribble(page, at.x + 10, at.y + 15 + i * 55, 200);
+  await page.locator("button.btn-done").click();
+  const card = page.locator(".submission");
+  await expect(card).toHaveAttribute("data-state", "done", { timeout: 20_000 });
+  await expect(card).toContainText("Simulated check");
+});

@@ -766,7 +766,7 @@ export function Board(props: Props) {
           )}
           {latestQuestion && response.length === 0 && (
             <div className="write-here" style={{ top: px(regionTop + 18), left: px(layout.pos[latestQuestion.id]?.x ?? PAD_L) }}>
-              Write here, one step per line
+              {latestQuestion.kind === "problem" && latestQuestion.questionKind === "diagnostic" ? "Rough work here; type your answer in the box below" : "Write here, one step per line"}
             </div>
           )}
         </div>

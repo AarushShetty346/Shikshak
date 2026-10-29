@@ -225,12 +225,17 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
   // ---------- class controls ----------
   const startOrResume = () => {
     if (!serverId) return;
-    const resuming = started;
+    setResumeTick((n) => n + 1);
+    void voice.start({ speed, resuming: started, handsFree });
+  };
+
+  // The class counts as started once a call is actually connected ("connecting" can still fail). If Start fails (voice not set up, no
+  // network), the button stays "Start" instead of claiming a paused class that never began.
+  useEffect(() => {
+    if (!active || started) return;
     setStarted(true);
     updateSession(sessionId, { started: true });
-    setResumeTick((n) => n + 1);
-    void voice.start({ speed, resuming, handsFree });
-  };
+  }, [active, started, sessionId]);
 
   const pause = () => {
     setHoldTick((n) => n + 1);

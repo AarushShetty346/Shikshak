@@ -249,7 +249,13 @@ export function Setup({
               {planning ? (files.length ? "Reading your notes…" : "Making your plan…") : "Make a plan"}
             </button>
           )}
-          <button type="button" className="btn-primary" disabled={planning || saving} onClick={create}>
+          <button
+            type="button"
+            className="btn-primary"
+            disabled={planning || saving || !(topic.trim() || files.length > 0)}
+            title={topic.trim() || files.length > 0 ? undefined : "Pick or type what you're studying first"}
+            onClick={create}
+          >
             {saving ? "Saving…" : "Create session"}
           </button>
         </div>

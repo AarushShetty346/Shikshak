@@ -210,7 +210,8 @@ export function createApp(opts: { devTools?: boolean; phoneProvider?: PhoneProvi
   app.use("/api/admin", admin);
 
   // ---------- devices ----------
-  app.post("/api/devices", rateLimit((req) => `dev:${ipOf(req)}`, 6, 10), (_req, res) => {
+  const signups = config.limits.deviceSignupsPerMinute();
+  app.post("/api/devices", rateLimit((req) => `dev:${ipOf(req)}`, signups, Math.max(10, signups)), (_req, res) => {
     const { device, token } = registerDevice();
     res.status(201).json({ deviceId: device.id, token });
   });
