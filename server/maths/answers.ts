@@ -2,7 +2,7 @@
 // text): "x = 3 or x = 4", "4, 3", "x=4,x=3" all match roots {3, 4}; "1.5" matches 3/2;
 // "a_n = 2 + 3n" matches 3n + 2.
 
-import { normalise, parse, sameExpression, value } from "./algebra";
+import { normalise, parse, sameExpression, toPoly, value } from "./algebra";
 import { MathError, Q, Surd } from "./exact";
 
 export type AnswerSpec =
@@ -12,8 +12,11 @@ export type AnswerSpec =
   | { type: "roots"; variable: string; values: string[] }
   /** Values of two unknowns: x = 2, y = 1. */
   | { type: "pair"; values: Record<string, string> }
-  /** An expression in one variable, e.g. the nth term 3n + 2. */
-  | { type: "expression"; variable: string; expr: string }
+  /**
+   * An expression in one variable, e.g. the nth term 3n + 2. With form "expanded" (an "Expand: ..."
+   * question) the answer must also be written multiplied out, with like terms collected.
+   */
+  | { type: "expression"; variable: string; expr: string; form?: "expanded" }
   /** No solution, e.g. "no real roots". */
   | { type: "none"; reason: string };
 
@@ -78,6 +81,39 @@ function splitValues(text: string, variable?: string): string[] {
       if (m && (!variable || m[1] === variable)) return m[2].trim();
       return p;
     });
+}
+
+/** Top-level terms of an expression: "x^2 + 6x - 9" -> 3. Signs inside brackets or after ^ * / don't split. */
+function termCount(src: string): number {
+  const t = normalise(src).replace(/\s+/g, "");
+  let depth = 0;
+  let n = 0;
+  let inTerm = false;
+  for (let i = 0; i < t.length; i++) {
+    const c = t[i];
+    if (c === "(" || c === "[" || c === "{") depth++;
+    if (c === ")" || c === "]" || c === "}") depth--;
+    const splits = (c === "+" || c === "-") && depth === 0 && !/[\^*/]/.test(t[i - 1] ?? "");
+    if (splits) inTerm = false;
+    else if (!inTerm) {
+      inTerm = true;
+      n++;
+    }
+  }
+  return n;
+}
+
+/**
+ * Written multiplied out: no brackets, and no like terms left to collect ("x^2 + 3x + 3x + 9" isn't).
+ * The value is checked separately.
+ */
+export function isExpanded(src: string): boolean {
+  if (/[([{]/.test(normalise(src))) return false;
+  try {
+    return termCount(src) === toPoly(parse(src)).size;
+  } catch {
+    return false;
+  }
 }
 
 function tryValue(text: string): Surd | null {
@@ -156,9 +192,10 @@ export function compareAnswer(spec: AnswerSpec, raw: string): Comparison {
         } catch {
           return { verdict: "unreadable", got, detail: "Couldn't read the expression." };
         }
-        return sameExpression(got, spec.expr)
-          ? { verdict: "correct", got, detail: "Same expression." }
-          : { verdict: "incorrect", got, detail: "A different expression." };
+        if (!sameExpression(got, spec.expr)) return { verdict: "incorrect", got, detail: "A different expression." };
+        if (spec.form === "expanded" && !isExpanded(got))
+          return { verdict: "incorrect", got, detail: "Equal in value, but not expanded yet: multiply out the brackets and collect like terms." };
+        return { verdict: "correct", got, detail: "Same expression." };
       }
     }
   } catch (err) {

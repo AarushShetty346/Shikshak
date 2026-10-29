@@ -16,7 +16,7 @@
 // the board's examiner instructions (an error is penalised only once; correct answers expressed
 // differently get due marks). See docs/MARKING.md.
 
-import { normalise, parse, sameExpression, splitChain, value, variables } from "./maths/algebra";
+import { normalise, parse, type Poly, polyVars, sameExpression, solveOne, splitChain, toPoly, value, variables } from "./maths/algebra";
 import type { Surd } from "./maths/exact";
 import { compareAnswer } from "./maths/answers";
 import type { Problem, Step } from "./curriculum/types";
@@ -190,7 +190,99 @@ function stepEarned(step: Step, segs: Seg[], swaps: Map<string, string>): ValueP
 /** Value points: checked steps whose own written line shows the checked work (a bare "Check:" note doesn't). */
 const markable = (steps: Step[]) => steps.filter((s) => s.check && stepEarned(s, analyse([s.text]), new Map()) === "shown");
 
-function markMethod(p: Problem, name: string, steps: Step[], segs: Seg[], final: string): Omit<Marking, "provisional" | "unreadableLines" | "note"> {
+// ---------- equation problems: the first wrong line, and correct consequences of a slip ----------
+
+/** "lhs = rhs" as one polynomial (lhs - rhs), or null if the segment isn't a polynomial equation. */
+function equationPoly(parts: string[]): Poly | null {
+  if (parts.length !== 2) return null;
+  try {
+    return toPoly(parse(`(${parts[0]}) - (${parts[1]})`));
+  } catch {
+    return null;
+  }
+}
+
+const degreeOf = (p: Poly) => Math.max(0, ...[...p.keys()].map((k) => [...k.matchAll(/\^(\d+)/g)].reduce((d, m) => d + Number(m[1]) - 1, 0) + (k.match(/[A-Za-z]/g)?.length ?? 0)));
+
+/** A polynomial written back as text the parser reads: {x^2: 1, x: -7, "": 12} -> "(1)*x^2 + (-7)*x + (12)". */
+const polyText = (p: Poly) => [...p].map(([k, c]) => `(${c.toString()})${k ? `*${k}` : ""}`).join(" + ") || "0";
+
+/** a = k·b for some non-zero constant k (multiplying or dividing an equation by a number keeps it equivalent). */
+function isMultiple(a: Poly, b: Poly): boolean {
+  if (!a.size || !b.size || a.size !== b.size) return false;
+  let k: ReturnType<Poly["get"]> = undefined;
+  for (const [key, cb] of b) {
+    const ca = a.get(key);
+    if (!ca) return false;
+    const r = ca.div(cb);
+    if (k === undefined) k = r;
+    else if (!r.sub(k).isZero()) return false;
+  }
+  return true;
+}
+
+/** Shape of an algebraic form with its numbers and signs blanked out: (x - 3)(x + 4) and (x - 3)(x - 4) look alike. */
+const shape = (s: string) =>
+  normalise(s)
+    .replace(/\s+/g, "")
+    .replace(/\*/g, "")
+    .replace(/\d+(\.\d+)?/g, "N")
+    .replace(/-/g, "+")
+    .replace(/^\+/, "");
+
+interface EquationTrace {
+  /** The first line that isn't equivalent to the question's equation (or states wrong roots before any slip). */
+  firstError: { line: number; note: string } | null;
+  /** Lines that correctly follow from the student's own earlier wrong line. */
+  carried: { line: number; part: string; poly: Poly }[];
+  /** The student's last full-degree equation, if it was reached correctly from an earlier slip. */
+  lastCarried: Poly | null;
+}
+
+/**
+ * Walks the student's equations for an "equation" problem (e.g. x^2 - 7x + 12 = 0). Every correct
+ * line must be the same equation up to a constant factor. The first line that isn't is the slip;
+ * later lines equivalent to the line before them are correct consequences of it (follow-through).
+ */
+function traceEquation(p: Problem, segs: Seg[], lines: string[]): EquationTrace | null {
+  if (p.verify.kind !== "equation") return null;
+  const target = equationPoly(splitChain(p.verify.equation));
+  if (!target) return null;
+  const degree = degreeOf(target);
+  const unknowns = polyVars(target).join();
+  const out: EquationTrace = { firstError: null, carried: [], lastCarried: null };
+  let prev: Poly | null = null;
+  for (let line = 1; line <= lines.length; line++) {
+    const here = segs.filter((s) => s.line === line);
+    if (here.some((s) => s.unreadable)) return out; // can't follow the chain past a line we couldn't read
+    let equations = 0;
+    for (const s of here) {
+      const poly = equationPoly(s.parts);
+      // Same unknowns and degree as the question ("x = 3 or 4" isn't an equation in x, o and r).
+      if (!poly || !poly.size || degreeOf(poly) !== degree || polyVars(poly).join() !== unknowns) continue;
+      equations++;
+      if (isMultiple(poly, target)) {
+        prev = poly;
+        continue;
+      }
+      if (!out.firstError) out.firstError = { line, note: `${s.text} isn't equivalent to the line before it.` };
+      else if (prev && isMultiple(poly, prev)) {
+        out.carried.push({ line, part: s.parts[0], poly });
+        out.lastCarried = poly;
+      } else out.lastCarried = null;
+      prev = poly;
+    }
+    // A line stating the roots (judged as a whole: "x = 3, 4" is one statement), before any slip.
+    if (!equations && !out.firstError && p.answer.type === "roots" && /=/.test(lines[line - 1])) {
+      const v = compareAnswer(p.answer, lines[line - 1]).verdict;
+      if (v === "incorrect") out.firstError = { line, note: `${lines[line - 1]}: these values don't solve the equation.` };
+      if (v === "partial") out.firstError = { line, note: `${lines[line - 1]}: only some of the roots are right.` };
+    }
+  }
+  return out;
+}
+
+function markMethod(p: Problem, name: string, steps: Step[], segs: Seg[], final: string, lines: string[]): Omit<Marking, "provisional" | "unreadableLines" | "note"> {
   const checked = markable(steps);
   // Wrong lines, in order: what the line should have equalled, and what the student wrote.
   const swaps = new Map<string, string>();
@@ -203,8 +295,20 @@ function markMethod(p: Problem, name: string, steps: Step[], segs: Seg[], final:
     if (computed.v.isRational() && claimed.v.isRational()) swaps.set(computed.v.toString(), claimed.v.toString());
   }
   const readable = segs.filter((s) => !s.unreadable);
+  const trace = traceEquation(p, segs, lines);
+  if (trace?.firstError && (!firstError || trace.firstError.line < firstError.line)) firstError = trace.firstError;
+  const used = new Set<number>();
   const points: ValuePoint[] = checked.map((step) => {
-    const how = stepEarned(step, readable, swaps);
+    let how = stepEarned(step, readable, swaps);
+    // An algebra step written in the right form but carrying the student's own earlier slip.
+    if (how === "missing" && trace && step.check && "identity" in step.check) {
+      const form = shape(splitChain(segments(step.text)[0])[0]);
+      const hit = trace.carried.find((c) => !used.has(c.line) && shape(c.part) === form);
+      if (hit) {
+        used.add(hit.line);
+        how = "follow-through";
+      }
+    }
     return { step: step.text, marks: 0.5, got: how === "missing" ? 0 : 0.5, how };
   });
 
@@ -223,6 +327,16 @@ function markMethod(p: Problem, name: string, steps: Step[], segs: Seg[], final:
       }
     }
   }
+  // Roots that correctly solve the student's own (wrong) equation, reached from a slip carried forward.
+  if (answer.how === "wrong" && trace?.lastCarried && p.answer.type === "roots" && points.some((x) => x.how === "follow-through")) {
+    try {
+      const r = solveOne(`${polyText(trace.lastCarried)} = 0`);
+      if (r.kind === "roots" && compareAnswer({ type: "roots", variable: p.answer.variable, values: r.roots.map((x) => x.toString()) }, final).verdict === "correct")
+        answer = { marks: 1, got: 1, how: "follow-through" };
+    } catch {
+      // leave it wrong
+    }
+  }
   const got = half(points.reduce((a, x) => a + x.got, 0) + answer.got);
   const of = half(points.reduce((a, x) => a + x.marks, 0) + answer.marks);
   return { got, of, method: name, points, answer, firstError };
@@ -236,7 +350,7 @@ export function markWork(p: Problem, lines: string[], finalAnswer?: string | nul
   const segs = analyse(lines);
   const final = (finalAnswer ?? "").trim() || (lines.at(-1) ?? "");
   const methods = [{ name: "Worked solution", steps: p.steps }, ...(p.alternates ?? []).map((a) => ({ name: a.name, steps: a.steps }))];
-  const results = methods.map((m) => markMethod(p, m.name, m.steps, segs, final));
+  const results = methods.map((m) => markMethod(p, m.name, m.steps, segs, final, lines));
   // Best method by share of marks (methods can have different numbers of steps).
   const best = results.reduce((a, b) => (b.got / b.of > a.got / a.of ? b : a));
   const unreadableLines = [...new Set(segs.filter((s) => s.unreadable).map((s) => s.line))];

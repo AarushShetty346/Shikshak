@@ -38,6 +38,13 @@ export interface LookResult {
   practice_marks?: string;
   /** The final answer was compared with the checked answer by the maths engine. */
   answer_checked?: "correct" | "incorrect" | "partial" | "approximate" | "not_checked";
+  /**
+   * Who chose the circled line: "engine" when the maths engine verified the reading line by line and
+   * found the first line that doesn't follow; otherwise the handwriting reader's own judgement.
+   */
+  line_source?: "engine" | "reader";
+  /** The reader's line, when the engine overruled it. */
+  reader_line?: number | null;
 }
 
 const SCHEMA = {
@@ -167,7 +174,7 @@ function candidates(s: Session): { id: string; name: string }[] {
  * Misconceptions: a final answer that exactly matches a known trap is "high" confidence; the
  * model's suggestion is only "medium". Unreadable work gets none.
  */
-export function verifyReading(s: Session, result: LookResult): LookResult {
+export function verifyReading(s: Session, result: LookResult, lineCount?: number): LookResult {
   const out: LookResult = { ...result, misconceptions: [], answer_checked: "not_checked" };
   const spec: AnswerSpec | undefined = s.problem?.answerSpec;
   const final = (result.final_answer ?? "").trim();
@@ -207,6 +214,26 @@ export function verifyReading(s: Session, result: LookResult): LookResult {
       }
     }
   }
+  // The maths engine checked the reading line by line. Where it found a line that doesn't follow,
+  // that line is circled, not the reader's guess, provided every line was read and the reading has
+  // exactly the lines that were written (so line numbers match the board).
+  const engineError = out.marks?.firstError;
+  const lines = readingLines(result.reading);
+  if (out.status !== "unreadable" && out.line !== null) out.line_source = "reader";
+  if (engineError && out.marks && !out.marks.provisional && (lineCount === undefined || lines.length === lineCount) && (result.kind === "working" || result.kind === "answer")) {
+    if (out.status === "mistake" && out.line !== engineError.line) {
+      out.reader_line = out.line;
+      out.line = engineError.line;
+      out.what_went_wrong = engineError.note;
+      out.say = ""; // the reader's sentence was about another line
+    } else if (out.status === "correct" || out.status === "incomplete") {
+      out.status = "mistake";
+      out.line = engineError.line;
+      out.what_went_wrong = engineError.note;
+      out.say = "";
+    }
+    if (out.status === "mistake") out.line_source = "engine";
+  }
   const guess = result.misconception_id;
   if (out.status === "mistake" && guess && guess !== "none" && MISCONCEPTIONS.some((m) => m.id === guess) && !out.misconceptions!.some((m) => m.id === guess)) {
     out.misconceptions!.push({ id: guess, confidence: "medium", note: "Suggested by the handwriting reader." });
@@ -230,7 +257,7 @@ export function analyze(s: Session, capture: Capture, studentSaid?: string): Pro
   const answer = expectedAnswer(s);
   const misconceptions = candidates(s);
   const job = (async () => {
-    if (!hasModel()) return verifyReading(s, fakeLook(capture.lineCount));
+    if (!hasModel()) return verifyReading(s, fakeLook(capture.lineCount), capture.lineCount);
     chargeModelCall(s.deviceId, "check");
     const read = await withModelSlot(() =>
       lookAtWork({
@@ -244,7 +271,7 @@ export function analyze(s: Session, capture: Capture, studentSaid?: string): Pro
         misconceptions,
       }),
     );
-    return verifyReading(s, read);
+    return verifyReading(s, read, capture.lineCount);
   })();
   s.analyses.set(key, job);
   // A failed analysis shouldn't stay cached; the next request retries.

@@ -114,7 +114,7 @@ export const MORE_PROBLEMS: Problem[] = [
     difficulty: 1,
     kinds: ["diagnostic", "practice"],
     statement: "Expand: (x + 3)^2",
-    answer: { type: "expression", variable: "x", expr: "x^2 + 6x + 9" },
+    answer: { type: "expression", variable: "x", expr: "x^2 + 6x + 9", form: "expanded" },
     steps: [
       { text: "(x + 3)^2 = (x + 3)(x + 3)", check: { identity: ["(x + 3)^2", "(x + 3)(x + 3)"] } },
       { text: "= x^2 + 3x + 3x + 9", check: { identity: ["(x + 3)(x + 3)", "x^2 + 3x + 3x + 9"] } },
@@ -140,6 +140,17 @@ export const MORE_PROBLEMS: Problem[] = [
     ],
     hints: ["Find two numbers that multiply to 12 and add to -7.", "-3 and -4 work: split -7x as -3x - 4x and group.", "x^2 - 3x - 4x + 12 = 0, so x(x - 3) - 4(x - 3) = 0."],
     traps: [{ misconception: "quad.root_sign", answer: "x = -3 or x = -4" }],
+    alternates: [
+      {
+        name: "Splitting the middle term the other way round",
+        steps: [
+          { text: "x^2 - 4x - 3x + 12 = 0", check: { identity: ["x^2 - 7x + 12", "x^2 - 4x - 3x + 12"] } },
+          { text: "x(x - 4) - 3(x - 4) = 0", check: { identity: ["x^2 - 4x - 3x + 12", "x(x - 4) - 3(x - 4)"] } },
+          { text: "(x - 4)(x - 3) = 0", check: { identity: ["x(x - 4) - 3(x - 4)", "(x - 4)(x - 3)"] } },
+          { text: "x = 4 or x = 3" },
+        ],
+      },
+    ],
     verify: { kind: "equation", equation: "x^2 - 7x + 12 = 0" },
   },
   {
@@ -158,6 +169,17 @@ export const MORE_PROBLEMS: Problem[] = [
     ],
     hints: ["Multiply 2 × (-6) = -12. Which two numbers multiply to -12 and add to 1?", "4 and -3: split x as 4x - 3x and group in pairs.", "2x^2 + 4x - 3x - 6 = 0."],
     traps: [{ misconception: "quad.root_sign", answer: "x = 2 or x = -3/2" }],
+    alternates: [
+      {
+        name: "Splitting the middle term the other way round",
+        steps: [
+          { text: "2x^2 - 3x + 4x - 6 = 0", check: { identity: ["2x^2 + x - 6", "2x^2 - 3x + 4x - 6"] } },
+          { text: "x(2x - 3) + 2(2x - 3) = 0", check: { identity: ["2x^2 - 3x + 4x - 6", "x(2x - 3) + 2(2x - 3)"] } },
+          { text: "(x + 2)(2x - 3) = 0", check: { identity: ["x(2x - 3) + 2(2x - 3)", "(x + 2)(2x - 3)"] } },
+          { text: "x = -2 or x = 3/2" },
+        ],
+      },
+    ],
     verify: { kind: "equation", equation: "2x^2 + x - 6 = 0" },
   },
   {
