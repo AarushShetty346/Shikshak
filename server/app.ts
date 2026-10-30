@@ -7,6 +7,7 @@ import { isLanguage, type Language } from "../shared/types";
 import { issueTicket, redeemTicket, registerDevice, requireDevice, sameSecret } from "./auth";
 import { noteInterrupt } from "./board";
 import { config } from "./config";
+import { scanQuestion } from "./scan";
 import { allow, BusyError, chargeModelCall, QuotaError, withModelSlot } from "./limits";
 import {
   getLearner as getLearnerSafe,
@@ -310,6 +311,23 @@ export function createApp(opts: { devTools?: boolean; phoneProvider?: PhoneProvi
     if (result.error) return void res.status(400).json({ error: result.error });
     touch(s);
     res.json({ ok: true, docs: result.docs });
+  });
+
+  // A photo of a question from the student's notebook: copied out by the vision model, put on the board.
+  api.post("/sessions/:id/scan", big, async (req, res) => {
+    const s = ownSession(req, res);
+    if (!s) return;
+    try {
+      const r = await scanQuestion(s, req.body?.file ?? {});
+      if (!r.ok) return void res.status(r.status).json({ error: r.error });
+      touch(s);
+      res.json({ ...r, docs: s.docs.map(docMeta) });
+    } catch (err) {
+      const e = err as Error;
+      if (sendLimitError(res, err) !== false) return;
+      console.error("[scan] failed", e.message);
+      res.status(502).json({ error: "Couldn't read that photo just now. Try again." });
+    }
   });
 
   api.delete("/sessions/:id/documents/:docId", (req, res) => {

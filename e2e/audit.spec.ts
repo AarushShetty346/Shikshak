@@ -155,3 +155,12 @@ test("the Student / Teacher switch wipes the board and changes mode, both ways",
   await expect(page).toHaveURL(/#\/$/, { timeout: 5000 });
   await expect(page.getByRole("switch", { name: "Teacher mode" })).toHaveAttribute("aria-checked", "false");
 });
+
+test("Scan a question: the camera button is there, and says clearly when the reader isn't set up", async ({ page }) => {
+  await openClass(page);
+  const scan = page.getByRole("button", { name: "Scan a question" });
+  await expect(scan).toBeVisible();
+  const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+  await page.locator('input[type=file][capture="environment"]').setInputFiles({ name: "q.png", mimeType: "image/png", buffer: png });
+  await expect(page.getByText(/Couldn't scan it: .*isn't set up/)).toBeVisible();
+});

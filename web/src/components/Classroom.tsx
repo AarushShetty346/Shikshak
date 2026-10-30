@@ -23,7 +23,7 @@ import { talkKey, talkKeyHint } from "../lib/pushToTalk";
 import { QuestionBar, QuickCheck } from "./ClassTools";
 import { ReportCard } from "./ReportCard";
 import { VoiceOrb, type VoiceState } from "./VoiceOrb";
-import { ArrowLeft, ChartBar, FileText, HandPalm, List, Microphone, MicrophoneSlash, Pause, PencilSimpleLine, Play, Question, SignOut, UploadSimple } from "@phosphor-icons/react";
+import { ArrowLeft, ChartBar, FileText, Scan, HandPalm, List, Microphone, MicrophoneSlash, Pause, PencilSimpleLine, Play, Question, SignOut, UploadSimple } from "@phosphor-icons/react";
 
 function toBlock(e: BlockEvent & { erased?: boolean }, instant: boolean): TutorBlock {
   switch (e.type) {
@@ -341,6 +341,34 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
     }
   };
 
+  // ---------- scan a question from the notebook ----------
+  const scanInput = useRef<HTMLInputElement>(null);
+  const [scanning, setScanning] = useState(false);
+  const scan = async (list: FileList | null) => {
+    const file = list?.[0];
+    if (!file || !serverId) return;
+    setScanning(true);
+    try {
+      const prepared = { ...(await prepareFile(file)), id: crypto.randomUUID().slice(0, 8) };
+      const r = await apiFetch<{ questions: string[]; placed: string | null; note: string; checked: boolean; docs: DocMeta[] }>(`/sessions/${serverId}/scan`, { body: { file: prepared } });
+      await putDoc({ sessionId, docId: prepared.id, name: prepared.name, mediaType: prepared.mediaType, data: prepared.data, pages: prepared.pages });
+      setDocs(r.docs);
+      saveData(sessionId, { docs: r.docs });
+      // Tell the tutor (keypad 4, as for any upload): she reads the photo and can help with it.
+      if (active) voice.sendTones("4#");
+      if (!r.placed) showToast(r.note || "Couldn't find a question in that photo. Try a closer, brighter photo.");
+      else
+        showToast(
+          `${r.questions.length > 1 ? `Found ${r.questions.length} questions; the first is` : "Your question is"} on the board.${r.checked ? "" : " (Not one the maths engine can check.)"}${active ? " Your teacher can see it." : ""}`,
+        );
+    } catch (e) {
+      showToast(`Couldn't scan it: ${(e as Error).message}`);
+    } finally {
+      setScanning(false);
+      if (scanInput.current) scanInput.current.value = "";
+    }
+  };
+
   // ---------- who has the floor ----------
   const teacherSpeaking = active && voice.volume > 0.03;
   const [thinkingUntil, setThinkingUntil] = useState(0);
@@ -396,6 +424,9 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
           <HandPalm /> Stop
         </button>
       )}
+      <button onClick={() => scanInput.current?.click()} disabled={scanning || !serverId} aria-label="Scan a question" title="Photograph a question from your notebook and put it on the board">
+        {scanning ? <span className="spin" /> : <Scan />}
+      </button>
       <button onClick={() => fileInput.current?.click()} disabled={uploading || !serverId} aria-label="Upload material" title="Upload a PDF or photos of your book or notes">
         {uploading ? <span className="spin" /> : <UploadSimple />}
       </button>
@@ -522,6 +553,7 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
       <VoiceOrb state={orb} level={orb === "teacher" ? Math.min(1, voice.volume * 3) : orb === "student" ? mic : 0} />
 
       <input ref={fileInput} type="file" accept="application/pdf,image/*" multiple hidden onChange={(e) => void upload(e.target.files)} />
+      <input ref={scanInput} type="file" accept="image/*" capture="environment" hidden onChange={(e) => void scan(e.target.files)} />
       {setupError && (
         <div className="toast" role="alert">
           {setupError}

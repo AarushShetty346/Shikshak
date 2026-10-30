@@ -3784,3 +3784,23 @@ body:has(.home-board) {
 .teacher-board .home-empty h2 {
   font-family: var(--font-hand);
 }
+
+/* Phones: logo and actions on the first row, the Student / Teacher switch on its own row below. */
+@media (max-width: 640px) {
+  .home-board .home-head {
+    flex-wrap: wrap;
+    row-gap: 12px;
+  }
+
+  .home-board .home-head-left {
+    display: contents;
+  }
+
+  .home-board .home-head .mode-toggle {
+    order: 3;
+  }
+
+  .home-board .home-head-actions {
+    gap: 10px;
+  }
+}
