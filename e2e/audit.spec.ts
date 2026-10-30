@@ -141,3 +141,17 @@ test("BUG-18: a fake check is labelled as simulated on the student's screen", as
   await expect(card).toHaveAttribute("data-state", "done", { timeout: 20_000 });
   await expect(card).toContainText("Simulated check");
 });
+
+test("the Student / Teacher switch wipes the board and changes mode, both ways", async ({ page }) => {
+  await page.goto("/");
+  const toggle = page.getByRole("switch", { name: "Teacher mode" });
+  await expect(toggle).toHaveAttribute("aria-checked", "false");
+  await toggle.click();
+  await expect(page.locator(".duster-wipe")).toBeAttached();
+  await expect(page).toHaveURL(/#\/teacher$/);
+  await expect(page.getByRole("heading", { name: "Teacher view" })).toBeVisible();
+  await expect(page.locator(".duster-wipe")).toHaveCount(0, { timeout: 5000 });
+  await page.getByRole("switch", { name: "Teacher mode" }).click();
+  await expect(page).toHaveURL(/#\/$/, { timeout: 5000 });
+  await expect(page.getByRole("switch", { name: "Teacher mode" })).toHaveAttribute("aria-checked", "false");
+});

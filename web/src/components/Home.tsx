@@ -11,6 +11,7 @@ import { apiFetch } from "../lib/api";
 import { createLearner, listLearners, selectedLearner, selectLearner, type Learner } from "../lib/learners";
 import { deleteSession, listSessions, loadData, newCode, saveData, saveSession, updateSession, type SessionMeta } from "../lib/session";
 import { ChalkFilter } from "./Chalk";
+import { ModeToggle, type Mode } from "./ModeToggle";
 import { Setup } from "./Setup";
 
 function ago(t: number): string {
@@ -28,7 +29,7 @@ function initial(s: SessionMeta): string {
   return (s.topic || s.name).trim().charAt(0).toUpperCase() || "श";
 }
 
-export function Home({ onOpen, onProgress }: { onOpen: (id: string) => void; onProgress: (learnerId: string) => void }) {
+export function Home({ onOpen, onProgress, onSwitchMode }: { onOpen: (id: string) => void; onProgress: (learnerId: string) => void; onSwitchMode: (to: Mode) => void }) {
   const [creating, setCreating] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
   const [menuFor, setMenuFor] = useState<string | null>(null);
@@ -211,12 +212,15 @@ export function Home({ onOpen, onProgress }: { onOpen: (id: string) => void; onP
     <main className="home home-board">
       <ChalkFilter />
       <header className="home-head">
-        <a className="wordmark" href="#/" aria-label="Shikshak home">
-          <span className="wordmark-tile" aria-hidden="true">
-            श
-          </span>
-          <span className="chalk">Shikshak</span>
-        </a>
+        <div className="home-head-left">
+          <a className="wordmark" href="#/" aria-label="Shikshak home">
+            <span className="wordmark-tile" aria-hidden="true">
+              श
+            </span>
+            <span className="chalk">Shikshak</span>
+          </a>
+          <ModeToggle mode="student" onSwitch={onSwitchMode} />
+        </div>
         <div className="home-head-actions">
           <button className="btn-primary" onClick={() => setCreating(newCode())} disabled={Boolean(learners?.length) && !current}>
             <Plus weight="bold" /> New session

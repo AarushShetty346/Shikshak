@@ -4,6 +4,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Copy, Trash } from "@phosphor-icons/react";
 import { apiFetch } from "../lib/api";
+import { ChalkFilter } from "./Chalk";
+import { ModeToggle, type Mode } from "./ModeToggle";
 import { STATUS_LABEL, type Memory, type Report } from "../lib/learners";
 
 interface TeacherLearner {
@@ -81,7 +83,7 @@ export function ShareWithTeacher({ learnerId, learnerName }: { learnerId: string
   );
 }
 
-export function TeacherView({ onBack }: { onBack: () => void }) {
+export function TeacherView({ onSwitchMode }: { onBack: () => void; onSwitchMode: (to: Mode) => void }) {
   const [list, setList] = useState<TeacherLearner[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [code, setCode] = useState("");
@@ -110,11 +112,22 @@ export function TeacherView({ onBack }: { onBack: () => void }) {
   if (open) return <TeacherLearnerDetail learnerId={open} onBack={() => setOpen(null)} />;
 
   return (
-    <main className="home">
-      <button className="back-link" onClick={onBack}>
-        <ArrowLeft /> Classes
-      </button>
-      <h1 className="home-title">Teacher view</h1>
+    <main className="home home-board teacher-board">
+      <ChalkFilter />
+      <header className="home-head">
+        <div className="home-head-left">
+          <span className="wordmark">
+            <span className="wordmark-tile" aria-hidden="true">
+              श
+            </span>
+            <span className="chalk">Shikshak</span>
+          </span>
+          <ModeToggle mode="teacher" onSwitch={onSwitchMode} />
+        </div>
+      </header>
+      <div className="home-title-row">
+        <h1 className="home-title chalk">Teacher view</h1>
+      </div>
       <form
         className="panel claim"
         onSubmit={async (e) => {

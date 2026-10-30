@@ -3649,3 +3649,138 @@ body:has(.home-board) {
     animation: none;
   }
 }
+
+/* ---------- Student / Teacher mode switch ---------- */
+
+.home-head-left {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px clamp(14px, 2vw, 28px);
+}
+
+.mode-toggle {
+  position: relative;
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  padding: 4px;
+  border: 2px solid rgb(241 239 230 / 0.4);
+  border-radius: 18px 14px 19px 13px / 13px 19px 14px 18px;
+  background: rgb(0 0 0 / 0.18);
+  cursor: pointer;
+  font-family: var(--font-hand);
+  font-size: clamp(15px, 1.1vw, 17px);
+  font-weight: 700;
+}
+
+.mode-option {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 5px 14px;
+  color: var(--ink-soft);
+  transition: color 0.25s ease;
+}
+
+.mode-option[data-on="true"] {
+  color: #1b2a23;
+}
+
+.mode-knob {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: calc(50% - 4px);
+  border-radius: 14px 11px 15px 10px / 10px 15px 11px 14px;
+  background: var(--chalk-yellow);
+  box-shadow: 0 2px 0 rgb(0 0 0 / 0.25);
+  transition: transform 0.35s var(--ease-out);
+}
+
+.mode-toggle[data-mode="teacher"] .mode-knob {
+  transform: translateX(100%);
+}
+
+.mode-toggle:hover {
+  border-color: var(--chalk-yellow);
+}
+
+/* ---------- The board duster ---------- */
+
+.duster-wipe {
+  position: fixed;
+  /* inside the wooden frame and above the chalk tray: only the board is rubbed clean */
+  inset: clamp(8px, 1.4vw, 16px) clamp(8px, 1.4vw, 16px) calc(clamp(8px, 1.4vw, 16px) + 18px);
+  z-index: 100;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.wipe-band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  transform: scaleX(0);
+  background-color: #1f372c;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    /* the fresh smear the felt leaves behind */
+    repeating-linear-gradient(0deg, rgb(241 239 230 / 0.05) 0 3px, transparent 3px 9px);
+}
+
+/* A wooden-backed duster with a grey felt pad, trailing chalk dust. */
+.duster {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 150px;
+  height: 68px;
+  transform: translate(-200px, -200px);
+  filter: drop-shadow(0 10px 12px rgb(0 0 0 / 0.45));
+}
+
+.duster::before {
+  /* the wooden back */
+  content: "";
+  position: absolute;
+  inset: 0 0 22px;
+  border-radius: 14px 14px 6px 6px;
+  background:
+    repeating-linear-gradient(92deg, rgb(255 255 255 / 0.07) 0 2px, transparent 2px 11px),
+    linear-gradient(#b07c4a, #8a5a31);
+}
+
+.duster::after {
+  /* the felt */
+  content: "";
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  bottom: 0;
+  height: 24px;
+  border-radius: 3px 3px 8px 8px;
+  background:
+    repeating-linear-gradient(90deg, rgb(255 255 255 / 0.18) 0 1px, transparent 1px 5px),
+    linear-gradient(#6d7174, #4c5053);
+}
+
+.duster-dust {
+  position: absolute;
+  left: -40px;
+  right: -40px;
+  bottom: -18px;
+  height: 46px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgb(244 241 232 / 0.55), rgb(244 241 232 / 0.12) 55%, transparent 72%);
+  filter: blur(6px);
+}
+
+.teacher-board .panel h2,
+.teacher-board .home-empty h2 {
+  font-family: var(--font-hand);
+}
