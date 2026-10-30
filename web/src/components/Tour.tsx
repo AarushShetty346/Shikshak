@@ -1,19 +1,16 @@
 // A first-time guided tour, like a game's tutorial: the screen dims, one control is lit up at a
 // time, and the teacher explains it in a speech bubble. It runs once per device for each screen and
-// can be replayed. (No narration: the browser's voice didn't sound like the teacher, and Bolna's
-// voice only exists inside a paid call.)
+// can be replayed. Each step is read aloud in the tutor's own voice from clips recorded once with
+// scripts/tour-voice.ts (web/public/tour/). A step without a clip is simply silent.
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { ArrowLeft, ArrowRight } from "@phosphor-icons/react";
+import { ArrowLeft, ArrowRight, SpeakerHigh, SpeakerSlash } from "@phosphor-icons/react";
+import { clipName, type TourStep } from "../lib/tourSteps";
 
-export interface TourStep {
-  /** CSS selector of the control to light up; none for a message in the middle of the screen. */
-  target?: string;
-  title: string;
-  text: string;
-}
+export { CLASS_TOUR, HOME_TOUR, type TourStep } from "../lib/tourSteps";
 
 const SEEN = (name: string) => `shikshak.tour.${name}.v1`;
+const MUTED = "shikshak.tour.muted";
 
 function read(key: string): string | null {
   try {
@@ -39,7 +36,20 @@ export function Tour({ name, steps, onClose }: { name: string; steps: TourStep[]
   const [i, setI] = useState(0);
   const [rect, setRect] = useState<DOMRect | null>(null);
   const nextRef = useRef<HTMLButtonElement>(null);
+  const [muted, setMuted] = useState(() => read(MUTED) === "1");
   const step = live[i];
+
+  // The teacher reads the step out. Browsers may block sound before the first click; then the
+  // first step stays silent and the voice starts at Next.
+  useEffect(() => {
+    if (!step || muted) return;
+    const audio = new Audio(`/tour/${clipName(step)}`);
+    audio.play().catch(() => {});
+    return () => {
+      audio.pause();
+      audio.src = "";
+    };
+  }, [step, muted]);
 
   const close = useCallback(() => {
     write(SEEN(name), "1");
@@ -99,6 +109,18 @@ export function Tour({ name, steps, onClose }: { name: string; steps: TourStep[]
             श
           </span>
           <h2 id="tour-title">{step.title}</h2>
+          <button
+            className="tour-mute"
+            onClick={() => {
+              write(MUTED, muted ? "0" : "1");
+              setMuted(!muted);
+            }}
+            aria-label={muted ? "Turn the teacher's voice on" : "Mute the teacher's voice"}
+            aria-pressed={muted}
+            title={muted ? "Voice off" : "Voice on"}
+          >
+            {muted ? <SpeakerSlash weight="bold" /> : <SpeakerHigh weight="bold" />}
+          </button>
         </div>
         <p className="tour-text" aria-live="polite">
           {step.text}
@@ -127,31 +149,3 @@ export function Tour({ name, steps, onClose }: { name: string; steps: TourStep[]
     </div>
   );
 }
-
-/** The home screen, the first time. */
-export const HOME_TOUR: TourStep[] = [
-  { title: "Namaste! I'm your maths teacher", text: "Let me show you around. It takes one minute. You can press Next, or use the arrow keys." },
-  { target: ".mode-toggle", title: "Student or Teacher", text: "Learning? Stay on Student. Teachers switch here to see the progress students share with them." },
-  { target: ".home-head-actions .btn-primary", title: "Start a class", text: "Press New session to start a class. Make one class for each chapter, like a notebook for every topic." },
-  { target: ".profile-button", title: "This is you", text: "Tap your picture to see your progress, switch to another learner, or add a brother or sister." },
-  { target: ".session-list, .home-empty", title: "Your classes", text: "Your classes live here. Open one any time and the board is exactly as you left it." },
-  { title: "That's it!", text: "Press New session, pick a topic, and I'll show you the board next." },
-];
-
-/** The classroom, the first time: what each control does, and how a class goes. */
-export const CLASS_TOUR: TourStep[] = [
-  { title: "This is our blackboard", text: "I teach on this board, and you write on it too. Let me show you the buttons." },
-  { target: ".btn-start", title: "Start the class", text: "Press Start and I'll begin talking. Then just talk back to me, like a real class." },
-  { target: ".btn-start", title: "How to talk to me", text: "Hold the Talk button, or hold Space or Caps Lock, while you speak. Let go when you're done. Need to stop me? Press Stop." },
-  { target: '[aria-label="Pen"]', title: "Your pen", text: "Write your working with your finger, mouse or stylus. One step on each line." },
-  { target: '[aria-label="Eraser"]', title: "Rub it out", text: "Made a mistake? Use the eraser, or undo your last line." },
-  { target: "button.btn-done", title: "Press Done", text: "When you finish, press Done. I'll read your steps and circle the first one that went wrong." },
-  { target: '[aria-label="From paper"]', title: "Working in your notebook?", text: "No stylus? Solve it on paper and send me a photo. It goes on the board and I check it right there." },
-  { target: '[aria-label="Upload material"]', title: "Your book", text: "Upload your textbook or notes, and I'll teach from your own pages." },
-  { target: ".btn-speed", title: "My speed", text: "Am I too fast or too slow? Change how fast I talk." },
-  { target: '[aria-label="Session menu"]', title: "The menu", text: "Your class report, a practice question and more are in here." },
-  {
-    title: "How we'll learn",
-    text: "First I explain on the board. Then it's your turn to try. Press Done, and I check it and circle any slip. Stuck? Ask me for a hint. Ready? Press Start!",
-  },
-];

@@ -223,11 +223,19 @@ test("Paper mode: a photo of my working is pinned on the board, checked, and mar
 });
 
 test("guided tour: the first visit walks through the controls, once, and can be replayed", async ({ page }) => {
+  const clips: string[] = [];
+  page.on("request", (r) => r.url().includes("/tour/") && clips.push(r.url()));
   await page.goto("/");
   const bubble = page.locator(".tour-bubble");
   await expect(bubble).toContainText("Namaste", { timeout: 5000 });
   await page.getByRole("button", { name: "Next" }).click();
   await expect(bubble).toContainText("Student or Teacher");
+  // Each step asks for its recorded clip; a missing clip is just silence. The voice can be muted.
+  await expect.poll(() => clips.some((u) => /\/tour\/tour-[0-9a-f]{8}\.mp3$/.test(u))).toBe(true);
+  const mute = page.getByRole("button", { name: "Mute the teacher's voice" });
+  await mute.click();
+  await expect(page.getByRole("button", { name: "Turn the teacher's voice on" })).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "Turn the teacher's voice on" }).click();
   await expect(page.locator(".tour-spot")).toBeVisible();
   await page.getByRole("button", { name: "Skip tour" }).click();
   await expect(page.locator(".tour")).toHaveCount(0);
