@@ -3956,3 +3956,39 @@ body:has(.home-board) {
     bottom: 150px;
   }
 }
+
+/* The moment of the class (teaching, your turn, your doubt, checking): a quiet chalk label. */
+.session-menu {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.moment-chip {
+  order: 2;
+  margin-left: 4px;
+  padding: 2px 12px;
+  border-radius: 999px;
+  border: 1.5px solid rgb(244 241 232 / 0.35);
+  color: var(--chalk);
+  background: rgb(0 0 0 / 0.2);
+  font-family: var(--font-hand);
+  font-size: 15px;
+  font-weight: 700;
+  animation: fade-up 0.3s var(--ease-out) both;
+}
+
+.moment-chip[data-moment="turn"] {
+  border-color: var(--chalk-yellow);
+  color: var(--chalk-yellow);
+}
+
+.moment-chip[data-moment="doubt"] {
+  border-color: var(--chalk-blue);
+  color: var(--chalk-blue);
+}
+
+.moment-chip[data-moment="checking"] {
+  border-color: rgb(244 241 232 / 0.6);
+}

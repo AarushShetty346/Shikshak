@@ -2,20 +2,30 @@
 // tutor): ask for the next hint, see the answer on purpose, skip; and the quick check that starts
 // a new topic, with typed answers checked exactly on the server.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Lightbulb, Eye, SkipForward, Check, X } from "@phosphor-icons/react";
 import type { BoardSnapshot } from "../../../shared/types";
 import { apiFetch } from "../lib/api";
 
+/** Seconds a student gets with a new question before the hint and answer buttons appear. */
+const THINK_SECONDS = 15;
+
 export function QuestionBar({ serverId, snapshot, onToast }: { serverId: string; snapshot: BoardSnapshot; onToast: (t: string) => void }) {
   const [busy, setBusy] = useState(false);
   const q = snapshot.question;
+  // Let them think first: help appears after a short while, not the moment the question does.
+  const [readyFor, setReadyFor] = useState<string | null>(null);
+  useEffect(() => {
+    if (!q) return;
+    const t = setTimeout(() => setReadyFor(q.id), THINK_SECONDS * 1000);
+    return () => clearTimeout(t);
+  }, [q?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const current = q ? snapshot.blocks.find((b) => b.type === "problem" && b.questionId === q.id) : undefined;
   if (!q || (current && current.type === "problem" && current.kind === "diagnostic")) return null;
   const hints = snapshot.blocks.filter((b) => b.type === "hint" && b.questionId === q.id).length;
   const solved = snapshot.correct?.questionId === q.id;
   const shown = snapshot.blocks.some((b) => b.type === "steps" && b.title === "Solution" && snapshot.blocks.indexOf(b) > snapshot.blocks.findIndex((x) => "questionId" in x && x.questionId === q.id));
-  if (solved || shown) return null;
+  if (solved || shown || (readyFor !== q.id && hints === 0)) return null;
   const run = async (path: string, confirmText?: string) => {
     if (confirmText && !window.confirm(confirmText)) return;
     setBusy(true);

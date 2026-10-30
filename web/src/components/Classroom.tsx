@@ -68,6 +68,8 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
   const [speed, setSpeed] = useState<Speed>(initial.speed);
   const [handsFree, setHandsFree] = useState(initial.handsFree);
   const [menuOpen, setMenuOpen] = useState(false);
+  /** The student stopped the teacher to ask something; over when she carries on (continue_lesson). */
+  const [doubt, setDoubt] = useState(false);
   const [started, setStarted] = useState(meta.started);
   const [uploading, setUploading] = useState(false);
   const [showReport, setShowReport] = useState<"view" | "end" | null>(null);
@@ -151,7 +153,12 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
       if (e.type === "problem" || (e.type === "write" && e.style === "your_turn")) setStatus("idle");
       if (e.type === "mark") setStatus("idle");
       if (e.type === "correct") setStatus("correct");
-      if (e.type === "resume") setResumeTick((n) => n + 1);
+      if (e.type === "resume") {
+        setResumeTick((n) => n + 1);
+        setDoubt(false);
+      }
+      // A new question: the last one's feedback card is done with.
+      if (e.type === "problem" || (e.type === "write" && e.style === "your_turn")) setSubmission((cur) => (cur.state === "done" || cur.state === "stale" || cur.state === "failed" ? { captureId: null, state: "idle" } : cur));
       setBoard(next);
       return "ok";
     },
@@ -244,6 +251,7 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
 
   const stopTeacher = () => {
     setHoldTick((n) => n + 1);
+    setDoubt(true);
     send({ kind: "interrupt", reason: "doubt" });
     voice.askDoubt();
   };
@@ -254,6 +262,7 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
     if (!active || handsFree) return;
     if (voice.volume > 0.03) {
       setHoldTick((n) => n + 1); // interrupting her: pause the half-written board
+      setDoubt(true);
       send({ kind: "interrupt", reason: "speech" });
     }
     voice.talk(true);
@@ -284,7 +293,10 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
   }, [talkDown, talkUp]);
   // Leaving a live call (Pause, call end) always closes the mic.
   useEffect(() => {
-    if (!active) talkUp();
+    if (!active) {
+      talkUp();
+      setDoubt(false);
+    }
   }, [active, talkUp]);
 
   const toggleHandsFree = () => {
@@ -418,6 +430,18 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
     const id = setInterval(() => tick((n) => n + 1), 300);
     return () => clearInterval(id);
   }, [active]);
+  // Which moment of the class this is, so the student always knows what's happening.
+  const questionOpen = Boolean(snapshot.question && snapshot.correct?.questionId !== snapshot.question.id);
+  const moment =
+    status === "checking" || submission.state === "submitting" || submission.state === "reviewing"
+      ? { key: "checking", label: "Checking your work" }
+      : doubt && active
+        ? { key: "doubt", label: "Your doubt" }
+        : questionOpen
+          ? { key: "turn", label: "Your turn" }
+          : active
+            ? { key: "teaching", label: "Teaching" }
+            : null;
   const orb: VoiceState =
     voice.state === "connecting" || voice.state === "ringing"
       ? "connecting"
@@ -524,6 +548,11 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
       />
 
       <div className="session-menu">
+        {moment && (
+          <span className="moment-chip" data-moment={moment.key} role="status" aria-live="polite">
+            {moment.label}
+          </span>
+        )}
         <button className="menu-button" onClick={() => setMenuOpen((o) => !o)} aria-expanded={menuOpen} aria-label="Session menu">
           <List className="menu-icon" />
           <span className="menu-name">{meta.name}</span>
