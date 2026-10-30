@@ -352,7 +352,7 @@ export function publishResult(s: Session, capture: Capture, result: LookResult):
   // A photo of paper working: remember where its lines are, and mark on the photo itself.
   const photo = capture.photo?.label;
   const boxes = photo ? (result.line_boxes ?? []) : [];
-  if (photo && boxes.length) s.photoLines = { ...(s.photoLines ?? {}), [photo]: boxes };
+  if (photo && boxes.length) s.photoLines = { ...s.photoLines, [photo]: boxes };
   const band = (line: number | null) => {
     if (!photo) return null;
     const b = line ? boxes[line - 1] : boxes.at(-1);
