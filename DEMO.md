@@ -36,6 +36,13 @@ don't add claims on the day.
 | 9 | Menu: **Report**. | The class report card (solved alone or with hints, the mistake that was fixed) with Share or Download. |
 | 10 | Open **Asha's progress**. | Skills with the evidence behind each status, the observed mistake with the questions it came from, and phone revision (off on this server). |
 
+## No stylus? The paper flow
+
+Write the same four lines in a notebook, then the camera button → **Send my working**. The photo is
+pinned on the board, the checker reads it, and the slip is circled on the photo itself. The tutor can
+point at its lines ("B5 line 2"). Needs the real checker (a model key); with `FAKE_CHECKER=1` the card
+says "Simulated check". **Not yet tried with a real model and real handwriting: rehearse it first.**
+
 ## If something breaks live
 
 - **Voice won't connect:** keep going on the board. Ask for hints with the menu, use the Done
