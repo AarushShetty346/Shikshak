@@ -1,5 +1,15 @@
 import { expect, test, type Page } from "@playwright/test";
 
+
+// These tests aren't about the first-time tour (its own test is in audit.spec.ts): mark it as seen.
+test.beforeEach(async ({ page }, info) => {
+  if (info.title.includes("guided tour")) return;
+  await page.addInitScript(() => {
+    localStorage.setItem("shikshak.tour.home.v1", "1");
+    localStorage.setItem("shikshak.tour.class.v1", "1");
+  });
+});
+
 async function addLearner(page: Page, name: string) {
   await page.goto("/");
   await page.getByRole("button", { name: "Add learner" }).click();

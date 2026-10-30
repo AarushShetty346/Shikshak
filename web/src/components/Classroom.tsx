@@ -21,9 +21,10 @@ import { Board, type BoardStatus, type Submission, type TutorBlock } from "./Boa
 import { DevPanel } from "./DevPanel";
 import { talkKey, talkKeyHint } from "../lib/pushToTalk";
 import { QuestionBar, QuickCheck } from "./ClassTools";
+import { CLASS_TOUR, Tour, tourDue } from "./Tour";
 import { ReportCard } from "./ReportCard";
 import { VoiceOrb, type VoiceState } from "./VoiceOrb";
-import { ArrowLeft, Camera, ChartBar, FileText, Scan, HandPalm, List, Microphone, MicrophoneSlash, Pause, PencilSimpleLine, Play, Question, SignOut, UploadSimple } from "@phosphor-icons/react";
+import { ArrowLeft, Camera, ChartBar, FileText, Scan, Signpost, HandPalm, List, Microphone, MicrophoneSlash, Pause, PencilSimpleLine, Play, Question, SignOut, UploadSimple } from "@phosphor-icons/react";
 
 function toBlock(e: BlockEvent & { erased?: boolean }, instant: boolean): TutorBlock {
   switch (e.type) {
@@ -68,6 +69,13 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
   const [speed, setSpeed] = useState<Speed>(initial.speed);
   const [handsFree, setHandsFree] = useState(initial.handsFree);
   const [menuOpen, setMenuOpen] = useState(false);
+  // The first class on this device starts with a guided tour of the board.
+  const [touring, setTouring] = useState(false);
+  useEffect(() => {
+    if (!serverId || !tourDue("class")) return;
+    const t = setTimeout(() => setTouring(true), 900);
+    return () => clearTimeout(t);
+  }, [serverId]);
   /** The student stopped the teacher to ask something; over when she carries on (continue_lesson). */
   const [doubt, setDoubt] = useState(false);
   const [started, setStarted] = useState(meta.started);
@@ -596,6 +604,15 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
             </button>
             <button
               role="menuitem"
+              onClick={() => {
+                setMenuOpen(false);
+                setTouring(true);
+              }}
+            >
+              <Signpost /> Show me around
+            </button>
+            <button
+              role="menuitem"
               disabled={!serverId}
               onClick={() => {
                 setMenuOpen(false);
@@ -664,6 +681,7 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
         </div>
       )}
       {serverId && <QuestionBar serverId={serverId} snapshot={snapshot} onToast={showToast} />}
+      {touring && <Tour name="class" steps={CLASS_TOUR} onClose={() => setTouring(false)} />}
       {serverId && <QuickCheck serverId={serverId} snapshot={snapshot} onToast={showToast} />}
       {showReport && serverId && (
         <ReportCard
