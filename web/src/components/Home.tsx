@@ -485,8 +485,8 @@ function AddLearner({ onDone }: { onDone: (l: Learner | null) => void }) {
           <option value="hinglish">Hinglish</option>
           <option value="hi">हिन्दी</option>
           <option value="en">English</option>
-          <option value="ta">தமிழ் (preview)</option>
-          <option value="te">తెలుగు (preview)</option>
+          <option value="ta">தமிழ்</option>
+          <option value="te">తెలుగు</option>
         </select>
       </label>
       <div className="actions">

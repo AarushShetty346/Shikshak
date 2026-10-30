@@ -40,6 +40,9 @@ test("the progress page is honest with no evidence and shows phone revision as o
 
 test("teacher view asks for a code; pilot tools require consent", async ({ page }) => {
   await page.goto("/#/teacher");
+  await page.getByLabel("Access code").fill("123456");
+  await page.getByRole("button", { name: "Unlock" }).click();
+  await expect(page.getByRole("heading", { name: "Teacher view" })).toBeVisible();
   await expect(page.getByText(/code/i).first()).toBeVisible();
   await page.goto("/#/pilot");
   await expect(page.getByText(/consent/i).first()).toBeVisible();

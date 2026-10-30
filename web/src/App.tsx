@@ -4,7 +4,7 @@ import { Home } from "./components/Home";
 import { Pilot } from "./components/Pilot";
 import { Progress } from "./components/Progress";
 import { ChalkFilter } from "./components/Chalk";
-import { DusterWipe, type Mode } from "./components/ModeToggle";
+import { DusterWipe, TeacherGate, teacherUnlocked, type Mode } from "./components/ModeToggle";
 import { TeacherView } from "./components/Teacher";
 import { getSession, sessionFromHash } from "./lib/session";
 
@@ -41,15 +41,38 @@ export function App() {
 
   // Switching between student and teacher mode: the duster rubs the board clean, then the other
   // mode is written underneath.
+  // Teacher mode asks for the access code first (once per tab), including when #/teacher is opened
+  // directly.
   const [wipeTo, setWipeTo] = useState<Mode | null>(null);
-  const switchMode = (to: Mode) => setWipeTo(to);
+  const [unlocked, setUnlocked] = useState(teacherUnlocked);
+  const [asking, setAsking] = useState(false);
+  const switchMode = (to: Mode) => {
+    if (wipeTo) return; // one wipe at a time
+    if (to === "teacher" && !unlocked) setAsking(true);
+    else setWipeTo(to);
+  };
   const wipe = wipeTo && <DusterWipe onCovered={() => go(wipeTo === "teacher" ? "#/teacher" : "#/")} onDone={() => setWipeTo(null)} />;
+  const locked = route.page === "teacher" && !unlocked;
+  const gate = (asking || locked) && (
+    <TeacherGate
+      onUnlock={() => {
+        setUnlocked(true);
+        setAsking(false);
+        if (!locked) setWipeTo("teacher");
+      }}
+      onCancel={() => {
+        setAsking(false);
+        if (locked) go("#/");
+      }}
+    />
+  );
 
   return (
     <>
       <ChalkFilter />
       {page()}
       {wipe}
+      {gate}
     </>
   );
 
@@ -60,6 +83,7 @@ export function App() {
     case "progress":
       return <Progress key={route.learnerId} learnerId={route.learnerId} onBack={() => go("#/")} />;
     case "teacher":
+      if (locked) return <Home onOpen={(id) => go(`#/s/${id}`)} onProgress={(lid) => go(`#/learner/${lid}`)} onSwitchMode={switchMode} />;
       return <TeacherView onBack={() => go("#/")} onSwitchMode={switchMode} />;
     case "pilot":
       return <Pilot onBack={() => go("#/")} />;

@@ -326,7 +326,7 @@ describe("voice limits", () => {
     const id = await kit.newSession(srv.base, token, { language: "ta" });
     const r = await mintVoice(sessions.getSession(id)!, { speed: "normal", resuming: false }, okFetch as unknown as typeof fetch);
     expect(r.status).toBe(409);
-    expect(JSON.stringify(r.body)).toMatch(/Tamil voice isn't set up/);
+    expect(JSON.stringify(r.body)).toMatch(/Tamil voice isn't switched on/);
     expect(okFetch).not.toHaveBeenCalled();
     process.env.BOLNA_AGENT_LANGUAGES = "hi,en,ta,te";
     try {

@@ -12,7 +12,7 @@ type View = "student" | "parent";
 export function ReportCard({ serverId, onClose }: { serverId: string; onClose: () => void }) {
   const [report, setReport] = useState<Report | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [view, setView] = useState<View>("student");
+  const view: View = "student"; // the student report only (the parent view was removed)
   const [showName, setShowName] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -89,14 +89,6 @@ export function ReportCard({ serverId, onClose }: { serverId: string; onClose: (
         )}
         {report && (
           <>
-            <div className="segmented report-view" role="tablist">
-              <button role="tab" aria-selected={view === "student"} className={view === "student" ? "on" : ""} onClick={() => setView("student")}>
-                For me
-              </button>
-              <button role="tab" aria-selected={view === "parent"} className={view === "parent" ? "on" : ""} onClick={() => setView("parent")}>
-                For a parent
-              </button>
-            </div>
             <ReportBody report={report} view={view} />
             <label className="check-row">
               <input type="checkbox" checked={showName} onChange={(e) => setShowName(e.target.checked)} /> Put the name on the image
