@@ -166,6 +166,8 @@ export function Board(props: Props) {
   const [view, setView] = useState({ w: 0, h: 0 });
   const [tool, setTool] = useState<"pen" | "eraser" | "hand">("pen");
   const [newBelow, setNewBelow] = useState(false);
+  // The open question has scrolled out of view above: show it pinned at the top.
+  const [questionAbove, setQuestionAbove] = useState(false);
   const [lastDone, setLastDone] = useState<string>("");
   const [revealed, setRevealed] = useState<Record<string, number>>({});
   const [held, setHeld] = useState<Set<string>>(new Set());
@@ -213,6 +215,21 @@ export function Board(props: Props) {
   const estimate = (b: TutorBlock, width: number) =>
     b.kind === "draw" ? diagramHeight(b.diagram, width) + 40 : b.kind === "page" ? 40 : b.kind === "source" ? width * 0.9 : 60 + piecesOf(b) * 46;
 
+  // A block that is still being written stays below any ink the student has added since it arrived,
+  // so the tutor never writes over the student's work (the student can't see a block's space
+  // before its lines appear). The floor only ever moves down, so a block never jumps back up.
+  for (const b of blocks) {
+    const total = piecesOf(b);
+    const shown = revealed[b.id] ?? (b.instant ? total : 1);
+    if (shown >= total && heights[b.id] !== undefined) continue;
+    const col = columnOf(b) === "side" ? side : main;
+    const since = arrivals.current[b.id] ?? 0;
+    const fresh = strokes.filter((st) => (st.t ?? 0) > since);
+    if (!fresh.length) continue;
+    const below = b.kind === "page" ? inkBottom(fresh) : inkBottom(fresh, col.x0, col.x1);
+    if (below > (floors.current[b.id] ?? 0)) floors.current[b.id] = below;
+  }
+
   const layout = useMemo(() => {
     const pos: Record<string, { x: number; y: number; w: number }> = {};
     const byLabel: Record<string, { x: number; y: number; w: number; h: number }> = {};
@@ -248,14 +265,21 @@ export function Board(props: Props) {
     }
     return { pos, bottom: Math.max(mainBottom, sideBottom) };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [blocks, heights, W]);
+  }, [blocks, heights, W, strokes, revealed]);
 
   const contentBottom = Math.max(layout.bottom, inkBottom(strokes));
   const pageHeightUnits = contentBottom + (view.h / scale) * 0.85 + 60;
 
   // The latest question (problem / "your turn") and where it ends, for the "write here" hint.
   const latestQuestion = [...blocks].reverse().find((b) => b.kind === "problem" || (b.kind === "write" && b.style === "your_turn"));
-  const regionTop = latestQuestion ? (layout.pos[latestQuestion.id]?.y ?? 0) + (heights[latestQuestion.id] ?? 0) : 0;
+  // "Write here" sits below the question and below anything the tutor added after it (a hint that is
+  // still to appear already has its space), so the student never starts writing where a block will show.
+  const afterQuestion = latestQuestion ? blocks.slice(blocks.indexOf(latestQuestion)) : [];
+  const regionTop = latestQuestion
+    ? Math.max(
+        ...afterQuestion.filter((b) => columnOf(b) === "main").map((b) => (layout.pos[b.id]?.y ?? 0) + (heights[b.id] ?? estimate(b, (layout.pos[b.id]?.w ?? 0)))),
+      )
+    : 0;
 
   // The student's answer: everything written since the latest question appeared (wherever it is on
   // the board), or since the last Done if there's no question. Earlier this used position ("below the
@@ -460,6 +484,16 @@ export function Board(props: Props) {
   }, [view, redraw]);
   useEffect(redraw, [strokes, redraw]);
 
+  const questionPos = latestQuestion ? layout.pos[latestQuestion.id] : undefined;
+  const questionBottom = questionPos && latestQuestion ? questionPos.y + (heights[latestQuestion.id] ?? 60) : 0;
+  const checkQuestionAbove = () => {
+    const s = scrollRef.current;
+    // As soon as the top of the question is cut off (the top bar covers about 50 px of the board).
+    setQuestionAbove(Boolean(s && questionPos && s.scrollTop + 50 > (questionPos.y + 10) * scale));
+  };
+  useEffect(checkQuestionAbove, [questionBottom, scale, layout]); // eslint-disable-line react-hooks/exhaustive-deps
+  const questionText = !latestQuestion ? "" : latestQuestion.kind === "problem" ? latestQuestion.problem : latestQuestion.kind === "write" ? latestQuestion.lines.join(" ") : "";
+
   const frame = useRef(0);
   const onScroll = () => {
     cancelAnimationFrame(frame.current);
@@ -467,6 +501,7 @@ export function Board(props: Props) {
       redraw();
       const s = scrollRef.current;
       if (s && s.scrollTop + s.clientHeight >= (layout.bottom - 20) * scale) setNewBelow(false);
+      checkQuestionAbove();
     });
   };
 
@@ -492,9 +527,17 @@ export function Board(props: Props) {
     const h = heights[lastBlock.id] ?? 0;
     const visibleTop = (scroller?.scrollTop ?? 0) / scale;
     const visibleBottom = visibleTop + view.h / scale;
-    // Bring the block into view if it starts below the fold or its revealed part runs past it.
+    // Bring the block into view if it starts above the view or its revealed part runs past the fold:
+    // scroll only as far as needed (keeping its top in view), and keep the open question and the
+    // student's work under it on screen when they fit together with the new block.
     const shownBottom = p.y + (h * (revealed[lastBlock.id] ?? 1)) / piecesOf(lastBlock);
-    if (p.y < visibleTop || shownBottom > visibleBottom - 80) followTo(Math.max(p.y - 40, shownBottom - (view.h / scale) * 0.75));
+    if (p.y < visibleTop || shownBottom > visibleBottom - 80) {
+      const roomBelow = 140; // the toolbar and hint pill cover the bottom of the board
+      let target = p.y < visibleTop ? p.y - 40 : Math.min(p.y - 40, shownBottom + roomBelow - view.h / scale);
+      const q = latestQuestion && latestQuestion.id !== lastBlock.id ? layout.pos[latestQuestion.id] : undefined;
+      if (q && q.y < p.y && shownBottom + roomBelow - (q.y - 20) <= view.h / scale) target = Math.min(target, q.y - 20);
+      followTo(Math.max(0, target));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastBlock?.id, revealed[lastBlock?.id ?? ""]]);
 
@@ -723,7 +766,7 @@ export function Board(props: Props) {
           )}
           {latestQuestion && response.length === 0 && (
             <div className="write-here" style={{ top: px(regionTop + 18), left: px(layout.pos[latestQuestion.id]?.x ?? PAD_L) }}>
-              Write here, one step per line
+              {latestQuestion.kind === "problem" && latestQuestion.questionKind === "diagnostic" ? "Rough work here; type your answer in the box below" : "Write here, one step per line"}
             </div>
           )}
         </div>
@@ -746,6 +789,16 @@ export function Board(props: Props) {
       {held.size > 0 && (
         <button className="board-pill board-pill-held" onClick={() => setHeld(new Set())}>
           <PauseCircle /> Board paused for your doubt. Continue
+        </button>
+      )}
+      {questionAbove && questionText && (
+        <button
+          className="board-pill board-pill-question"
+          title="Scroll up to the question"
+          onClick={() => questionPos && scrollRef.current?.scrollTo({ top: Math.max(0, (questionPos.y - 20) * scale), behavior: "smooth" })}
+        >
+          <span className="board-pill-question-tag">Your turn</span>
+          <MathText text={questionText} />
         </button>
       )}
       {newBelow && (

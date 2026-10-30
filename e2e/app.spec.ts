@@ -5,7 +5,9 @@ async function addLearner(page: Page, name: string) {
   await page.getByRole("button", { name: "Add learner" }).click();
   await page.getByPlaceholder("Asha").fill(name);
   await page.getByRole("button", { name: "Add", exact: true }).click();
-  await expect(page.getByRole("button", { name: `${name}'s progress` })).toBeVisible();
+  // Learners are profiles: the new one is picked and shows as the profile button, with "My progress".
+  await expect(page.getByRole("button", { name: `Profile: ${name}` })).toBeVisible();
+  await expect(page.getByRole("button", { name: "My progress" })).toBeVisible();
 }
 
 test("a learner can be added and a class created and opened, with no horizontal scrolling", async ({ page }) => {
@@ -20,7 +22,7 @@ test("a learner can be added and a class created and opened, with no horizontal 
 
 test("the progress page is honest with no evidence and shows phone revision as off", async ({ page }) => {
   await addLearner(page, "Ravi");
-  await page.getByRole("button", { name: "Ravi's progress" }).click();
+  await page.getByRole("button", { name: "My progress" }).click();
   await expect(page.getByRole("heading", { name: "Phone revision" })).toBeVisible();
   await expect(page.getByText("Phone calls are switched off on this server")).toBeVisible();
   await expect(page.getByText(/mastered|excellent/i)).toHaveCount(0);

@@ -370,18 +370,79 @@ export function planNext(s: Session): { action: Move; reason: string; tool: stri
  * True if writing these lines would hand over the answer to the question the student is working
  * on (before they've solved it, and before the solution was deliberately shown).
  */
+// Number words a tutor might write instead of digits (English, Hindi in Roman script, Devanagari digits).
+const NUMBER_WORDS: Record<string, number> = Object.fromEntries(
+  [
+    ["zero", "shunya"], ["one", "ek"], ["two", "do"], ["three", "teen"], ["four", "char", "chaar"], ["five", "paanch", "panch"],
+    ["six", "chhe", "chhah", "che"], ["seven", "saat"], ["eight", "aath"], ["nine", "nau"], ["ten", "das"],
+  ].flatMap((words, n) => words.map((w) => [w, n])),
+);
+
+/** Values written on their own in prose: "roots are 3 and 4", "x ∈ {3, 4}", "teen aur chaar" -> 3, 4. Not numbers inside expressions. */
+function proseValues(text: string): string[] {
+  const t = normalise(text).replace(/[०-९]/g, (d) => String("०१२३४५६७८९".indexOf(d)));
+  const out = [...t.matchAll(/(?<![\w^./*)])-?\d+(?:\.\d+)?(?:\/\d+)?(?![\w(^./*]|\s*[*/^(]|\s*[a-z]\b)/gi)].map((m) => m[0]);
+  const minus = /\b(minus|negative|maainus|ऋण)\s+$/i;
+  for (const m of t.toLowerCase().matchAll(/[a-z]+/g)) {
+    const n = NUMBER_WORDS[m[0]];
+    if (n !== undefined) out.push(minus.test(t.slice(0, m.index).toLowerCase()) ? String(-n) : String(n));
+  }
+  return out;
+}
+
+/** Roots stated by linear equations or factors in a write: "x - 3 = 0 or x - 4 = 0", "(x - 3)(x - 4) = 0". */
+function statedRoots(lines: string[], spec: AnswerSpec): string[] {
+  if (spec.type !== "roots") return [];
+  const out: string[] = [];
+  for (const line of lines)
+    for (const part of normalise(line).split(/\bor\b|\band\b|,|;|\bso\b/i)) {
+      if (!part.includes("=")) continue;
+      try {
+        const r = solveOne(part);
+        if (r.kind !== "roots") continue;
+        // A factored equation states every root; for a quadratic, "x - 3 = 0" states one. Other equations
+        // (the question itself, or a linear question rearranged) don't count.
+        const lhs = part.split("=")[0].replace(/\s+/g, "");
+        const factored = /^-?[\w.]*(\([^()]+\))+$/.test(lhs) && /\(/.test(lhs);
+        if (factored || (r.roots.length === 1 && spec.values.length > 1)) out.push(...r.roots.map((x) => x.toString()));
+      } catch {
+        // not an equation we can solve
+      }
+    }
+  return out;
+}
+
+/**
+ * True if these board lines would hand over the answer to the open question: the answer itself in
+ * any order or spread over several lines, the roots in words, the factored form, or two lines of
+ * the checked solution. Intermediate steps that are just the question rearranged ("2x = 8") are
+ * allowed: they are what the third hint shows, and blocking them would block writing the question.
+ */
 export function revealsAnswer(s: Session, lines: string[]): boolean {
   const q = s.problem;
   if (!q || q.solved || q.revealed || !q.answerSpec) return false;
+  const spec = q.answerSpec;
+  const covers = (values: string[]) => {
+    if (!values.length) return false;
+    if (spec.type === "value") return values.some((v) => compareAnswer(spec, v).verdict === "correct");
+    if (spec.type !== "roots") return false;
+    return spec.values.every((want) => values.some((v) => compareAnswer({ type: "roots", variable: spec.variable, values: [want] }, v).verdict === "correct"));
+  };
   for (const line of lines) {
-    if (!/=|\bor\b/.test(line) && q.answerSpec.type !== "value") continue;
+    if (!/=|\bor\b/.test(line) && spec.type !== "value") continue;
     const parts = line.split("=");
     const rhs = parts[parts.length - 1];
-    if (parts.length > 1 || q.answerSpec.type === "value") {
-      const v = compareAnswer(q.answerSpec, q.answerSpec.type === "roots" || q.answerSpec.type === "pair" ? line : rhs);
+    if (parts.length > 1 || spec.type === "value") {
+      const v = compareAnswer(spec, spec.type === "roots" || spec.type === "pair" ? line : rhs);
       if (v.verdict === "correct") return true;
     }
   }
+  // The answer spread over several lines: "x = 4 || x = 3".
+  if (lines.length > 1 && (spec.type === "roots" || spec.type === "pair") && compareAnswer(spec, lines.join(", ")).verdict === "correct") return true;
+  if (covers(statedRoots(lines, spec))) return true;
+  // Values in prose only: a line with maths in it ("Evaluate: 2 tan^2 45° + ...") isn't a statement of the answer.
+  const prose = (l: string) => !/[=+*/^×÷]|\b(sin|cos|tan|sec|cosec|cot|sqrt)\b/i.test(l);
+  if (covers(lines.filter(prose).flatMap(proseValues))) return true;
   const sol = s.solutions.find((x) => x.id === q.solutionId);
   if (sol) {
     const norm = (t: string) => normalise(t).replace(/\s+/g, "").toLowerCase();

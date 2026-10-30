@@ -102,3 +102,16 @@ describe("comparing answers by value", () => {
     expect(compareAnswer({ type: "none", reason: "no real roots" }, "Koi real root nahi").verdict).toBe("correct");
   });
 });
+
+describe("audit regression BUG-03: 'Expand' needs an expanded answer", () => {
+  it("accepts multiplied-out forms in any order and refuses brackets or uncollected terms", async () => {
+    const { compareAnswer, isExpanded } = await import("./answers");
+    const spec = { type: "expression", variable: "x", expr: "x^2 + 6x + 9", form: "expanded" } as const;
+    for (const ok of ["x^2 + 6x + 9", "x² + 6x + 9", "9 + 6x + x^2", "x*x + 6*x + 9"]) expect(compareAnswer(spec, ok).verdict, ok).toBe("correct");
+    for (const notYet of ["(x+3)(x+3)", "(x + 3)^2", "x^2 + 3x + 3x + 9", "x(x + 6) + 9"]) expect(compareAnswer(spec, notYet).verdict, notYet).toBe("incorrect");
+    expect(compareAnswer(spec, "x^2 + 9").verdict).toBe("incorrect");
+    // Without the form requirement (an nth term), an unexpanded equal expression still counts.
+    expect(compareAnswer({ type: "expression", variable: "n", expr: "3n + 2" }, "2 + 3(n - 1) + 3").verdict).toBe("correct");
+    expect(isExpanded("x^2 - 6x + 9")).toBe(true);
+  });
+});

@@ -61,6 +61,15 @@ export function QuickCheck({ serverId, snapshot, onToast }: { serverId: string; 
   const q = snapshot.question;
   const block = q ? snapshot.blocks.find((b) => b.type === "problem" && b.questionId === q.id) : undefined;
   const active = Boolean(block && block.type === "problem" && block.kind === "diagnostic");
+  // An example in the shape this question expects, so nobody types "29" for an expansion.
+  const text = block && block.type === "problem" ? block.problem : "";
+  const example = /^\s*expand/i.test(text)
+    ? "x^2 + 2x + 1"
+    : /\by\b/.test(text) && /\bx\b/.test(text)
+      ? "x = 1, y = 2"
+      : /^\s*solve/i.test(text)
+        ? "x = 2 or x = 5"
+        : "29";
 
   const step = async (action: "next" | "skip_question" | "skip") => {
     setBusy(true);
@@ -102,7 +111,7 @@ export function QuickCheck({ serverId, snapshot, onToast }: { serverId: string; 
         if (!answer.trim()) return;
         setBusy(true);
         try {
-          const r = await apiFetch<{ ok: boolean; verdict: string; error?: string }>(`/sessions/${serverId}/answer`, { body: { answer } });
+          const r = await apiFetch<{ ok: boolean; verdict: string; detail?: string; error?: string }>(`/sessions/${serverId}/answer`, { body: { answer } });
           if (!r.ok) {
             onToast(r.error ?? "Couldn't check that.");
             return;
@@ -114,7 +123,9 @@ export function QuickCheck({ serverId, snapshot, onToast }: { serverId: string; 
                 ? { text: "Couldn't read that as an answer. Try writing it like 29 or x = 3 or 4.", tone: "neutral" }
                 : r.verdict === "approximate"
                   ? { text: "Close, but give the exact value.", tone: "neutral" }
-                  : { text: "Not quite. That's fine, it tells us where to start.", tone: "bad" },
+                  : /not expanded/i.test(r.detail ?? "")
+                    ? { text: "Not quite: that's equal, but not expanded yet.", tone: "bad" }
+                    : { text: "Not quite. That's fine, it tells us where to start.", tone: "bad" },
           );
         } catch (err) {
           onToast((err as Error).message);
@@ -134,7 +145,7 @@ export function QuickCheck({ serverId, snapshot, onToast }: { serverId: string; 
         </>
       ) : (
         <div className="quick-row">
-          <input value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder="Your answer, e.g. 29" aria-label="Your answer" maxLength={120} />
+          <input value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder={`Your answer, e.g. ${example}`} aria-label="Your answer" maxLength={120} />
           <button className="btn-primary btn-small" disabled={busy || !answer.trim()}>
             <Check /> Check
           </button>
@@ -151,48 +162,5 @@ export function QuickCheck({ serverId, snapshot, onToast }: { serverId: string; 
         </button>
       </div>
     </form>
-  );
-}
-
-/** Offered once at the start of a new topic. */
-export function QuickCheckOffer({ serverId, onStarted, onDismiss }: { serverId: string; onStarted: () => void; onDismiss: () => void }) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  return (
-    <div className="quick-card quick-offer">
-      <strong>New topic?</strong>
-      <span className="muted-line">A 2-minute quick check (up to 4 questions) helps your teacher start at the right place.</span>
-      {error && <span className="form-error">{error}</span>}
-      <div className="quick-row">
-        <button
-          className="btn-primary btn-small"
-          disabled={busy}
-          onClick={async () => {
-            setBusy(true);
-            try {
-              const r = await apiFetch<{ ok: boolean; error?: string }>(`/sessions/${serverId}/diagnostic`, { body: { action: "start" } });
-              if (r.ok) onStarted();
-              else setError(r.error ?? "No quick check for this topic.");
-            } catch (e) {
-              setError((e as Error).message);
-            } finally {
-              setBusy(false);
-            }
-          }}
-        >
-          Start quick check
-        </button>
-        <button
-          className="btn-secondary btn-small"
-          disabled={busy}
-          onClick={async () => {
-            await apiFetch(`/sessions/${serverId}/diagnostic`, { body: { action: "skip" } }).catch(() => {});
-            onDismiss();
-          }}
-        >
-          <SkipForward /> Skip
-        </button>
-      </div>
-    </div>
   );
 }

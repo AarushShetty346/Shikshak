@@ -32,6 +32,19 @@ The lines are the ones the handwriting reader returns. A step earns its ½ mark 
 - **Follow-through:** a line correctly carries an earlier slip forward. The error is penalised
   once. If `d = 5 - 2 = 4` is wrong but `a_10 = 2 + 9 × 4 = 38` is right for d = 4, the second
   step and the answer 38 keep their marks: 1½ / 2.
+- **Follow-through in equations:** for "solve" problems the engine checks each written equation
+  against the question. The first one that isn't equivalent (up to a constant factor) is the slip.
+  A later line that is equivalent to the student's own previous line, and written in the form of a
+  worked step, earns that step's ½ as follow-through. Roots that correctly solve the student's own
+  equation earn the answer mark. The demo slip `x(x - 3) + 4(x - 3) = 0` followed by
+  `(x - 3)(x + 4) = 0` and `x = 3 or x = -4` gets 2 / 2½: only the slip loses its ½.
+- **The circled line:** when every line was read and the reading has as many lines as were written,
+  the line the engine finds first wrong is circled, even if the handwriting reader pointed elsewhere.
+  Otherwise the reader's line is used.
+- **Other correct methods:** splitting the middle term the other way round (−4x − 3x instead of
+  −3x − 4x) is listed as an alternate scheme for the factorisation problems, so it earns full marks.
+- **"Expand" answers** must be multiplied out with like terms collected: `(x + 3)(x + 3)` is equal to
+  `(x + 3)^2` but isn't an expansion.
 
 Some cases earn less:
 
@@ -57,6 +70,9 @@ the exact split can differ.
 - Only library problems are marked. A problem the tutor makes up with `give_problem` gets no marks.
 - Marks depend on the reader's transcription. A misread line can lose or gain a ½ mark, which is
   one more reason they're practice marks only.
-- Follow-through tracks whole-number slips that are carried into later lines. Slips in fractions or
-  surds aren't followed, so the later steps simply show as missing.
+- Arithmetic follow-through tracks whole-number slips carried into later lines; slips in fractions
+  or surds aren't followed. Equation follow-through works for any polynomial equation in the
+  question's unknown, but only credits lines written in the form of a worked step.
+- Factorising straight to `(x - 3)(x - 4) = 0` without the splitting line earns 1½ / 2½: the
+  splitting and grouping steps weren't written. A teacher might accept it; this needs review.
 - Nobody has reviewed these schemes against real examiner marking yet. That needs a maths teacher.

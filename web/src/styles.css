@@ -987,6 +987,27 @@ sub {
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
 }
 
+.board-pill-question {
+  top: 58px;
+  max-width: min(720px, calc(100% - 32px));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: rgba(28, 47, 38, 0.94);
+  border: 1px dashed var(--chalk-yellow);
+  font-family: var(--font-hand);
+  font-size: 17px;
+  cursor: pointer;
+}
+
+.board-pill-question-tag {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--chalk-yellow);
+}
+
 .board-pill-new {
   top: auto;
   bottom: 80px;
@@ -1405,7 +1426,8 @@ sub {
   color: var(--chalk-yellow);
   font-family: var(--font-hand);
   font-size: 22px;
-  padding-top: 3px;
+  /* Kalam's श carries extra space on its right and sits a little high: these even it out (measured). */
+  padding: 3px 5px 0 0;
 }
 
 .home-title {
@@ -1981,7 +2003,7 @@ sub {
 .preview-mark {
   margin-left: 4px;
   font-size: 11px;
-  opacity: 0.7;
+  color: var(--ink-soft);
 }
 
 .submission[data-state="stale"] {
@@ -2065,17 +2087,6 @@ sub {
 .add-learner .actions,
 .add-learner .form-error {
   grid-column: 1 / -1;
-}
-
-.home-foot {
-  display: flex;
-  gap: 18px;
-  margin-top: 40px;
-  font-size: 14px;
-}
-
-.home-foot a {
-  color: var(--ink-soft);
 }
 
 .muted-line {
@@ -2479,4 +2490,1317 @@ sub {
 
 .submission-marks b {
   color: var(--ink);
+}
+
+.board-pill-question sup {
+  font-size: 0.65em;
+  line-height: 0;
+  vertical-align: 0.6em;
+  margin-left: 1px;
+}
+
+/* Phones turned sideways: one row of controls along the bottom, so the board keeps its height. */
+@media (max-height: 500px) and (orientation: landscape) {
+  .board-tools {
+    right: 8px;
+    bottom: 6px;
+    padding: 3px;
+  }
+
+  .board-tools button {
+    min-width: 36px;
+    height: 36px;
+  }
+
+  .question-bar {
+    left: 8px;
+    right: auto;
+    bottom: 6px;
+    padding: 3px;
+  }
+
+  .question-bar button {
+    padding: 6px 10px;
+    font-size: 13px;
+  }
+
+  .quick-card {
+    bottom: 52px;
+  }
+
+  .board-pill-question {
+    top: 8px;
+    font-size: 15px;
+  }
+}
+
+/* ---------- Home: the blackboard ----------
+ * The home screen is a real board: green slate with chalk dust and eraser smudges, a wooden frame
+ * and chalk tray, headings in chalk (Kalam + the #chalk-text filter from Home.tsx). It is always a
+ * board, in light and dark mode. Body text stays in Mukta for reading, coloured like chalk.
+ */
+.home-board {
+  --bg: #1d3329;
+  --surface: rgb(255 255 255 / 0.045);
+  --surface-2: rgb(255 255 255 / 0.1);
+  --ink: #f1efe6;
+  --ink-soft: #c3cfc6;
+  --line: rgb(241 239 230 / 0.34);
+  --brand: #f6d77a;
+  --brand-ink: #1b2a23;
+  --accent: #f6d77a;
+  --accent-ink: #1b2a23;
+  --accent-soft: rgb(246 215 122 / 0.16);
+  --red: #ff9a8c;
+  --shadow: none;
+  --hand-radius: 22px 16px 24px 14px / 14px 24px 16px 22px;
+  color-scheme: dark;
+
+  position: relative;
+  box-sizing: border-box;
+  border: clamp(8px, 1.4vw, 16px) solid transparent;
+  border-color: #6b4a2b;
+  border-image: linear-gradient(90deg, #6b4a2b, #7d5735 22%, #66462a 41%, #80593a 63%, #6a482b 81%, #77522f) 1;
+  background-color: #1f372c;
+  background-image:
+    /* chalk dust grain */
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    /* old eraser smudges */
+    radial-gradient(ellipse 38% 16% at 22% 18%, rgb(241 239 230 / 0.07), transparent 70%),
+    radial-gradient(ellipse 30% 12% at 78% 64%, rgb(241 239 230 / 0.05), transparent 70%),
+    radial-gradient(ellipse 26% 10% at 35% 88%, rgb(241 239 230 / 0.04), transparent 70%),
+    /* the board's edges are darker */
+    radial-gradient(ellipse at 50% 40%, transparent 55%, rgb(0 0 0 / 0.38));
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.4), inset 0 8px 30px rgb(0 0 0 / 0.35);
+  padding-bottom: 96px;
+}
+
+body:has(.home-board) {
+  background: #5f4126;
+}
+
+/* The chalk tray along the bottom, with two sticks of chalk. */
+.home-board::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 18px;
+  background: linear-gradient(#8a6440, #5f4126 70%, #4a321d);
+  box-shadow: 0 -2px 6px rgb(0 0 0 / 0.35);
+}
+
+.home-board::before {
+  content: "";
+  position: absolute;
+  right: 14%;
+  bottom: 14px;
+  width: 52px;
+  height: 9px;
+  border-radius: 4px 5px 5px 4px;
+  background: linear-gradient(#ffffff, #e4e0d4);
+  box-shadow: -74px 1px 0 -1px #f6d77a;
+  transform: rotate(-3deg);
+  z-index: 1;
+}
+
+.chalk-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+/* Chalk lettering: hand font, a soft dusty glow, rough edges and gaps. */
+.home-board .chalk {
+  font-family: var(--font-hand);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--ink);
+  text-shadow:
+    0 0 1px rgb(241 239 230 / 0.55),
+    0 0 8px rgb(241 239 230 / 0.12);
+  filter: url(#chalk-text);
+}
+
+.home-board .wordmark {
+  font-size: 26px;
+}
+
+.home-board .wordmark .chalk {
+  font-weight: 700;
+}
+
+.home-board .wordmark-tile {
+  background: transparent;
+  border: 2px solid var(--chalk-yellow);
+  border-radius: 12px 9px 13px 8px;
+  color: var(--chalk-yellow);
+}
+
+.home-board .home-title {
+  font-size: clamp(38px, 6vw, 58px);
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.1;
+}
+
+/* A chalk underline under the title. */
+.home-board .home-title::after {
+  content: "";
+  display: block;
+  width: min(220px, 50%);
+  height: 6px;
+  margin-top: 6px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 220 6' preserveAspectRatio='none'%3E%3Cpath d='M2 4 C 50 1, 110 5, 160 2 S 210 3, 218 2' stroke='%23f6d77a' stroke-width='2.6' fill='none' stroke-linecap='round' opacity='0.85'/%3E%3C/svg%3E") no-repeat center / 100% 100%;
+  filter: url(#chalk-text);
+}
+
+/* Buttons: the main action is a stick of yellow chalk; the rest are outlined in chalk. */
+.home-board .btn-primary {
+  background: var(--chalk-yellow);
+  color: var(--brand-ink);
+  box-shadow: 0 2px 0 rgb(0 0 0 / 0.25);
+}
+
+.home-board .btn-primary:hover:not(:disabled) {
+  background: #fbe39b;
+}
+
+.home-board .btn-primary:disabled {
+  opacity: 0.45;
+}
+
+.home-board .btn-secondary {
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1.5px var(--line);
+}
+
+.home-board :focus-visible {
+  outline: 2px solid var(--chalk-yellow);
+  outline-offset: 3px;
+}
+
+/* Cards are areas drawn round in chalk, not white boxes. */
+.home-board .home-empty,
+.home-board .add-learner,
+.home-board .panel,
+.home-board .session-list {
+  background: var(--surface);
+  border: 2px solid var(--line);
+  border-radius: var(--hand-radius);
+  box-shadow: none;
+}
+
+.home-board .session-row + .session-row {
+  border-top: 1.5px dashed rgb(241 239 230 / 0.2);
+}
+
+.home-board .session-row:hover {
+  background: rgb(255 255 255 / 0.05);
+}
+
+.home-board .session-name {
+  font-size: 21px;
+  font-weight: 700;
+}
+
+.home-board .session-tile {
+  background: transparent;
+  border: 2px solid var(--chalk-yellow);
+  color: var(--chalk-yellow);
+  font-family: var(--font-hand);
+}
+
+.home-board .home-empty h2 {
+  font-size: 30px;
+}
+
+.home-board .home-empty p {
+  color: var(--ink-soft);
+}
+
+/* The example: chalk working with the slip circled in red, written straight on the board. */
+.home-board .home-empty {
+  grid-template-columns: 280px 1fr;
+}
+
+.home-board .empty-board,
+.home-board .session-tile,
+.home-board .wordmark-tile {
+  outline: none;
+}
+
+.home-board .empty-board {
+  background: none;
+  transform: rotate(-2deg);
+  padding: 8px 14px;
+  font-size: 20px;
+  gap: 16px;
+}
+
+.home-board .empty-board .chalk {
+  font-weight: 400;
+}
+
+.home-board .empty-board span:first-child {
+  color: var(--chalk-yellow);
+}
+
+.empty-board-slip {
+  position: relative;
+  white-space: nowrap;
+}
+
+.chalk-circle {
+  position: absolute;
+  top: -12px;
+  left: -22px;
+  width: calc(100% + 38px);
+  height: calc(100% + 24px);
+  overflow: visible;
+}
+
+.chalk-circle path {
+  fill: none;
+  stroke: var(--chalk-red);
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.home-board .empty-board .empty-board-note {
+  color: var(--chalk-red);
+  font-size: 16px;
+  padding-left: 6px;
+}
+
+/* Chips and fields in chalk. */
+.home-board .learner-chip {
+  background: transparent;
+  border-color: var(--line);
+  border-radius: 18px 14px 19px 13px / 13px 19px 14px 18px;
+}
+
+.home-board .learner-chip[aria-pressed="true"],
+.home-board .learner-chip[aria-selected="true"] {
+  border-color: var(--chalk-yellow);
+  background: rgb(246 215 122 / 0.12);
+  color: var(--chalk-yellow);
+}
+
+.home-board .field input,
+.home-board .field select {
+  background: rgb(0 0 0 / 0.2);
+  border-color: var(--line);
+}
+
+.home-board .field select option {
+  background: #1f372c;
+}
+
+/* Menus open over the board, so they need a solid background. */
+.home-board .menu.menu-light {
+  background: #2a463a;
+  border-color: var(--line);
+  box-shadow: 0 12px 30px rgb(0 0 0 / 0.45);
+}
+
+@media (max-width: 640px) {
+  .home-board .home-empty {
+    grid-template-columns: 1fr;
+  }
+
+  .home-board .empty-board {
+    font-size: 19px;
+  }
+
+  .home-board::before {
+    right: 10%;
+  }
+}
+
+/* ---------- Home: profiles ("Who's learning?") ---------- */
+
+.home-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.avatar {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 128px;
+  height: 128px;
+  border-radius: 14px 11px 15px 10px / 10px 15px 11px 14px;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.22 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    var(--avatar, #6fa8dc);
+  box-shadow: inset 0 0 0 2px rgb(255 255 255 / 0.18), 0 3px 0 rgb(0 0 0 / 0.25);
+  flex: none;
+}
+
+.avatar-face {
+  width: 72%;
+  height: 72%;
+  fill: none;
+  stroke: #fbf9f2;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: url(#chalk-text);
+}
+
+.avatar-face circle,
+.avatar-face .filled {
+  fill: #fbf9f2;
+}
+
+.avatar-small {
+  width: 40px;
+  height: 40px;
+  border-radius: 9px 7px 10px 6px / 6px 10px 7px 9px;
+}
+
+.avatar-tiny {
+  display: inline-grid;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  vertical-align: middle;
+}
+
+.avatar-small .avatar-face,
+.avatar-tiny .avatar-face {
+  stroke-width: 3;
+  filter: none;
+}
+
+.avatar-add {
+  background: transparent;
+  border: 2.5px dashed rgb(241 239 230 / 0.55);
+  box-shadow: none;
+  color: var(--chalk);
+  font-size: 46px;
+}
+
+.avatar-add.avatar-small {
+  font-size: 18px;
+  border-width: 2px;
+}
+
+.profile-picker {
+  display: flex;
+  flex-direction: column;
+}
+
+.picker {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 34px;
+  padding: 24px 0 40px;
+  text-align: center;
+}
+
+.picker-title {
+  margin: 0;
+  font-size: clamp(40px, 7vw, 64px);
+  line-height: 1.1;
+}
+
+.profiles {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 28px 32px;
+  margin: 0;
+  padding: 0;
+}
+
+.profile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  border: 0;
+  background: none;
+  color: var(--ink-soft);
+  padding: 4px;
+  border-radius: 18px;
+  cursor: pointer;
+}
+
+.profile .avatar {
+  transition: transform 0.18s var(--ease-out), box-shadow 0.18s ease;
+}
+
+.profile:hover .avatar,
+.profile:focus-visible .avatar {
+  transform: translateY(-3px) rotate(-1.5deg);
+  box-shadow: inset 0 0 0 2px rgb(255 255 255 / 0.18), 0 0 0 3px var(--chalk-yellow), 0 6px 0 rgb(0 0 0 / 0.25);
+}
+
+.profile.profile-add:hover .avatar,
+.profile.profile-add:focus-visible .avatar {
+  border-color: var(--chalk-yellow);
+  color: var(--chalk-yellow);
+  box-shadow: none;
+}
+
+.home-board .profile:focus-visible {
+  outline: none;
+}
+
+.profile-name {
+  font-size: 22px;
+  color: var(--ink);
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-add .profile-name {
+  font-family: var(--font-hand);
+  color: var(--ink-soft);
+}
+
+.profile:hover .profile-name {
+  color: var(--chalk-yellow);
+}
+
+.picker .add-learner {
+  max-width: 640px;
+  text-align: left;
+}
+
+.profile-menu {
+  position: relative;
+}
+
+.profile-button {
+  display: grid;
+  padding: 0;
+  border: 0;
+  background: none;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.profile-button:hover .avatar,
+.profile-button[aria-expanded="true"] .avatar {
+  box-shadow: 0 0 0 2px var(--chalk-yellow);
+}
+
+.profile-dropdown {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 4px);
+  right: 0;
+  left: auto;
+  min-width: 220px;
+}
+
+.profile-dropdown-name {
+  margin: 4px 12px 8px;
+  font-size: 20px;
+}
+
+.profile-dropdown button {
+  gap: 10px;
+}
+
+@media (max-width: 640px) {
+  .avatar {
+    width: 96px;
+    height: 96px;
+  }
+
+  .avatar-small {
+    width: 38px;
+    height: 38px;
+  }
+
+  .profiles {
+    gap: 22px 24px;
+  }
+
+  .profile-name {
+    font-size: 19px;
+  }
+
+  .home-head-actions .btn-primary {
+    padding: 10px 14px;
+  }
+}
+
+/* ---------- Home: fill the board at every screen size ---------- */
+
+.home-board {
+  padding-left: clamp(18px, 5vw, 96px);
+  padding-right: clamp(18px, 5vw, 96px);
+  display: flex;
+  flex-direction: column;
+}
+
+.home-board .home-head {
+  height: auto;
+  padding-top: clamp(4px, 1vw, 16px);
+}
+
+.home-board .wordmark {
+  font-size: clamp(24px, 2.2vw, 34px);
+}
+
+.home-board .wordmark-tile {
+  width: clamp(34px, 2.8vw, 46px);
+  height: clamp(34px, 2.8vw, 46px);
+  font-size: clamp(22px, 1.9vw, 30px);
+}
+
+.home-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px 24px;
+  margin: clamp(24px, 4vh, 48px) 0 clamp(18px, 3vh, 32px);
+}
+
+.home-board .home-title {
+  margin: 0;
+  font-size: clamp(38px, 5.2vw, 84px);
+}
+
+.home-board .progress-button {
+  font-size: clamp(15px, 1.15vw, 18px);
+  padding: 10px 20px;
+  box-shadow: inset 0 0 0 2px var(--line);
+  border-radius: 18px 14px 19px 13px / 13px 19px 14px 18px;
+}
+
+.home-board .progress-button:hover {
+  box-shadow: inset 0 0 0 2px var(--chalk-yellow);
+  color: var(--chalk-yellow);
+}
+
+/* Classes: a grid of chalk cards across the whole board. */
+.home-board .session-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  gap: clamp(14px, 1.6vw, 26px);
+  padding: 0;
+  background: none;
+  border: 0;
+}
+
+.home-board .session-row {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: clamp(150px, 16vh, 210px);
+  padding: 8px 12px 14px;
+  background: var(--surface);
+  border: 2px solid var(--line);
+  border-radius: var(--hand-radius);
+}
+
+.home-board .session-row + .session-row {
+  margin-top: 0;
+  border-top: 2px solid var(--line);
+}
+
+.home-board .session-row:hover {
+  border-color: rgb(246 215 122 / 0.6);
+  background: rgb(255 255 255 / 0.07);
+}
+
+.home-board .session-open {
+  flex-wrap: wrap;
+  align-items: flex-start;
+  padding: 10px 4px 0;
+}
+
+.home-board .session-tile {
+  width: clamp(48px, 3.6vw, 60px);
+  height: clamp(48px, 3.6vw, 60px);
+  font-size: clamp(24px, 1.9vw, 30px);
+}
+
+.home-board .session-name {
+  font-size: clamp(20px, 1.6vw, 26px);
+  white-space: normal;
+}
+
+.home-board .session-meta {
+  font-size: clamp(14px, 1vw, 16px);
+}
+
+.home-board .session-time {
+  flex-basis: 100%;
+  padding-left: calc(clamp(48px, 3.6vw, 60px) + 14px);
+}
+
+.home-board .session-actions {
+  justify-content: flex-end;
+}
+
+/* The welcome card and its text grow with the board. */
+.home-board .home-empty {
+  grid-template-columns: minmax(260px, 0.9fr) 1.1fr;
+  padding: clamp(22px, 3vw, 56px);
+  gap: clamp(20px, 3vw, 56px);
+}
+
+.home-board .home-empty h2 {
+  font-size: clamp(28px, 2.6vw, 44px);
+}
+
+.home-board .home-empty p {
+  max-width: 62ch;
+  font-size: clamp(16px, 1.15vw, 19px);
+}
+
+.home-board .empty-board {
+  font-size: clamp(20px, 1.9vw, 32px);
+  justify-self: center;
+}
+
+/* The profile picker grows too. */
+.home-board .avatar:not(.avatar-small):not(.avatar-tiny) {
+  width: clamp(96px, 10vw, 180px);
+  height: clamp(96px, 10vw, 180px);
+}
+
+.home-board .avatar-add:not(.avatar-small) {
+  font-size: clamp(40px, 4vw, 70px);
+}
+
+.home-board .picker-title {
+  font-size: clamp(40px, 5.5vw, 92px);
+}
+
+.home-board .profile-name {
+  font-size: clamp(19px, 1.7vw, 28px);
+  max-width: clamp(110px, 11vw, 200px);
+}
+
+.home-board .profiles {
+  gap: clamp(20px, 2.6vw, 48px);
+}
+
+@media (max-width: 640px) {
+  .home-board .home-empty {
+    grid-template-columns: 1fr;
+  }
+
+  .home-board .home-title-row {
+    align-items: center;
+  }
+}
+
+/* ---------- New session: the board, with the form on a sticky note ---------- */
+
+.setup.home-board {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, clamp(420px, 36vw, 600px));
+  gap: clamp(32px, 6vw, 120px);
+  align-items: center;
+  max-width: none;
+  margin: 0;
+  padding-top: clamp(24px, 4vh, 56px);
+}
+
+.setup-board .back-link {
+  color: var(--ink-soft);
+  font-family: var(--font-hand);
+  font-size: 18px;
+}
+
+.setup-board .back-link:hover {
+  background: rgb(255 255 255 / 0.08);
+  color: var(--chalk-yellow);
+}
+
+.setup-board h1 {
+  font-size: clamp(42px, 5.4vw, 92px);
+  letter-spacing: 0;
+}
+
+.setup-board h1 .hand {
+  color: var(--chalk-yellow);
+  font-weight: 400;
+}
+
+.setup-board .lede {
+  max-width: 44ch;
+  font-size: clamp(17px, 1.3vw, 22px);
+  color: var(--ink-soft);
+}
+
+/* The example is written straight on the board, not on a board of its own. */
+.setup-board .board-preview {
+  background: none;
+  box-shadow: none;
+  outline: none;
+  padding: 0;
+  max-width: none;
+  font-size: clamp(21px, 1.7vw, 30px);
+}
+
+.setup-board .board-preview figcaption {
+  color: var(--ink-soft);
+}
+
+/* The sticky note: yellow paper, a strip of tape, a curled corner, pen-coloured handwriting. */
+.sticky-note {
+  --ink: #2c2414;
+  --ink-soft: #5e5034;
+  --line: rgb(70 52 18 / 0.3);
+  --surface: rgb(255 255 255 / 0.4);
+  --surface-2: rgb(120 90 20 / 0.1);
+  --bg: rgb(255 255 255 / 0.45);
+  --brand: #23392f;
+  --brand-ink: #f6d77a;
+  --red: #b3261e;
+  --accent-soft: rgb(255 255 255 / 0.55);
+  color-scheme: light;
+
+  position: relative;
+  color: var(--ink);
+  font-family: var(--font-hand);
+  background:
+    linear-gradient(170deg, rgb(255 255 255 / 0.35), transparent 40%),
+    linear-gradient(#fdec92, #f9df6d);
+  border-radius: 2px 2px 26px 2px;
+  padding: clamp(30px, 2.6vw, 44px) clamp(24px, 2.4vw, 40px) clamp(26px, 2.4vw, 40px);
+  transform: rotate(1.2deg);
+  box-shadow:
+    0 1px 1px rgb(0 0 0 / 0.15),
+    0 16px 28px -10px rgb(0 0 0 / 0.55),
+    inset 0 -18px 30px -24px rgb(120 80 0 / 0.35);
+}
+
+/* Tape holding it to the board. */
+.sticky-note::before {
+  content: "";
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  width: 120px;
+  height: 30px;
+  transform: translateX(-50%) rotate(-3deg);
+  background: rgb(255 255 255 / 0.45);
+  border-left: 1px dashed rgb(255 255 255 / 0.6);
+  border-right: 1px dashed rgb(255 255 255 / 0.6);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.15);
+}
+
+/* The curled bottom-right corner. */
+.sticky-note::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 0 0 26px 0;
+  background: linear-gradient(135deg, transparent 50%, rgb(150 110 20 / 0.28) 50%, #f3d660 72%);
+  pointer-events: none;
+}
+
+.sticky-note .field > span,
+.sticky-note .field > legend {
+  font-family: var(--font-hand);
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.sticky-note .field input,
+.sticky-note .field select {
+  font-family: var(--font-hand);
+  font-size: 19px;
+  background: var(--bg);
+  border: 1.5px solid var(--line);
+  border-radius: 10px 8px 11px 7px / 7px 11px 8px 10px;
+}
+
+.sticky-note .field input::placeholder {
+  color: rgb(70 52 18 / 0.5);
+}
+
+.sticky-note .field input:focus,
+.sticky-note .field select:focus {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px rgb(35 57 47 / 0.15);
+}
+
+.sticky-note .segmented {
+  background: var(--surface-2);
+  font-family: var(--font-hand);
+}
+
+.sticky-note .segmented button {
+  font-family: var(--font-hand);
+  font-size: 18px;
+  color: var(--ink-soft);
+}
+
+.sticky-note .segmented button.on {
+  background: #fffdf2;
+  color: var(--ink);
+  font-weight: 700;
+  box-shadow: 0 1px 2px rgb(70 52 18 / 0.25);
+}
+
+.sticky-note .chip {
+  font-family: var(--font-hand);
+  font-size: 16px;
+  color: var(--ink);
+  border-color: var(--line);
+  border-radius: 14px 11px 15px 10px / 10px 15px 11px 14px;
+}
+
+.sticky-note .chip:hover {
+  border-color: var(--brand);
+  background: rgb(255 255 255 / 0.4);
+}
+
+.sticky-note .upload {
+  font-size: 17px;
+  color: var(--ink-soft);
+  border-color: rgb(70 52 18 / 0.35);
+}
+
+.sticky-note .upload:hover {
+  background: rgb(255 255 255 / 0.3);
+}
+
+.sticky-note .plan,
+.sticky-note .form-error {
+  font-family: var(--font-ui);
+}
+
+/* On the yellow note the main button is board-green with chalk-yellow writing. */
+.home-board .sticky-note .btn-primary {
+  background: var(--brand);
+  color: var(--brand-ink);
+  font-family: var(--font-ui);
+}
+
+.home-board .sticky-note .btn-primary:hover:not(:disabled) {
+  background: #2d4a3d;
+}
+
+.home-board .sticky-note .btn-secondary {
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1.5px var(--line);
+  font-family: var(--font-ui);
+}
+
+.sticky-note .btn-primary:disabled,
+.sticky-note .btn-secondary:disabled {
+  opacity: 0.5;
+}
+
+.sticky-note :focus-visible {
+  outline-color: #23392f;
+}
+
+@media (max-width: 860px) {
+  .setup.home-board {
+    grid-template-columns: 1fr;
+    gap: 36px;
+    align-items: start;
+  }
+
+  .sticky-note {
+    transform: rotate(0.6deg);
+  }
+}
+
+.setup.home-board {
+  grid-template-columns: minmax(0, 1fr) minmax(0, clamp(420px, 36vw, 600px));
+}
+
+@media (max-width: 860px) {
+  .setup.home-board {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sticky-note .segmented {
+    grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
+  }
+}
+
+.plan-ready {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 18px;
+}
+
+.plan-ready .link-button {
+  margin: 0;
+  padding: 0 4px;
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+/* ---------- The plan, on a notepad ---------- */
+
+.notepad-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+  background: rgb(8 16 12 / 0.62);
+  backdrop-filter: blur(3px);
+  animation: fade-up 0.2s var(--ease-out) both;
+}
+
+.notepad {
+  --pad-line: 34px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(680px, 100%);
+  max-height: min(86dvh, 820px);
+  padding-top: 34px;
+  background: #fffdf6;
+  border-radius: 6px 6px 10px 10px;
+  box-shadow: 0 30px 70px -20px rgb(0 0 0 / 0.7), 0 2px 0 rgb(0 0 0 / 0.08);
+  color: #1f2a44;
+  font-family: var(--font-hand);
+  transform: rotate(-0.6deg);
+  animation: rise 0.35s var(--ease-out) both;
+}
+
+/* The spiral binding along the top. */
+.notepad-rings {
+  position: absolute;
+  top: -12px;
+  left: 28px;
+  right: 28px;
+  height: 30px;
+  background:
+    radial-gradient(circle at 50% 70%, #1c2a24 0 4px, transparent 4.5px) 0 0 / 34px 30px repeat-x,
+    linear-gradient(90deg, #9aa3a0, #e8ecea 40%, #8d9693) 0 0 / 34px 22px repeat-x;
+  -webkit-mask: linear-gradient(90deg, #000 0 10px, transparent 10px 34px) 12px 0 / 34px 100% repeat-x;
+  mask: linear-gradient(90deg, #000 0 10px, transparent 10px 34px) 12px 0 / 34px 100% repeat-x;
+}
+
+.notepad::before {
+  /* the punched holes under the rings */
+  content: "";
+  position: absolute;
+  top: 12px;
+  left: 28px;
+  right: 28px;
+  height: 10px;
+  background: radial-gradient(circle, #1d3329 0 4px, transparent 4.5px) 12px 0 / 34px 10px repeat-x;
+}
+
+.notepad-page {
+  overflow: auto;
+  padding: 6px 32px 12px 76px;
+  line-height: var(--pad-line);
+  font-size: 21px;
+  background:
+    linear-gradient(90deg, transparent 58px, #e98b8b 58px 60px, transparent 60px),
+    repeating-linear-gradient(transparent 0 calc(var(--pad-line) - 1px), #cfdcf0 calc(var(--pad-line) - 1px) var(--pad-line));
+  background-attachment: local;
+}
+
+.notepad-page p,
+.notepad-page ol {
+  margin: 0;
+}
+
+.notepad-heading {
+  margin: 0;
+  font-size: 30px;
+  line-height: calc(var(--pad-line) * 1.5);
+  color: #13203a;
+}
+
+.notepad-goal {
+  color: #33456b;
+}
+
+.notepad-steps {
+  padding-left: 26px;
+  color: var(--pen);
+}
+
+.notepad-steps li::marker {
+  font-weight: 700;
+}
+
+.notepad-steps .from-notes {
+  margin-left: 10px;
+  font-size: 15px;
+  color: #8a6d1d;
+  background: #fbefb4;
+  border-radius: 4px;
+  padding: 0 6px;
+}
+
+.notepad-practice {
+  color: #9b2c25;
+}
+
+.notepad-writing {
+  color: var(--pen);
+}
+
+.notepad-dots span {
+  animation: blink 1.2s infinite both;
+}
+
+.notepad-dots span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.notepad-dots span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 0.15;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.notepad-error,
+.notepad-warn {
+  color: #b3261e;
+}
+
+.notepad-close {
+  position: absolute;
+  top: 34px;
+  right: 10px;
+  color: #4a5751;
+  z-index: 1;
+}
+
+.notepad-close:hover {
+  background: #eef1ee;
+  color: #15211c;
+}
+
+.notepad-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 24px 20px;
+  border-top: 1px solid #e6e0cf;
+  font-family: var(--font-ui);
+}
+
+.notepad-actions:empty {
+  display: none;
+}
+
+.notepad .btn-primary {
+  background: #23392f;
+  color: #f6d77a;
+}
+
+.notepad .btn-secondary {
+  color: #15211c;
+  box-shadow: inset 0 0 0 1.5px #cfd6d1;
+}
+
+@media (max-width: 560px) {
+  .notepad-page {
+    padding: 6px 18px 12px 52px;
+    font-size: 19px;
+    background:
+      linear-gradient(90deg, transparent 38px, #e98b8b 38px 40px, transparent 40px),
+      repeating-linear-gradient(transparent 0 calc(var(--pad-line) - 1px), #cfdcf0 calc(var(--pad-line) - 1px) var(--pad-line));
+    background-attachment: local;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notepad,
+  .notepad-backdrop,
+  .notepad-dots span {
+    animation: none;
+  }
+}
+
+/* ---------- Student / Teacher mode switch ---------- */
+
+.home-head-left {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px clamp(14px, 2vw, 28px);
+}
+
+.mode-toggle {
+  position: relative;
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  padding: 4px;
+  border: 2px solid rgb(241 239 230 / 0.4);
+  border-radius: 18px 14px 19px 13px / 13px 19px 14px 18px;
+  background: rgb(0 0 0 / 0.18);
+  cursor: pointer;
+  font-family: var(--font-hand);
+  font-size: clamp(15px, 1.1vw, 17px);
+  font-weight: 700;
+}
+
+.mode-option {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 5px 14px;
+  color: var(--ink-soft);
+  transition: color 0.25s ease;
+}
+
+.mode-option[data-on="true"] {
+  color: #1b2a23;
+}
+
+.mode-knob {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: calc(50% - 4px);
+  border-radius: 14px 11px 15px 10px / 10px 15px 11px 14px;
+  background: var(--chalk-yellow);
+  box-shadow: 0 2px 0 rgb(0 0 0 / 0.25);
+  transition: transform 0.35s var(--ease-out);
+}
+
+.mode-toggle[data-mode="teacher"] .mode-knob {
+  transform: translateX(100%);
+}
+
+.mode-toggle:hover {
+  border-color: var(--chalk-yellow);
+}
+
+/* ---------- The board duster ---------- */
+
+.duster-wipe {
+  position: fixed;
+  /* inside the wooden frame and above the chalk tray: only the board is rubbed clean */
+  inset: clamp(8px, 1.4vw, 16px) clamp(8px, 1.4vw, 16px) calc(clamp(8px, 1.4vw, 16px) + 18px);
+  z-index: 100;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.wipe-band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  transform: scaleX(0);
+  background-color: #1f372c;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    /* the fresh smear the felt leaves behind */
+    repeating-linear-gradient(0deg, rgb(241 239 230 / 0.05) 0 3px, transparent 3px 9px);
+}
+
+/* A wooden-backed duster with a grey felt pad, trailing chalk dust. */
+.duster {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 150px;
+  height: 68px;
+  transform: translate(-200px, -200px);
+  filter: drop-shadow(0 10px 12px rgb(0 0 0 / 0.45));
+}
+
+.duster::before {
+  /* the wooden back */
+  content: "";
+  position: absolute;
+  inset: 0 0 22px;
+  border-radius: 14px 14px 6px 6px;
+  background:
+    repeating-linear-gradient(92deg, rgb(255 255 255 / 0.07) 0 2px, transparent 2px 11px),
+    linear-gradient(#b07c4a, #8a5a31);
+}
+
+.duster::after {
+  /* the felt */
+  content: "";
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  bottom: 0;
+  height: 24px;
+  border-radius: 3px 3px 8px 8px;
+  background:
+    repeating-linear-gradient(90deg, rgb(255 255 255 / 0.18) 0 1px, transparent 1px 5px),
+    linear-gradient(#6d7174, #4c5053);
+}
+
+.duster-dust {
+  position: absolute;
+  left: -40px;
+  right: -40px;
+  bottom: -18px;
+  height: 46px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgb(244 241 232 / 0.55), rgb(244 241 232 / 0.12) 55%, transparent 72%);
+  filter: blur(6px);
+}
+
+.teacher-board .panel h2,
+.teacher-board .home-empty h2 {
+  font-family: var(--font-hand);
+}
+
+/* Phones: logo and actions on the first row, the Student / Teacher switch on its own row below. */
+@media (max-width: 640px) {
+  .home-board .home-head {
+    flex-wrap: wrap;
+    row-gap: 12px;
+  }
+
+  .home-board .home-head-left {
+    display: contents;
+  }
+
+  .home-board .home-head .mode-toggle {
+    order: 3;
+  }
+
+  .home-board .home-head-actions {
+    gap: 10px;
+  }
 }

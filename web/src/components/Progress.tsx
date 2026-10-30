@@ -8,6 +8,7 @@ import { deleteLearner, learnerMemory, rejectMisconception, resetMemory, STATUS_
 import { selectLearner } from "../lib/learners";
 import { ShareWithTeacher } from "./Teacher";
 import { PhoneRevision } from "./PhoneRevision";
+import { MathText } from "./MathText";
 
 const when = (t: number) => new Date(t).toLocaleDateString(undefined, { day: "numeric", month: "short" });
 
@@ -69,7 +70,9 @@ export function Progress({ learnerId, onBack }: { learnerId: string; onBack: () 
           {m.next && (
             <section className="panel panel-accent">
               <h2>Next up</h2>
-              <p className="next-q">{m.next.statement}</p>
+              <p className="next-q">
+                <MathText text={m.next.statement} />
+              </p>
               <p className="muted-line">{m.next.why}</p>
             </section>
           )}
@@ -120,7 +123,7 @@ export function Progress({ learnerId, onBack }: { learnerId: string; onBack: () 
                       </span>
                     </div>
                     <p className="muted-line">
-                      {x.confidence === "high" ? "Sure: the answer was exactly what this mistake gives." : "Possible: suggested by the handwriting reader."} Last seen {when(x.lastAt)}, e.g. "{x.examples[0]}".
+                      {x.confidence === "high" ? "Sure: the answer was exactly what this mistake gives." : "Possible: suggested by the handwriting reader."} Last seen {when(x.lastAt)}, e.g. "<MathText text={x.examples[0] ?? ""} />".
                     </p>
                     <p className="remedy">{x.remedy}</p>
                     <button

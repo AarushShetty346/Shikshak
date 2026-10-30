@@ -1,14 +1,17 @@
-// Home: who is learning on this device, and their classes (like chats). Start a new one (blank
+// Home: who is learning on this device, and their classes (like chats). Learners are profiles, picked
+// on a "Who's learning?" screen when the app opens (like a streaming app's profiles). Start a new one (blank
 // board) or reopen an old one exactly as it was. Rename, archive and delete (with confirmation)
 // live in each row's menu. Several learners can share a device; each sees only their own classes.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Archive, ArrowCounterClockwise, BookOpenText, ChartLineUp, DotsThree, PencilSimpleLine, Plus, Trash, UserPlus } from "@phosphor-icons/react";
+import { Archive, ArrowCounterClockwise, ArrowsLeftRight, BookOpenText, ChartLineUp, DotsThree, PencilSimpleLine, Plus, Trash, UserPlus } from "@phosphor-icons/react";
 import { emptySnapshot } from "../../../shared/boardState";
 import { LANGUAGE_NAMES, LANGUAGE_STATUS, type Language } from "../../../shared/types";
 import { apiFetch } from "../lib/api";
 import { createLearner, listLearners, selectedLearner, selectLearner, type Learner } from "../lib/learners";
 import { deleteSession, listSessions, loadData, newCode, saveData, saveSession, updateSession, type SessionMeta } from "../lib/session";
+import { ChalkFilter } from "./Chalk";
+import { ModeToggle, type Mode } from "./ModeToggle";
 import { Setup } from "./Setup";
 
 function ago(t: number): string {
@@ -26,7 +29,7 @@ function initial(s: SessionMeta): string {
   return (s.topic || s.name).trim().charAt(0).toUpperCase() || "श";
 }
 
-export function Home({ onOpen, onProgress }: { onOpen: (id: string) => void; onProgress: (learnerId: string) => void }) {
+export function Home({ onOpen, onProgress, onSwitchMode }: { onOpen: (id: string) => void; onProgress: (learnerId: string) => void; onSwitchMode: (to: Mode) => void }) {
   const [creating, setCreating] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
   const [menuFor, setMenuFor] = useState<string | null>(null);
@@ -34,6 +37,10 @@ export function Home({ onOpen, onProgress }: { onOpen: (id: string) => void; onP
   const [learnerError, setLearnerError] = useState<string | null>(null);
   const [current, setCurrent] = useState<string | null>(selectedLearner());
   const [adding, setAdding] = useState(false);
+  // Ask "Who's learning?" once per visit (per tab); coming back from a class doesn't ask again.
+  const [picking, setPicking] = useState(() => !readFlag(PICKED));
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
   const [, refresh] = useState(0);
 
   const loadLearners = useCallback(() => {
@@ -78,6 +85,29 @@ export function Home({ onOpen, onProgress }: { onOpen: (id: string) => void; onP
       window.removeEventListener("keydown", onKey);
     };
   }, [menuFor]);
+  useEffect(() => {
+    if (!profileOpen) return;
+    const onDown = (e: PointerEvent) => {
+      if (!profileRef.current?.contains(e.target as Node)) setProfileOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setProfileOpen(false);
+    window.addEventListener("pointerdown", onDown);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [profileOpen]);
+
+  const choose = (id: string) => {
+    setCurrent(id);
+    selectLearner(id);
+    setPicking(false);
+    setAdding(false);
+    setProfileOpen(false);
+    writeFlag(PICKED);
+  };
+  const indexOf = (id: string) => Math.max(0, learners?.findIndex((l) => l.id === id) ?? 0);
 
   if (creating) {
     return (
@@ -114,83 +144,172 @@ export function Home({ onOpen, onProgress }: { onOpen: (id: string) => void; onP
     refresh((n) => n + 1);
   };
 
-  return (
-    <main className="home">
-      <header className="home-head">
-        <a className="wordmark" href="#/" aria-label="Shikshak home">
-          <span className="wordmark-tile" aria-hidden="true">
-            श
+  const addForm = adding && (
+    <AddLearner
+      onDone={(l) => {
+        setAdding(false);
+        if (l) {
+          choose(l.id);
+          loadLearners();
+        }
+      }}
+    />
+  );
+
+  // "Who's learning?": one chalk profile per learner, and one to add a learner.
+  if (learners !== null && (adding || (learners.length > 0 && (picking || !current)))) {
+    return (
+      <main className="home home-board profile-picker">
+        <ChalkFilter />
+        <header className="home-head">
+          <span className="wordmark">
+            <span className="wordmark-tile" aria-hidden="true">
+              श
+            </span>
+            <span className="chalk">Shikshak</span>
           </span>
-          Shikshak
-        </a>
-        <button className="btn-primary" onClick={() => setCreating(newCode())} disabled={Boolean(learners?.length) && !current}>
-          <Plus weight="bold" /> New session
-        </button>
+        </header>
+        <section className="picker" aria-labelledby="picker-title">
+          <h1 id="picker-title" className="picker-title chalk">
+            Who's learning?
+          </h1>
+          <ul className="profiles">
+            {learners.map((l, i) => (
+              <li key={l.id}>
+                <button className="profile" onClick={() => choose(l.id)} aria-current={l.id === current ? "true" : undefined}>
+                  <Avatar index={i} />
+                  <span className="profile-name chalk">{l.name}</span>
+                  {l.streak.current >= 2 && (
+                    <span className="streak" title={`${l.streak.current} learning days in a row`}>
+                      {l.streak.current}d
+                    </span>
+                  )}
+                </button>
+              </li>
+            ))}
+            <li>
+              <button className="profile profile-add" onClick={() => setAdding(true)} aria-expanded={adding}>
+                <span className="avatar avatar-add" aria-hidden="true">
+                  <Plus weight="bold" />
+                </span>
+                <span className="profile-name">Add learner</span>
+              </button>
+            </li>
+          </ul>
+          {addForm}
+          {learnerError && <p className="form-error">{learnerError}</p>}
+          {adding && learners.length === 0 && (
+            <button className="link-button" onClick={() => setAdding(false)}>
+              Back
+            </button>
+          )}
+        </section>
+      </main>
+    );
+  }
+
+  return (
+    <main className="home home-board">
+      <ChalkFilter />
+      <header className="home-head">
+        <div className="home-head-left">
+          <a className="wordmark" href="#/" aria-label="Shikshak home">
+            <span className="wordmark-tile" aria-hidden="true">
+              श
+            </span>
+            <span className="chalk">Shikshak</span>
+          </a>
+          <ModeToggle mode="student" onSwitch={onSwitchMode} />
+        </div>
+        <div className="home-head-actions">
+          <button className="btn-primary" onClick={() => setCreating(newCode())} disabled={Boolean(learners?.length) && !current}>
+            <Plus weight="bold" /> New session
+          </button>
+          {learner ? (
+            <div className="profile-menu" ref={profileRef}>
+              <button
+                className="profile-button"
+                aria-label={`Profile: ${learner.name}`}
+                aria-haspopup="menu"
+                aria-expanded={profileOpen}
+                onClick={() => setProfileOpen((o) => !o)}
+              >
+                <Avatar index={indexOf(learner.id)} small />
+              </button>
+              {profileOpen && (
+                <div className="menu menu-light profile-dropdown" role="menu">
+                  <p className="profile-dropdown-name chalk">{learner.name}</p>
+                  {(learners ?? [])
+                    .filter((l) => l.id !== learner.id)
+                    .map((l) => (
+                      <button key={l.id} role="menuitem" onClick={() => choose(l.id)}>
+                        <Avatar index={indexOf(l.id)} tiny /> {l.name}
+                      </button>
+                    ))}
+                  <button role="menuitem" onClick={() => onProgress(learner.id)}>
+                    <ChartLineUp /> My progress
+                  </button>
+                  <button
+                    role="menuitem"
+                    onClick={() => {
+                      setProfileOpen(false);
+                      setPicking(true);
+                    }}
+                  >
+                    <ArrowsLeftRight /> Switch profile
+                  </button>
+                  <button
+                    role="menuitem"
+                    onClick={() => {
+                      setProfileOpen(false);
+                      setAdding(true);
+                    }}
+                  >
+                    <UserPlus /> Add learner
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <button className="profile-button" aria-label="Add learner" title="Add learner" onClick={() => setAdding(true)}>
+              <span className="avatar avatar-add avatar-small" aria-hidden="true">
+                <Plus weight="bold" />
+              </span>
+            </button>
+          )}
+        </div>
       </header>
 
-      <section className="learner-bar" aria-label="Who's learning">
-        <span className="learner-bar-label">Who's learning?</span>
-        <div className="learner-chips">
-          {(learners ?? []).map((l) => (
-            <button
-              key={l.id}
-              className="learner-chip"
-              aria-pressed={l.id === current}
-              onClick={() => {
-                setCurrent(l.id);
-                selectLearner(l.id);
-              }}
-            >
-              {l.name}
-              {l.streak.current >= 2 && (
-                <span className="streak" title={`${l.streak.current} learning days in a row`}>
-                  {l.streak.current}d
-                </span>
-              )}
-            </button>
-          ))}
-          <button className="learner-chip learner-add" onClick={() => setAdding((a) => !a)} aria-expanded={adding}>
-            <UserPlus /> Add learner
-          </button>
-        </div>
+      {learnerError && <p className="form-error">{learnerError}</p>}
+
+      <div className="home-title-row">
+        <h1 className="home-title chalk">{learner ? `${learner.name}'s classes` : "Your classes"}</h1>
         {learner && (
-          <button className="link-button" onClick={() => onProgress(learner.id)}>
-            <ChartLineUp /> {learner.name}'s progress
+          <button className="btn-secondary progress-button" onClick={() => onProgress(learner.id)}>
+            <ChartLineUp weight="bold" /> My progress
           </button>
         )}
-        {learnerError && <p className="form-error">{learnerError}</p>}
-        {adding && (
-          <AddLearner
-            onDone={(l) => {
-              setAdding(false);
-              if (l) {
-                setCurrent(l.id);
-                selectLearner(l.id);
-                loadLearners();
-              }
-            }}
-          />
-        )}
-      </section>
+      </div>
 
-      <h1 className="home-title">{learner ? `${learner.name}'s classes` : "Your classes"}</h1>
-
-      {Boolean(learners?.length) && !current ? (
-        <section className="home-empty">
-          <div>
-            <h2>Choose who's learning</h2>
-            <p>Pick a name above (or add one) so classes and progress stay with the right person.</p>
-          </div>
-        </section>
-      ) : sessions.length === 0 ? (
+      {sessions.length === 0 ? (
         <section className="home-empty">
           <div className="empty-board" aria-hidden="true">
-            <span>Maths: AP</span>
-            <span>Physics: Electricity</span>
+            <span className="chalk">x² − 7x + 12 = 0</span>
+            <span className="chalk empty-board-slip">
+              x(x − 3) + 4(x − 3) = 0
+              <svg className="chalk-circle" viewBox="0 0 200 60" preserveAspectRatio="none">
+                <path d="M8 34 C 10 12, 70 4, 118 7 C 168 10, 196 20, 192 36 C 188 52, 120 58, 70 55 C 28 52, 4 46, 12 26" />
+              </svg>
+            </span>
+            <span className="chalk empty-board-note">Step 2: −4, not +4</span>
           </div>
           <div>
-            <h2>Start your first class</h2>
-            <p>Make one session per chapter. Each keeps its own board, notes and progress, so you can pick up where you stopped.</p>
+            <h2 className="chalk">Learn maths out loud</h2>
+            <p>
+              Shikshak is a voice maths tutor for classes 8 to 12. It talks you through a topic in Hinglish, Hindi or English while writing on a shared
+              chalkboard. You solve on the board, press Done, and it reads your handwritten steps and circles the one that went wrong.
+            </p>
+            <p>Start with one class per chapter. Each keeps its own board, notes and progress.</p>
             <button className="btn-primary" onClick={() => setCreating(newCode())}>
               <Plus weight="bold" /> New session
             </button>
@@ -208,7 +327,7 @@ export function Home({ onOpen, onProgress }: { onOpen: (id: string) => void; onP
                     {initial(s)}
                   </span>
                   <span className="session-text">
-                    <span className="session-name">{s.name}</span>
+                    <span className="session-name chalk">{s.name}</span>
                     <span className="session-meta">
                       {meta}
                       {LANGUAGE_STATUS[s.language] === "preview" && <span className="preview-tag">preview language</span>}
@@ -305,10 +424,6 @@ export function Home({ onOpen, onProgress }: { onOpen: (id: string) => void; onP
           </ul>
         </section>
       )}
-      <footer className="home-foot">
-        <a href="#/teacher">Teacher view</a>
-        <a href="#/pilot">Pilot tools</a>
-      </footer>
     </main>
   );
 }
@@ -367,5 +482,39 @@ function AddLearner({ onDone }: { onDone: (l: Learner | null) => void }) {
       </div>
       {error && <p className="form-error">{error}</p>}
     </form>
+  );
+}
+
+
+const PICKED = "shikshak.profilePicked";
+function readFlag(key: string): boolean {
+  try {
+    return sessionStorage.getItem(key) === "1";
+  } catch {
+    return false;
+  }
+}
+function writeFlag(key: string) {
+  try {
+    sessionStorage.setItem(key, "1");
+  } catch {
+    // private mode: the picker just shows again next time
+  }
+}
+
+/** Chalk colours for profiles, in order of when the learner was added. */
+const AVATAR_COLOURS = ["#6fa8dc", "#e07a68", "#e3bb55", "#6dbb8e", "#cf86b3", "#9c8fdb"];
+
+/** A learner's profile picture: a coloured chalk square with a chalk face (a few different faces). */
+function Avatar({ index, small, tiny }: { index: number; small?: boolean; tiny?: boolean }) {
+  const face = index % 3;
+  return (
+    <span className={`avatar${small ? " avatar-small" : ""}${tiny ? " avatar-tiny" : ""}`} style={{ ["--avatar" as string]: AVATAR_COLOURS[index % AVATAR_COLOURS.length] }} aria-hidden="true">
+      <svg viewBox="0 0 40 40" className="avatar-face">
+        {face === 1 ? <path d="M11.5 15.5 h5" /> : <circle cx="14" cy="15.5" r="2.1" />}
+        <circle cx="26" cy="15.5" r="2.1" />
+        {face === 2 ? <path d="M12 23.5 Q20 33 28 23.5 Z" className="filled" /> : <path d="M11.5 24 Q20 31 28.5 24" />}
+      </svg>
+    </span>
   );
 }

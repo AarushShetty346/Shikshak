@@ -3,6 +3,7 @@ import { Classroom } from "./components/Classroom";
 import { Home } from "./components/Home";
 import { Pilot } from "./components/Pilot";
 import { Progress } from "./components/Progress";
+import { DusterWipe, type Mode } from "./components/ModeToggle";
 import { TeacherView } from "./components/Teacher";
 import { getSession, sessionFromHash } from "./lib/session";
 
@@ -37,16 +38,31 @@ export function App() {
     setRoute(readRoute());
   };
 
+  // Switching between student and teacher mode: the duster rubs the board clean, then the other
+  // mode is written underneath.
+  const [wipeTo, setWipeTo] = useState<Mode | null>(null);
+  const switchMode = (to: Mode) => setWipeTo(to);
+  const wipe = wipeTo && <DusterWipe onCovered={() => go(wipeTo === "teacher" ? "#/teacher" : "#/")} onDone={() => setWipeTo(null)} />;
+
+  return (
+    <>
+      {page()}
+      {wipe}
+    </>
+  );
+
+  function page() {
   switch (route.page) {
     case "class":
       return <Classroom key={route.id} sessionId={route.id} onHome={() => go("#/")} />;
     case "progress":
       return <Progress key={route.learnerId} learnerId={route.learnerId} onBack={() => go("#/")} />;
     case "teacher":
-      return <TeacherView onBack={() => go("#/")} />;
+      return <TeacherView onBack={() => go("#/")} onSwitchMode={switchMode} />;
     case "pilot":
       return <Pilot onBack={() => go("#/")} />;
     default:
-      return <Home onOpen={(id) => go(`#/s/${id}`)} onProgress={(lid) => go(`#/learner/${lid}`)} />;
+      return <Home onOpen={(id) => go(`#/s/${id}`)} onProgress={(lid) => go(`#/learner/${lid}`)} onSwitchMode={switchMode} />;
+  }
   }
 }
