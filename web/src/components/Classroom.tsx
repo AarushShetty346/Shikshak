@@ -19,6 +19,7 @@ import { useMicLevel } from "../lib/useMicLevel";
 import { useVoiceCall } from "../lib/useVoiceCall";
 import { Board, type BoardStatus, type Submission, type TutorBlock } from "./Board";
 import { DevPanel } from "./DevPanel";
+import { talkKey, talkKeyHint } from "../lib/pushToTalk";
 import { QuestionBar, QuickCheck } from "./ClassTools";
 import { ReportCard } from "./ReportCard";
 import { VoiceOrb, type VoiceState } from "./VoiceOrb";
@@ -247,7 +248,7 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
     voice.askDoubt();
   };
 
-  // Push-to-talk: hold the Talk button or the Space bar. Released on key up, pointer up/cancel,
+  // Push-to-talk: hold the Talk button, Space or Caps Lock (see pushToTalk.ts). Released on key up, pointer up/cancel,
   // and whenever the window loses focus or the page is hidden (no stuck open mic).
   const talkDown = useCallback(() => {
     if (!active || handsFree) return;
@@ -261,13 +262,12 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
   useEffect(() => {
     const typing = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || /INPUT|TEXTAREA|SELECT/.test(t.tagName));
     const down = (e: KeyboardEvent) => {
-      if (e.code === "Space" && !e.repeat && !typing(e.target)) {
-        e.preventDefault();
-        talkDown();
-      }
+      if (talkKey("keydown", e, typing(e.target)) !== "down") return;
+      if (e.code === "Space") e.preventDefault();
+      talkDown();
     };
     const up = (e: KeyboardEvent) => {
-      if (e.code === "Space" && !typing(e.target)) talkUp();
+      if (talkKey("keyup", e, typing(e.target)) === "up") talkUp();
     };
     const lost = () => talkUp();
     const hidden = () => document.visibilityState === "hidden" && talkUp();
@@ -293,7 +293,7 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
     saveData(sessionId, { handsFree: next });
     voice.setHandsFree(next);
     setMenuOpen(false);
-    showToast(next ? "Hands-free on: the teacher hears everything, including room noise." : "Push-to-talk on: hold Talk (or Space) to speak.");
+    showToast(next ? "Hands-free on: the teacher hears everything, including room noise." : `Push-to-talk on: hold Talk, or ${talkKeyHint()}.`);
   };
 
   const cycleSpeed = () => {
@@ -386,7 +386,7 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
           onPointerCancel={talkUp}
           onLostPointerCapture={talkUp}
           onContextMenu={(e) => e.preventDefault()}
-          title="Hold to talk (or hold Space)"
+          title={`Hold to talk (or ${talkKeyHint()})`}
         >
           <Microphone weight={voice.talking ? "fill" : "bold"} /> {voice.talking ? "Listening…" : "Hold to talk"}
         </button>
