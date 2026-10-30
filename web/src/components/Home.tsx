@@ -115,13 +115,14 @@ export function Home({ onOpen, onProgress }: { onOpen: (id: string) => void; onP
   };
 
   return (
-    <main className="home">
+    <main className="home home-board">
+      <ChalkFilter />
       <header className="home-head">
         <a className="wordmark" href="#/" aria-label="Shikshak home">
           <span className="wordmark-tile" aria-hidden="true">
             श
           </span>
-          Shikshak
+          <span className="chalk">Shikshak</span>
         </a>
         <button className="btn-primary" onClick={() => setCreating(newCode())} disabled={Boolean(learners?.length) && !current}>
           <Plus weight="bold" /> New session
@@ -173,23 +174,29 @@ export function Home({ onOpen, onProgress }: { onOpen: (id: string) => void; onP
         )}
       </section>
 
-      <h1 className="home-title">{learner ? `${learner.name}'s classes` : "Your classes"}</h1>
+      <h1 className="home-title chalk">{learner ? `${learner.name}'s classes` : "Your classes"}</h1>
 
       {Boolean(learners?.length) && !current ? (
         <section className="home-empty">
           <div>
-            <h2>Choose who's learning</h2>
+            <h2 className="chalk">Choose who's learning</h2>
             <p>Pick a name above (or add one) so classes and progress stay with the right person.</p>
           </div>
         </section>
       ) : sessions.length === 0 ? (
         <section className="home-empty">
           <div className="empty-board" aria-hidden="true">
-            <span>x² − 7x + 12 = 0</span>
-            <span>(x − 3)(x − 4) = 0</span>
+            <span className="chalk">x² − 7x + 12 = 0</span>
+            <span className="chalk empty-board-slip">
+              x(x − 3) + 4(x − 3) = 0
+              <svg className="chalk-circle" viewBox="0 0 200 60" preserveAspectRatio="none">
+                <path d="M8 34 C 10 12, 70 4, 118 7 C 168 10, 196 20, 192 36 C 188 52, 120 58, 70 55 C 28 52, 4 46, 12 26" />
+              </svg>
+            </span>
+            <span className="chalk empty-board-note">Step 2: −4, not +4</span>
           </div>
           <div>
-            <h2>Learn maths out loud</h2>
+            <h2 className="chalk">Learn maths out loud</h2>
             <p>
               Shikshak is a voice maths tutor for classes 8 to 12. It talks you through a topic in Hinglish, Hindi or English while writing on a shared
               chalkboard. You solve on the board, press Done, and it reads your handwritten steps and circles the one that went wrong.
@@ -212,7 +219,7 @@ export function Home({ onOpen, onProgress }: { onOpen: (id: string) => void; onP
                     {initial(s)}
                   </span>
                   <span className="session-text">
-                    <span className="session-name">{s.name}</span>
+                    <span className="session-name chalk">{s.name}</span>
                     <span className="session-meta">
                       {meta}
                       {LANGUAGE_STATUS[s.language] === "preview" && <span className="preview-tag">preview language</span>}
@@ -372,5 +379,22 @@ function AddLearner({ onDone }: { onDone: (l: Learner | null) => void }) {
       </div>
       {error && <p className="form-error">{error}</p>}
     </form>
+  );
+}
+
+/**
+ * The chalk look for the home board's headings: a little displacement for rough edges and a grain
+ * mask that leaves gaps, the way chalk skips over a board. Used by `.chalk` (see styles.css).
+ */
+function ChalkFilter() {
+  return (
+    <svg className="chalk-defs" aria-hidden="true" focusable="false">
+      <filter id="chalk-text" x="-5%" y="-10%" width="110%" height="120%" colorInterpolationFilters="sRGB">
+        <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="7" result="noise" />
+        <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.8" xChannelSelector="R" yChannelSelector="G" result="rough" />
+        <feColorMatrix in="noise" type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 4 -0.75" result="grain" />
+        <feComposite in="rough" in2="grain" operator="in" />
+      </filter>
+    </svg>
   );
 }

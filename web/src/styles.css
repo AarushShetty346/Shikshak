@@ -2544,3 +2544,299 @@ sub {
     font-size: 15px;
   }
 }
+
+/* ---------- Home: the blackboard ----------
+ * The home screen is a real board: green slate with chalk dust and eraser smudges, a wooden frame
+ * and chalk tray, headings in chalk (Kalam + the #chalk-text filter from Home.tsx). It is always a
+ * board, in light and dark mode. Body text stays in Mukta for reading, coloured like chalk.
+ */
+.home-board {
+  --bg: #1d3329;
+  --surface: rgb(255 255 255 / 0.045);
+  --surface-2: rgb(255 255 255 / 0.1);
+  --ink: #f1efe6;
+  --ink-soft: #c3cfc6;
+  --line: rgb(241 239 230 / 0.34);
+  --brand: #f6d77a;
+  --brand-ink: #1b2a23;
+  --accent: #f6d77a;
+  --accent-ink: #1b2a23;
+  --accent-soft: rgb(246 215 122 / 0.16);
+  --red: #ff9a8c;
+  --shadow: none;
+  --hand-radius: 22px 16px 24px 14px / 14px 24px 16px 22px;
+  color-scheme: dark;
+
+  position: relative;
+  box-sizing: border-box;
+  border: clamp(8px, 1.4vw, 16px) solid transparent;
+  border-color: #6b4a2b;
+  border-image: linear-gradient(90deg, #6b4a2b, #7d5735 22%, #66462a 41%, #80593a 63%, #6a482b 81%, #77522f) 1;
+  background-color: #1f372c;
+  background-image:
+    /* chalk dust grain */
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    /* old eraser smudges */
+    radial-gradient(ellipse 38% 16% at 22% 18%, rgb(241 239 230 / 0.07), transparent 70%),
+    radial-gradient(ellipse 30% 12% at 78% 64%, rgb(241 239 230 / 0.05), transparent 70%),
+    radial-gradient(ellipse 26% 10% at 35% 88%, rgb(241 239 230 / 0.04), transparent 70%),
+    /* the board's edges are darker */
+    radial-gradient(ellipse at 50% 40%, transparent 55%, rgb(0 0 0 / 0.38));
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.4), inset 0 8px 30px rgb(0 0 0 / 0.35);
+  padding-bottom: 96px;
+}
+
+body:has(.home-board) {
+  background: #5f4126;
+}
+
+/* The chalk tray along the bottom, with two sticks of chalk. */
+.home-board::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 18px;
+  background: linear-gradient(#8a6440, #5f4126 70%, #4a321d);
+  box-shadow: 0 -2px 6px rgb(0 0 0 / 0.35);
+}
+
+.home-board::before {
+  content: "";
+  position: absolute;
+  right: 14%;
+  bottom: 14px;
+  width: 52px;
+  height: 9px;
+  border-radius: 4px 5px 5px 4px;
+  background: linear-gradient(#ffffff, #e4e0d4);
+  box-shadow: -74px 1px 0 -1px #f6d77a;
+  transform: rotate(-3deg);
+  z-index: 1;
+}
+
+.chalk-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+/* Chalk lettering: hand font, a soft dusty glow, rough edges and gaps. */
+.home-board .chalk {
+  font-family: var(--font-hand);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--ink);
+  text-shadow:
+    0 0 1px rgb(241 239 230 / 0.55),
+    0 0 8px rgb(241 239 230 / 0.12);
+  filter: url(#chalk-text);
+}
+
+.home-board .wordmark {
+  font-size: 26px;
+}
+
+.home-board .wordmark .chalk {
+  font-weight: 700;
+}
+
+.home-board .wordmark-tile {
+  background: transparent;
+  border: 2px solid var(--chalk-yellow);
+  border-radius: 12px 9px 13px 8px;
+  color: var(--chalk-yellow);
+}
+
+.home-board .home-title {
+  font-size: clamp(38px, 6vw, 58px);
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.1;
+}
+
+/* A chalk underline under the title. */
+.home-board .home-title::after {
+  content: "";
+  display: block;
+  width: min(220px, 50%);
+  height: 6px;
+  margin-top: 6px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 220 6' preserveAspectRatio='none'%3E%3Cpath d='M2 4 C 50 1, 110 5, 160 2 S 210 3, 218 2' stroke='%23f6d77a' stroke-width='2.6' fill='none' stroke-linecap='round' opacity='0.85'/%3E%3C/svg%3E") no-repeat center / 100% 100%;
+  filter: url(#chalk-text);
+}
+
+/* Buttons: the main action is a stick of yellow chalk; the rest are outlined in chalk. */
+.home-board .btn-primary {
+  background: var(--chalk-yellow);
+  color: var(--brand-ink);
+  box-shadow: 0 2px 0 rgb(0 0 0 / 0.25);
+}
+
+.home-board .btn-primary:hover:not(:disabled) {
+  background: #fbe39b;
+}
+
+.home-board .btn-primary:disabled {
+  opacity: 0.45;
+}
+
+.home-board .btn-secondary {
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1.5px var(--line);
+}
+
+.home-board :focus-visible {
+  outline: 2px solid var(--chalk-yellow);
+  outline-offset: 3px;
+}
+
+/* Cards are areas drawn round in chalk, not white boxes. */
+.home-board .home-empty,
+.home-board .add-learner,
+.home-board .panel,
+.home-board .session-list {
+  background: var(--surface);
+  border: 2px solid var(--line);
+  border-radius: var(--hand-radius);
+  box-shadow: none;
+}
+
+.home-board .session-row + .session-row {
+  border-top: 1.5px dashed rgb(241 239 230 / 0.2);
+}
+
+.home-board .session-row:hover {
+  background: rgb(255 255 255 / 0.05);
+}
+
+.home-board .session-name {
+  font-size: 21px;
+  font-weight: 700;
+}
+
+.home-board .session-tile {
+  background: transparent;
+  border: 2px solid var(--chalk-yellow);
+  color: var(--chalk-yellow);
+  font-family: var(--font-hand);
+}
+
+.home-board .home-empty h2 {
+  font-size: 30px;
+}
+
+.home-board .home-empty p {
+  color: var(--ink-soft);
+}
+
+/* The example: chalk working with the slip circled in red, written straight on the board. */
+.home-board .home-empty {
+  grid-template-columns: 280px 1fr;
+}
+
+.home-board .empty-board,
+.home-board .session-tile,
+.home-board .wordmark-tile {
+  outline: none;
+}
+
+.home-board .empty-board {
+  background: none;
+  transform: rotate(-2deg);
+  padding: 8px 14px;
+  font-size: 20px;
+  gap: 16px;
+}
+
+.home-board .empty-board .chalk {
+  font-weight: 400;
+}
+
+.home-board .empty-board span:first-child {
+  color: var(--chalk-yellow);
+}
+
+.empty-board-slip {
+  position: relative;
+  white-space: nowrap;
+}
+
+.chalk-circle {
+  position: absolute;
+  top: -12px;
+  left: -22px;
+  width: calc(100% + 38px);
+  height: calc(100% + 24px);
+  overflow: visible;
+}
+
+.chalk-circle path {
+  fill: none;
+  stroke: var(--chalk-red);
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.home-board .empty-board .empty-board-note {
+  color: var(--chalk-red);
+  font-size: 16px;
+  padding-left: 6px;
+}
+
+/* Chips and fields in chalk. */
+.home-board .learner-chip {
+  background: transparent;
+  border-color: var(--line);
+  border-radius: 18px 14px 19px 13px / 13px 19px 14px 18px;
+}
+
+.home-board .learner-chip[aria-pressed="true"],
+.home-board .learner-chip[aria-selected="true"] {
+  border-color: var(--chalk-yellow);
+  background: rgb(246 215 122 / 0.12);
+  color: var(--chalk-yellow);
+}
+
+.home-board .field input,
+.home-board .field select {
+  background: rgb(0 0 0 / 0.2);
+  border-color: var(--line);
+}
+
+.home-board .field select option {
+  background: #1f372c;
+}
+
+/* Menus open over the board, so they need a solid background. */
+.home-board .menu.menu-light {
+  background: #2a463a;
+  border-color: var(--line);
+  box-shadow: 0 12px 30px rgb(0 0 0 / 0.45);
+}
+
+.home-board .home-foot {
+  margin-top: 48px;
+}
+
+.home-board .home-foot a {
+  color: var(--ink);
+  text-decoration-color: rgb(241 239 230 / 0.5);
+}
+
+@media (max-width: 640px) {
+  .home-board .home-empty {
+    grid-template-columns: 1fr;
+  }
+
+  .home-board .empty-board {
+    font-size: 19px;
+  }
+
+  .home-board::before {
+    right: 10%;
+  }
+}
