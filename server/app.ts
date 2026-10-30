@@ -7,6 +7,7 @@ import { isLanguage, type Language } from "../shared/types";
 import { issueTicket, redeemTicket, registerDevice, requireDevice, sameSecret } from "./auth";
 import { noteInterrupt } from "./board";
 import { config } from "./config";
+import { submitPaperWork } from "./paper";
 import { scanQuestion } from "./scan";
 import { allow, BusyError, chargeModelCall, QuotaError, withModelSlot } from "./limits";
 import {
@@ -328,6 +329,17 @@ export function createApp(opts: { devTools?: boolean; phoneProvider?: PhoneProvi
       console.error("[scan] failed", e.message);
       res.status(502).json({ error: "Couldn't read that photo just now. Try again." });
     }
+  });
+
+  // Paper mode: a photo of the student's working, pinned on the board and checked like a Done.
+  api.post("/sessions/:id/paper", big, (req, res) => {
+    const s = ownSession(req, res);
+    if (!s) return;
+    if (!allow(`done:${s.id}`, 20, 4)) return void res.status(429).json({ error: "Too many submissions in a short time. Wait a moment." });
+    const r = submitPaperWork(s, req.body?.file ?? {}, req.body?.captureId);
+    if (!r.ok) return void res.status(r.status).json({ error: r.error });
+    touch(s);
+    res.json({ ...r, docs: s.docs.map(docMeta) });
   });
 
   api.delete("/sessions/:id/documents/:docId", (req, res) => {

@@ -45,7 +45,7 @@ export type BlockEvent =
   /** Start a fresh page (new topic). Earlier pages stay above; the board scrolls to the new one. */
   | { type: "page"; id: string }
   /** A real page of the student's uploaded material, shown on the board with its source. */
-  | { type: "source"; id: string; label: string; docId: string; docName: string; page: number | null; caption: string }
+  | { type: "source"; id: string; label: string; docId: string; docName: string; page: number | null; caption: string; photo?: boolean }
   /** One rung of the hint ladder for the current question (nudge, hint, one worked step). */
   | { type: "hint"; id: string; label: string; questionId: string; level: HintLevel; rung: number; of: number; text: string };
 
@@ -56,14 +56,25 @@ export type BlockEvent =
 export type BoardEvent =
   | BlockEvent
   /** Point at something already on the board. line is 1-based within the block, or null for the whole block. */
-  | { type: "highlight"; id: string; target: string; line: number | null; style: MarkStyle; note: string }
+  | { type: "highlight"; id: string; target: string; line: number | null; style: MarkStyle; note: string; band?: { top: number; bottom: number } | null }
   /** Rub out a block (its space stays, so the student's writing never moves). */
   | { type: "erase"; target: string }
   /** The doubt is answered: continue writing what was paused. */
   | { type: "resume" }
   /** Circle a line of a capture the student sent. box is that line's place on the board (board units). */
-  | { type: "mark"; captureId: string; questionId: string | null; line: number; note: string; box: Box | null }
-  | { type: "correct"; captureId: string | null; questionId: string | null; note: string; box: Box | null };
+  | { type: "mark"; captureId: string; questionId: string | null; line: number; note: string; box: Box | null; on?: PhotoBand | null }
+  | { type: "correct"; captureId: string | null; questionId: string | null; note: string; box: Box | null; on?: PhotoBand | null };
+
+/**
+ * A strip of a photo on the board (block label, and its top and bottom as fractions of the photo's
+ * height). Marks on a photo of paper working use it instead of a board box: only the browser knows
+ * where the photo is laid out.
+ */
+export interface PhotoBand {
+  label: string;
+  top: number;
+  bottom: number;
+}
 
 /** Short-lived signals that are shown but never saved or replayed. */
 export type Signal =
@@ -79,6 +90,8 @@ export interface HighlightState {
   line: number | null;
   style: MarkStyle;
   note: string;
+  /** For a line of a photo: where that line is, as fractions of the photo's height. */
+  band?: { top: number; bottom: number } | null;
 }
 
 export interface MarkState {
@@ -87,6 +100,7 @@ export interface MarkState {
   line: number;
   note: string;
   box: Box | null;
+  on?: PhotoBand | null;
 }
 
 export interface CorrectState {
@@ -94,6 +108,7 @@ export interface CorrectState {
   questionId: string | null;
   note: string;
   box: Box | null;
+  on?: PhotoBand | null;
 }
 
 /** The whole board as the student sees it: what a reload or reconnect restores. */

@@ -45,6 +45,19 @@ export interface LookResult {
   line_source?: "engine" | "reader";
   /** The reader's line, when the engine overruled it. */
   reader_line?: number | null;
+  /** Photos only: each numbered line's [top, bottom] as fractions of the photo's height. */
+  line_boxes?: [number, number][];
+}
+
+/** Keeps only sensible [top, bottom] pairs, clamped to the photo. */
+export function cleanBoxes(raw: unknown): [number, number][] {
+  if (!Array.isArray(raw)) return [];
+  return raw.slice(0, 30).map((b) => {
+    const [a, c] = Array.isArray(b) ? b.map(Number) : [NaN, NaN];
+    const top = Math.min(1, Math.max(0, Number.isFinite(a) ? a : 0));
+    const bottom = Math.min(1, Math.max(top + 0.01, Number.isFinite(c) ? c : top + 0.05));
+    return [top, Math.min(1, bottom)] as [number, number];
+  });
 }
 
 const SCHEMA = {
@@ -62,6 +75,18 @@ const SCHEMA = {
     misconception_id: { type: "string" },
   },
 };
+
+/** A photo of paper working: the reader numbers the lines itself and says where each one is. */
+const PHOTO_SCHEMA = {
+  ...SCHEMA,
+  required: [...SCHEMA.required, "line_boxes"],
+  properties: {
+    ...SCHEMA.properties,
+    line_boxes: { type: "array", items: { type: "array", items: { type: "number" }, minItems: 2, maxItems: 2 }, maxItems: 30 },
+  },
+};
+
+const PHOTO_NOTE = `This is a PHOTO of the student's working on paper (a notebook or a sheet), not the board, so the lines have no numbers. Number the lines of working yourself from the top, starting at 1, skipping crossed-out lines, and use those numbers in reading and line. Also return line_boxes: for each numbered line, in order, [top, bottom] as fractions (0 to 1) of the photo's height. Ignore anything that isn't the student's working (page edges, printed text, fingers).`;
 
 const SYSTEM = `You are a patient class 10 maths teacher in India looking at what a student just wrote or drew on a shared blackboard during a live voice lesson.
 
@@ -87,6 +112,8 @@ Use what the student said aloud and the board context to understand what they me
 export async function lookAtWork(input: {
   png: string;
   lineCount: number;
+  /** A photo of paper working (see PHOTO_NOTE). */
+  photo?: boolean;
   problem: string | null;
   answer?: string;
   boardContext: string[];
@@ -95,22 +122,27 @@ export async function lookAtWork(input: {
   misconceptions?: { id: string; name: string }[];
 }): Promise<LookResult> {
   const result = await askJson<LookResult>({
-    system: SYSTEM.replace("{LANGUAGE}", languageName(input.language)),
+    system: SYSTEM.replace("{LANGUAGE}", languageName(input.language)).replace(
+      "The image shows only the student's own writing. Each handwritten line has a grey number in the left margin (1, 2, 3...).",
+      input.photo ? PHOTO_NOTE : "The image shows only the student's own writing. Each handwritten line has a grey number in the left margin (1, 2, 3...).",
+    ),
     effort: "low",
-    schema: SCHEMA,
+    schema: input.photo ? PHOTO_SCHEMA : SCHEMA,
     attachments: [dataUrlToAttachment(input.png)],
     text: [
       input.problem ? `Current problem: ${input.problem}` : "No problem was set; the student may be asking something.",
       input.answer ? `Expected final answer: ${input.answer}` : "",
       input.boardContext.length ? `Tutor's recent board lines: ${input.boardContext.join(" | ")}` : "",
       input.studentSaid ? `The student said: "${input.studentSaid}"` : "",
-      `The student has written ${input.lineCount} line(s).`,
+      input.photo ? "Count the lines in the photo yourself." : `The student has written ${input.lineCount} line(s).`,
       input.misconceptions?.length ? `Known misconceptions for this topic (id: description): ${input.misconceptions.map((m) => `${m.id}: ${m.name}`).join("; ")}` : "No misconception list for this topic: use \"none\".",
     ]
       .filter(Boolean)
       .join("\n"),
   });
-  if (result.line !== null && (result.line < 1 || result.line > input.lineCount)) result.line = null;
+  const count = input.photo ? Math.max(result.line_boxes?.length ?? 0, readingLines(result.reading).length) : input.lineCount;
+  if (result.line !== null && (result.line < 1 || result.line > count)) result.line = null;
+  if (input.photo) result.line_boxes = cleanBoxes(result.line_boxes);
   return result;
 }
 
@@ -119,7 +151,21 @@ export async function lookAtWork(input: {
  * Everything it says is labelled as simulated, so it can't be mistaken for a real check on camera.
  */
 export const SIMULATED = "Simulated check (no handwriting reader on this server):";
-function fakeLook(lineCount: number): LookResult {
+function fakeLook(lineCount: number, photo = false): LookResult {
+  if (photo)
+    return {
+      kind: "working",
+      reading: "(simulated check)",
+      status: "mistake",
+      line: 2,
+      what_went_wrong: `${SIMULATED} line 2 of the photo is always circled.`,
+      say: "(Simulated check) Line 2 dobara dekho.",
+      line_boxes: [
+        [0.12, 0.28],
+        [0.34, 0.5],
+        [0.56, 0.72],
+      ],
+    };
   if (lineCount < 2)
     return { kind: "answer", reading: "1) (simulated)", status: "correct", line: null, what_went_wrong: `${SIMULATED} marked correct.`, say: "(Simulated check) Bilkul sahi!" };
   return {
@@ -253,7 +299,7 @@ function expectedAnswer(s: Session): string | undefined {
 
 /** Analysis for this capture in its current context, shared by everyone who asks for the same thing. */
 export function analyze(s: Session, capture: Capture, studentSaid?: string): Promise<LookResult> {
-  if (!capture.png || capture.lineCount === 0) return Promise.resolve(EMPTY_LOOK);
+  if (!capture.png || (capture.lineCount === 0 && !capture.photo)) return Promise.resolve(EMPTY_LOOK);
   const key = analysisKey(s, capture, studentSaid);
   const cached = s.analyses.get(key);
   if (cached) return cached;
@@ -261,12 +307,13 @@ export function analyze(s: Session, capture: Capture, studentSaid?: string): Pro
   const answer = expectedAnswer(s);
   const misconceptions = candidates(s);
   const job = (async () => {
-    if (!hasModel()) return verifyReading(s, fakeLook(capture.lineCount), capture.lineCount);
+    if (!hasModel()) return verifyReading(s, fakeLook(capture.lineCount, Boolean(capture.photo)), capture.photo ? undefined : capture.lineCount);
     chargeModelCall(s.deviceId, "check");
     const read = await withModelSlot(() =>
       lookAtWork({
         png: capture.png!,
         lineCount: capture.lineCount,
+        photo: Boolean(capture.photo),
         problem: problem?.text ?? null,
         answer,
         boardContext: s.recentBoard,
@@ -275,7 +322,7 @@ export function analyze(s: Session, capture: Capture, studentSaid?: string): Pro
         misconceptions,
       }),
     );
-    return verifyReading(s, read, capture.lineCount);
+    return verifyReading(s, read, capture.photo ? undefined : capture.lineCount);
   })();
   s.analyses.set(key, job);
   // A failed analysis shouldn't stay cached; the next request retries.
@@ -287,7 +334,12 @@ export function analyze(s: Session, capture: Capture, studentSaid?: string): Pro
 /** True if this capture is still the student's latest answer to the question on the board now. */
 export function isCurrent(s: Session, capture: Capture): boolean {
   if ((capture.questionId ?? null) !== (s.problem?.id ?? null)) return false;
-  for (const c of s.captures.values()) if (c.questionId === capture.questionId && c.at > capture.at && c.lineCount > 0) return false;
+  for (const c of s.captures.values()) {
+    if (c.questionId !== capture.questionId || c.at <= capture.at) continue;
+    // A photo of paper working is replaced only by work handed in later (a Done or another photo),
+    // not by the board snapshot the tutor asks for when she looks.
+    if (capture.photo ? c.photo || (c.reason === "done" && c.lineCount > 0) : c.lineCount > 0 || c.photo) return false;
+  }
   return true;
 }
 
@@ -297,6 +349,15 @@ export function isCurrent(s: Session, capture: Capture): boolean {
  */
 export function publishResult(s: Session, capture: Capture, result: LookResult): boolean {
   if (!isCurrent(s, capture)) return false;
+  // A photo of paper working: remember where its lines are, and mark on the photo itself.
+  const photo = capture.photo?.label;
+  const boxes = photo ? (result.line_boxes ?? []) : [];
+  if (photo && boxes.length) s.photoLines = { ...(s.photoLines ?? {}), [photo]: boxes };
+  const band = (line: number | null) => {
+    if (!photo) return null;
+    const b = line ? boxes[line - 1] : boxes.at(-1);
+    return b ? { label: photo, top: b[0], bottom: b[1] } : { label: photo, top: 0, bottom: 1 };
+  };
   if ((result.status === "mistake" || result.status === "unreadable") && result.line) {
     emit(s, {
       type: "mark",
@@ -304,10 +365,18 @@ export function publishResult(s: Session, capture: Capture, result: LookResult):
       questionId: capture.questionId,
       line: result.line,
       note: result.status === "unreadable" ? "Can't read this line" : result.what_went_wrong,
-      box: capture.lines[result.line - 1] ?? null,
+      box: photo ? null : (capture.lines[result.line - 1] ?? null),
+      ...(photo ? { on: band(result.line) } : {}),
     });
   } else if (result.status === "correct") {
-    emit(s, { type: "correct", captureId: capture.id, questionId: capture.questionId, note: result.what_went_wrong, box: capture.lines[capture.lines.length - 1] ?? null });
+    emit(s, {
+      type: "correct",
+      captureId: capture.id,
+      questionId: capture.questionId,
+      note: result.what_went_wrong,
+      box: photo ? null : (capture.lines[capture.lines.length - 1] ?? null),
+      ...(photo ? { on: band(null) } : {}),
+    });
   }
   return true;
 }

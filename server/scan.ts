@@ -7,7 +7,8 @@ import { randomUUID } from "node:crypto";
 import { newQuestionId } from "./board";
 import { chargeModelCall, withModelSlot } from "./limits";
 import { askJson, hasModel } from "./llm";
-import { addDocs, type UploadedFile } from "./material";
+import type { UploadedFile } from "./material";
+import { isPhoto, keepPhoto, pinPhoto } from "./paper";
 import { emit, nextLabel, recordBlock, save, type Session } from "./sessions";
 import { solutionFor } from "./teaching";
 import { describeAnswer } from "./maths/answers";
@@ -39,9 +40,9 @@ export type ScanResult = { ok: true; questions: string[]; placed: string | null;
 
 export async function scanQuestion(s: Session, file: UploadedFile): Promise<ScanResult> {
   if (!hasModel()) return { ok: false, status: 503, error: "The question reader isn't set up on this server (no GEMINI_API_KEY or ANTHROPIC_API_KEY)." };
-  if (typeof file?.mediaType !== "string" || !file.mediaType.startsWith("image/")) return { ok: false, status: 400, error: "Take a photo (JPG, PNG or WebP) of the question." };
+  if (!isPhoto(file)) return { ok: false, status: 400, error: "Take a photo (JPG, PNG or WebP) of the question." };
   // Keep the photo with the class first: it's checked like any upload, and the tutor can read it later.
-  const stored = addDocs(s, [{ ...file, name: typeof file.name === "string" && file.name ? file.name : "Notebook question" }]);
+  const stored = keepPhoto(s, file, "Question from your notebook");
   if (stored.error) return { ok: false, status: 400, error: stored.error };
 
   chargeModelCall(s.deviceId, "material");
@@ -64,6 +65,9 @@ export async function scanQuestion(s: Session, file: UploadedFile): Promise<Scan
     )
     .filter(Boolean);
   if (!questions.length) return { ok: true, questions: [], placed: null, readable: read.readable, note: read.note || "No question could be read in that photo.", checked: false };
+
+  // The photo itself goes on the board, so the student sees exactly what was read.
+  pinPhoto(s, stored.docId, "Question from your notebook", "the question, as you wrote it");
 
   // The first question becomes the student's current question, like give_problem.
   const text = questions[0];
