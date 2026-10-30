@@ -16,7 +16,7 @@ import { allow } from "./limits";
 import { analyze, canLook, EMPTY_LOOK, isCurrent, publishResult } from "./look";
 import { readMaterial, showPage } from "./material";
 import { endPhoneCall, phoneAnswer, phoneOptOut, phoneQuestion } from "./phone";
-import { awaitCapture, boardMap, emit, nextLabel, recordBlock, resolve, signal, touch, type Session } from "./sessions";
+import { awaitCapture, boardMap, emit, nextLabel, recordBlock, resolve, signal, touch, type Capture, type Session } from "./sessions";
 import { afterReview, revealsAnswer, teachingTools } from "./teaching";
 
 type Params = Record<string, unknown>;
@@ -74,13 +74,16 @@ async function lookAtBoard(req: Request, res: Response) {
   // Ask the browser for the student's latest work, and wait for that exact reply. Older work is never graded instead.
   const requestId = `r_${randomId(9)}`;
   signal(s, { type: "checking", requestId });
-  const capture = await awaitCapture(s, requestId);
+  const fromBoard = await awaitCapture(s, requestId);
+  // A photo of paper working counts as the latest work when nothing newer was handed in on the board.
+  const photo = latestPhotoWork(s);
+  const capture = photo && (!fromBoard?.png || fromBoard.lineCount === 0 || photo.at >= lastBoardDone(s)) ? photo : fromBoard;
 
   if (!capture) {
     signal(s, { type: "unclear", note: "Couldn't get your latest work" });
     return void res.json({ ...EMPTY_LOOK, ok: false, note: "The student's screen didn't send their work in time. Ask them to press Done, or to read it aloud." });
   }
-  if (!capture.png || capture.lineCount === 0) {
+  if (!capture.png || (capture.lineCount === 0 && !capture.photo)) {
     signal(s, { type: "unclear", note: "Nothing new written yet" });
     return void res.json({
       ...EMPTY_LOOK,
@@ -110,6 +113,18 @@ async function lookAtBoard(req: Request, res: Response) {
     signal(s, { type: "unclear", note: "Couldn't read the board" });
     res.json({ ok: false, error: e.name === "QuotaError" || e.name === "BusyError" ? e.message : "Could not read the board right now. Ask the student to read their work aloud instead." });
   }
+}
+
+/** The newest photo of paper working sent for the question on the board now. */
+function latestPhotoWork(s: Session): Capture | null {
+  const q = s.problem?.id ?? null;
+  return [...s.captures.values()].filter((c) => c.photo && c.png && c.questionId === q).at(-1) ?? null;
+}
+
+/** When the student last pressed Done on board work for this question. */
+function lastBoardDone(s: Session): number {
+  const q = s.problem?.id ?? null;
+  return Math.max(0, ...[...s.captures.values()].filter((c) => !c.photo && c.reason === "done" && c.lineCount > 0 && c.questionId === q).map((c) => c.at));
 }
 
 function showSection(s: Session, pick: number | "next") {

@@ -21,9 +21,10 @@ import { Board, type BoardStatus, type Submission, type TutorBlock } from "./Boa
 import { DevPanel } from "./DevPanel";
 import { talkKey, talkKeyHint } from "../lib/pushToTalk";
 import { QuestionBar, QuickCheck } from "./ClassTools";
+import { CLASS_TOUR, Tour, tourDue } from "./Tour";
 import { ReportCard } from "./ReportCard";
 import { VoiceOrb, type VoiceState } from "./VoiceOrb";
-import { ArrowLeft, ChartBar, FileText, Scan, HandPalm, List, Microphone, MicrophoneSlash, Pause, PencilSimpleLine, Play, Question, SignOut, UploadSimple } from "@phosphor-icons/react";
+import { ArrowLeft, Camera, ChartBar, FileText, Scan, Signpost, HandPalm, List, Microphone, MicrophoneSlash, Pause, PencilSimpleLine, Play, Question, SignOut, UploadSimple } from "@phosphor-icons/react";
 
 function toBlock(e: BlockEvent & { erased?: boolean }, instant: boolean): TutorBlock {
   switch (e.type) {
@@ -40,7 +41,7 @@ function toBlock(e: BlockEvent & { erased?: boolean }, instant: boolean): TutorB
     case "page":
       return { kind: "page", id: e.id, instant };
     case "source":
-      return { kind: "source", id: e.id, label: e.label, docId: e.docId, docName: e.docName, page: e.page, caption: e.caption, instant };
+      return { kind: "source", id: e.id, label: e.label, docId: e.docId, docName: e.docName, page: e.page, caption: e.caption, photo: e.photo, instant };
     case "hint":
       return { kind: "hint", id: e.id, label: e.label, level: e.level, rung: e.rung, of: e.of, text: e.text, instant };
   }
@@ -68,6 +69,15 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
   const [speed, setSpeed] = useState<Speed>(initial.speed);
   const [handsFree, setHandsFree] = useState(initial.handsFree);
   const [menuOpen, setMenuOpen] = useState(false);
+  // The first class on this device starts with a guided tour of the board.
+  const [touring, setTouring] = useState(false);
+  useEffect(() => {
+    if (!serverId || !tourDue("class")) return;
+    const t = setTimeout(() => setTouring(true), 900);
+    return () => clearTimeout(t);
+  }, [serverId]);
+  /** The student stopped the teacher to ask something; over when she carries on (continue_lesson). */
+  const [doubt, setDoubt] = useState(false);
   const [started, setStarted] = useState(meta.started);
   const [uploading, setUploading] = useState(false);
   const [showReport, setShowReport] = useState<"view" | "end" | null>(null);
@@ -151,7 +161,12 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
       if (e.type === "problem" || (e.type === "write" && e.style === "your_turn")) setStatus("idle");
       if (e.type === "mark") setStatus("idle");
       if (e.type === "correct") setStatus("correct");
-      if (e.type === "resume") setResumeTick((n) => n + 1);
+      if (e.type === "resume") {
+        setResumeTick((n) => n + 1);
+        setDoubt(false);
+      }
+      // A new question: the last one's feedback card is done with.
+      if (e.type === "problem" || (e.type === "write" && e.style === "your_turn")) setSubmission((cur) => (cur.state === "done" || cur.state === "stale" || cur.state === "failed" ? { captureId: null, state: "idle" } : cur));
       setBoard(next);
       return "ok";
     },
@@ -244,6 +259,7 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
 
   const stopTeacher = () => {
     setHoldTick((n) => n + 1);
+    setDoubt(true);
     send({ kind: "interrupt", reason: "doubt" });
     voice.askDoubt();
   };
@@ -254,6 +270,7 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
     if (!active || handsFree) return;
     if (voice.volume > 0.03) {
       setHoldTick((n) => n + 1); // interrupting her: pause the half-written board
+      setDoubt(true);
       send({ kind: "interrupt", reason: "speech" });
     }
     voice.talk(true);
@@ -284,7 +301,10 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
   }, [talkDown, talkUp]);
   // Leaving a live call (Pause, call end) always closes the mic.
   useEffect(() => {
-    if (!active) talkUp();
+    if (!active) {
+      talkUp();
+      setDoubt(false);
+    }
   }, [active, talkUp]);
 
   const toggleHandsFree = () => {
@@ -341,7 +361,44 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
     }
   };
 
-  // ---------- scan a question from the notebook ----------
+  // ---------- paper mode: photos from the notebook ----------
+  // For students without a stylus: send a photo of your working (pinned on the board and checked like
+  // Done), or of a question (copied out and put on the board).
+  const workInput = useRef<HTMLInputElement>(null);
+  const [paperOpen, setPaperOpen] = useState(false);
+  useEffect(() => {
+    if (!paperOpen) return;
+    const close = (e: Event) => {
+      if (e instanceof KeyboardEvent ? e.key === "Escape" : !(e.target as Element | null)?.closest(".paper-menu, .paper-pop")) setPaperOpen(false);
+    };
+    window.addEventListener("pointerdown", close);
+    window.addEventListener("keydown", close);
+    return () => {
+      window.removeEventListener("pointerdown", close);
+      window.removeEventListener("keydown", close);
+    };
+  }, [paperOpen]);
+  const sendWork = async (list: FileList | null) => {
+    const file = list?.[0];
+    if (!file || !serverId) return;
+    const captureId = crypto.randomUUID();
+    clearTimeout(submitTimer.current);
+    setSubmission({ captureId, state: "submitting" });
+    try {
+      const prepared = { ...(await prepareFile(file)), id: `paper-${crypto.randomUUID().slice(0, 8)}` };
+      // Saved on this device first, so the photo shows on the board as soon as the server pins it.
+      await putDoc({ sessionId, docId: prepared.id, name: "Your working", mediaType: prepared.mediaType, data: prepared.data, pages: prepared.pages });
+      const r = await apiFetch<{ docs: DocMeta[] }>(`/sessions/${serverId}/paper`, { body: { file: prepared, captureId } });
+      setDocs(r.docs);
+      saveData(sessionId, { docs: r.docs });
+      if (active) voice.sendDone(); // the tutor looks at it, as after Done
+    } catch (e) {
+      setSubmission((cur) => (cur.captureId === captureId ? { ...cur, state: "failed", summary: (e as Error).message } : cur));
+    } finally {
+      if (workInput.current) workInput.current.value = "";
+    }
+  };
+
   const scanInput = useRef<HTMLInputElement>(null);
   const [scanning, setScanning] = useState(false);
   const scan = async (list: FileList | null) => {
@@ -349,9 +406,9 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
     if (!file || !serverId) return;
     setScanning(true);
     try {
-      const prepared = { ...(await prepareFile(file)), id: crypto.randomUUID().slice(0, 8) };
+      const prepared = { ...(await prepareFile(file)), id: `paper-${crypto.randomUUID().slice(0, 8)}` };
+      await putDoc({ sessionId, docId: prepared.id, name: "Question from your notebook", mediaType: prepared.mediaType, data: prepared.data, pages: prepared.pages });
       const r = await apiFetch<{ questions: string[]; placed: string | null; note: string; checked: boolean; docs: DocMeta[] }>(`/sessions/${serverId}/scan`, { body: { file: prepared } });
-      await putDoc({ sessionId, docId: prepared.id, name: prepared.name, mediaType: prepared.mediaType, data: prepared.data, pages: prepared.pages });
       setDocs(r.docs);
       saveData(sessionId, { docs: r.docs });
       // Tell the tutor (keypad 4, as for any upload): she reads the photo and can help with it.
@@ -381,6 +438,18 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
     const id = setInterval(() => tick((n) => n + 1), 300);
     return () => clearInterval(id);
   }, [active]);
+  // Which moment of the class this is, so the student always knows what's happening.
+  const questionOpen = Boolean(snapshot.question && snapshot.correct?.questionId !== snapshot.question.id);
+  const moment =
+    status === "checking" || submission.state === "submitting" || submission.state === "reviewing"
+      ? { key: "checking", label: "Checking your work" }
+      : doubt && active
+        ? { key: "doubt", label: "Your doubt" }
+        : questionOpen
+          ? { key: "turn", label: "Your turn" }
+          : active
+            ? { key: "teaching", label: "Teaching" }
+            : null;
   const orb: VoiceState =
     voice.state === "connecting" || voice.state === "ringing"
       ? "connecting"
@@ -424,9 +493,18 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
           <HandPalm /> Stop
         </button>
       )}
-      <button onClick={() => scanInput.current?.click()} disabled={scanning || !serverId} aria-label="Scan a question" title="Photograph a question from your notebook and put it on the board">
-        {scanning ? <span className="spin" /> : <Scan />}
-      </button>
+      <div className="paper-menu">
+        <button
+          onClick={() => setPaperOpen((o) => !o)}
+          disabled={scanning || !serverId}
+          aria-label="From paper"
+          aria-haspopup="menu"
+          aria-expanded={paperOpen}
+          title="Working on paper? Send a photo"
+        >
+          {scanning ? <span className="spin" /> : <Camera />}
+        </button>
+      </div>
       <button onClick={() => fileInput.current?.click()} disabled={uploading || !serverId} aria-label="Upload material" title="Upload a PDF or photos of your book or notes">
         {uploading ? <span className="spin" /> : <UploadSimple />}
       </button>
@@ -478,6 +556,11 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
       />
 
       <div className="session-menu">
+        {moment && (
+          <span className="moment-chip" data-moment={moment.key} role="status" aria-live="polite">
+            {moment.label}
+          </span>
+        )}
         <button className="menu-button" onClick={() => setMenuOpen((o) => !o)} aria-expanded={menuOpen} aria-label="Session menu">
           <List className="menu-icon" />
           <span className="menu-name">{meta.name}</span>
@@ -521,6 +604,15 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
             </button>
             <button
               role="menuitem"
+              onClick={() => {
+                setMenuOpen(false);
+                setTouring(true);
+              }}
+            >
+              <Signpost /> Show me around
+            </button>
+            <button
+              role="menuitem"
               disabled={!serverId}
               onClick={() => {
                 setMenuOpen(false);
@@ -553,7 +645,31 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
       <VoiceOrb state={orb} level={orb === "teacher" ? Math.min(1, voice.volume * 3) : orb === "student" ? mic : 0} />
 
       <input ref={fileInput} type="file" accept="application/pdf,image/*" multiple hidden onChange={(e) => void upload(e.target.files)} />
-      <input ref={scanInput} type="file" accept="image/*" capture="environment" hidden onChange={(e) => void scan(e.target.files)} />
+      <input ref={scanInput} type="file" accept="image/*" capture="environment" hidden data-paper="question" onChange={(e) => void scan(e.target.files)} />
+      <input ref={workInput} type="file" accept="image/*" capture="environment" hidden data-paper="work" onChange={(e) => void sendWork(e.target.files)} />
+    {paperOpen && (
+      <div className="menu paper-pop" role="menu">
+        <p className="paper-pop-title">Working on paper?</p>
+        <button
+          role="menuitem"
+          onClick={() => {
+            setPaperOpen(false);
+            workInput.current?.click();
+          }}
+        >
+          <Camera /> <span><strong>Send my working</strong><small>A photo of your steps. Your teacher checks it like Done.</small></span>
+        </button>
+        <button
+          role="menuitem"
+          onClick={() => {
+            setPaperOpen(false);
+            scanInput.current?.click();
+          }}
+        >
+          <Scan /> <span><strong>Add a question</strong><small>A photo of a question from your book or notebook.</small></span>
+        </button>
+      </div>
+    )}
       {setupError && (
         <div className="toast" role="alert">
           {setupError}
@@ -565,6 +681,7 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
         </div>
       )}
       {serverId && <QuestionBar serverId={serverId} snapshot={snapshot} onToast={showToast} />}
+      {touring && <Tour name="class" steps={CLASS_TOUR} onClose={() => setTouring(false)} />}
       {serverId && <QuickCheck serverId={serverId} snapshot={snapshot} onToast={showToast} />}
       {showReport && serverId && (
         <ReportCard

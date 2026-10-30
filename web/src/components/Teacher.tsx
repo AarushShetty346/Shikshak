@@ -4,7 +4,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Copy, Trash } from "@phosphor-icons/react";
 import { apiFetch } from "../lib/api";
-import { ChalkFilter } from "./Chalk";
 import { ModeToggle, type Mode } from "./ModeToggle";
 import { STATUS_LABEL, type Memory, type Report } from "../lib/learners";
 
@@ -113,7 +112,6 @@ export function TeacherView({ onSwitchMode }: { onBack: () => void; onSwitchMode
 
   return (
     <main className="home home-board teacher-board">
-      <ChalkFilter />
       <header className="home-head">
         <div className="home-head-left">
           <span className="wordmark">
@@ -212,7 +210,7 @@ function TeacherLearnerDetail({ learnerId, onBack }: { learnerId: string; onBack
       .catch((e: Error) => setError(e.message));
   }, [learnerId]);
   return (
-    <main className="home progress">
+    <main className="home home-board progress">
       <button className="back-link" onClick={onBack}>
         <ArrowLeft /> Students
       </button>

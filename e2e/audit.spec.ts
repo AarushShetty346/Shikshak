@@ -2,6 +2,16 @@
 // The tutor's tool calls are made directly, as the voice agent would; no provider is called.
 import { expect, test, type Page } from "@playwright/test";
 
+
+// These tests aren't about the first-time tour (its own test is in audit.spec.ts): mark it as seen.
+test.beforeEach(async ({ page }, info) => {
+  if (info.title.includes("guided tour")) return;
+  await page.addInitScript(() => {
+    localStorage.setItem("shikshak.tour.home.v1", "1");
+    localStorage.setItem("shikshak.tour.class.v1", "1");
+  });
+});
+
 async function openClass(page: Page, topic = "Quadratic equations") {
   await page.goto("/");
   await page.getByRole("button", { name: /New session/ }).first().click();
@@ -156,11 +166,59 @@ test("the Student / Teacher switch wipes the board and changes mode, both ways",
   await expect(page.getByRole("switch", { name: "Teacher mode" })).toHaveAttribute("aria-checked", "false");
 });
 
-test("Scan a question: the camera button is there, and says clearly when the reader isn't set up", async ({ page }) => {
+test("Scan a question: under From paper, and says clearly when the reader isn't set up", async ({ page }) => {
   await openClass(page);
-  const scan = page.getByRole("button", { name: "Scan a question" });
-  await expect(scan).toBeVisible();
+  await page.getByRole("button", { name: "From paper" }).click();
+  await expect(page.getByRole("menuitem", { name: /Add a question/ })).toBeVisible();
+  await page.keyboard.press("Escape");
   const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
-  await page.locator('input[type=file][capture="environment"]').setInputFiles({ name: "q.png", mimeType: "image/png", buffer: png });
+  await page.locator('input[data-paper="question"]').setInputFiles({ name: "q.png", mimeType: "image/png", buffer: png });
   await expect(page.getByText(/Couldn't scan it: .*isn't set up/)).toBeVisible();
+});
+
+test("Paper mode: a photo of my working is pinned on the board, checked, and marked on the photo", async ({ page }) => {
+  const id = await openClass(page);
+  await tool(page, "next_problem", { session_code: id, problem_id: "quad.fact.01" });
+  await page.getByRole("button", { name: "From paper" }).click();
+  await expect(page.getByRole("menuitem", { name: /Send my working/ })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.locator('input[data-paper="work"]').setInputFiles("e2e/paper-working.jpg");
+  const photo = page.locator(".photo-page");
+  await expect(photo.locator("img")).toBeVisible({ timeout: 15_000 });
+  await expect(photo).toContainText("Your working");
+  const card = page.locator(".submission");
+  await expect(card).toHaveAttribute("data-state", "done", { timeout: 20_000 });
+  await expect(card).toContainText("Simulated check");
+  // The circle sits on the photo.
+  const circle = page.locator(".mark-note");
+  await expect(circle).toBeVisible();
+  const [p, c] = [(await photo.boundingBox())!, (await circle.boundingBox())!];
+  expect(c.y).toBeGreaterThan(p.y);
+  expect(c.y).toBeLessThan(p.y + p.height);
+});
+
+test("guided tour: the first visit walks through the controls, once, and can be replayed", async ({ page }) => {
+  await page.goto("/");
+  const bubble = page.locator(".tour-bubble");
+  await expect(bubble).toContainText("Namaste", { timeout: 5000 });
+  await page.getByRole("button", { name: "Next" }).click();
+  await expect(bubble).toContainText("Student or Teacher");
+  await expect(page.locator(".tour-spot")).toBeVisible();
+  await page.getByRole("button", { name: "Skip tour" }).click();
+  await expect(page.locator(".tour")).toHaveCount(0);
+  await page.reload();
+  await page.waitForTimeout(1500);
+  await expect(page.locator(".tour")).toHaveCount(0);
+  // The first class has its own tour, ending with how a class goes.
+  await page.getByRole("button", { name: /New session/ }).first().click();
+  await page.getByPlaceholder("e.g. Quadratic equations").fill("Quadratic equations");
+  await page.getByRole("button", { name: "Create session" }).click();
+  await expect(bubble).toContainText("This is our blackboard", { timeout: 10_000 });
+  for (let i = 0; i < 12 && !(await bubble.textContent())?.includes("How we'll learn"); i++) await page.getByRole("button", { name: "Next" }).click();
+  await expect(bubble).toContainText("I explain on the board");
+  await page.getByRole("button", { name: "Let's start" }).click();
+  await expect(page.locator(".tour")).toHaveCount(0);
+  await page.getByRole("button", { name: "Session menu" }).click();
+  await page.getByRole("menuitem", { name: "Show me around" }).click();
+  await expect(bubble).toBeVisible();
 });

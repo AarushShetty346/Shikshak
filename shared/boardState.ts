@@ -51,18 +51,18 @@ export function applyEvent(snap: BoardSnapshot, e: BoardEvent, maxBlocks = 400):
   }
   switch (e.type) {
     case "highlight":
-      next.highlights = [...snap.highlights.filter((h) => h.id !== e.id), { id: e.id, target: e.target, line: e.line, style: e.style, note: e.note }].slice(-6);
+      next.highlights = [...snap.highlights.filter((h) => h.id !== e.id), { id: e.id, target: e.target, line: e.line, style: e.style, note: e.note, ...(e.band ? { band: e.band } : {}) }].slice(-6);
       return next;
     case "erase":
       next.blocks = snap.blocks.map((b) => (blockLabel(b) === e.target ? { ...b, erased: true } : b));
       next.highlights = snap.highlights.filter((h) => h.target !== e.target);
       return next;
     case "mark":
-      next.mark = { captureId: e.captureId, questionId: e.questionId, line: e.line, note: e.note, box: e.box };
+      next.mark = { captureId: e.captureId, questionId: e.questionId, line: e.line, note: e.note, box: e.box, ...(e.on ? { on: e.on } : {}) };
       next.correct = null;
       return next;
     case "correct":
-      next.correct = { captureId: e.captureId, questionId: e.questionId, note: e.note, box: e.box };
+      next.correct = { captureId: e.captureId, questionId: e.questionId, note: e.note, box: e.box, ...(e.on ? { on: e.on } : {}) };
       next.mark = null;
       return next;
     case "resume":

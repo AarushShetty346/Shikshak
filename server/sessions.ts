@@ -31,6 +31,8 @@ export interface Capture {
   at: number;
   /** Hash of the image only; analyses are cached by image + full question context (see look.ts). */
   hash: string;
+  /** A photo of working on paper (not the board): the board block it's pinned as. Its lines are found by the reader. */
+  photo?: { label: string };
 }
 
 /** The question the student is answering, with what only the teacher knows. */
@@ -132,6 +134,8 @@ export interface SessionRecord {
   used: string[];
   diagnostic: DiagnosticState | null;
   docsMeta: DocMeta[];
+  /** Photos of paper working on the board: each line's top and bottom (fractions of the photo's height), by block label. */
+  photoLines?: Record<string, [number, number][]>;
   /** Voice calls minted for this session (for estimates and limits). */
   calls: { id: string; startedAt: number; endedAt: number | null }[];
 }
@@ -179,6 +183,7 @@ function persisted(s: Session): SessionRecord {
     diagnostic: s.diagnostic,
     docsMeta: s.docs.length ? s.docs.map(docMeta) : s.docsMeta,
     calls: s.calls.slice(-50),
+    photoLines: s.photoLines,
   };
 }
 

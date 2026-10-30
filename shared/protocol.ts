@@ -113,7 +113,7 @@ const BlockSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("plan"), id, label: label.optional(), title: text(200), items: z.array(text(200)).max(12), ...erased }).strict(),
   z.object({ type: z.literal("page"), id, ...erased }).strict(),
   z
-    .object({ type: z.literal("source"), id, label, docId: id, docName: text(120), page: z.number().int().min(1).max(5000).nullable(), caption: text(120), ...erased })
+    .object({ type: z.literal("source"), id, label, docId: id, docName: text(120), page: z.number().int().min(1).max(5000).nullable(), caption: text(120), photo: z.boolean().optional(), ...erased })
     .strict(),
   z
     .object({
@@ -130,18 +130,32 @@ const BlockSchema = z.discriminatedUnion("type", [
     .strict(),
 ]);
 
+const fraction = z.number().min(0).max(1);
+const BandSchema = z.object({ label, top: fraction, bottom: fraction }).strict();
+
 const SnapshotSchema = z
   .object({
     v: z.literal(1),
     seq: z.number().int().min(0).max(10_000_000),
     blocks: z.array(BlockSchema).max(400),
     highlights: z
-      .array(z.object({ id, target: label, line: z.number().int().min(1).max(50).nullable(), style: z.enum(["underline", "circle", "box", "tick", "arrow"]), note: text(80) }).strict())
+      .array(
+        z
+          .object({
+            id,
+            target: label,
+            line: z.number().int().min(1).max(50).nullable(),
+            style: z.enum(["underline", "circle", "box", "tick", "arrow"]),
+            note: text(80),
+            band: z.object({ top: fraction, bottom: fraction }).strict().nullish(),
+          })
+          .strict(),
+      )
       .max(6),
     section: z.number().int().min(1).max(50).nullable(),
     question: z.object({ id, text: text(600) }).strict().nullable(),
-    mark: z.object({ captureId: id, questionId: id.nullable(), line: z.number().int().min(1).max(MAX_LINES), note: text(300), box: BoxSchema.nullable() }).strict().nullable(),
-    correct: z.object({ captureId: id.nullable(), questionId: id.nullable(), note: text(300), box: BoxSchema.nullable() }).strict().nullable(),
+    mark: z.object({ captureId: id, questionId: id.nullable(), line: z.number().int().min(1).max(MAX_LINES), note: text(300), box: BoxSchema.nullable(), on: BandSchema.nullish() }).strict().nullable(),
+    correct: z.object({ captureId: id.nullable(), questionId: id.nullable(), note: text(300), box: BoxSchema.nullable(), on: BandSchema.nullish() }).strict().nullable(),
   })
   .strict();
 

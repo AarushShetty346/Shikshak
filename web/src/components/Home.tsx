@@ -4,14 +4,14 @@
 // live in each row's menu. Several learners can share a device; each sees only their own classes.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Archive, ArrowCounterClockwise, ArrowsLeftRight, BookOpenText, ChartLineUp, DotsThree, PencilSimpleLine, Plus, Trash, UserPlus } from "@phosphor-icons/react";
+import { Archive, ArrowCounterClockwise, ArrowsLeftRight, BookOpenText, ChartLineUp, DotsThree, PencilSimpleLine, Plus, Signpost, Trash, UserPlus } from "@phosphor-icons/react";
 import { emptySnapshot } from "../../../shared/boardState";
 import { LANGUAGE_NAMES, LANGUAGE_STATUS, type Language } from "../../../shared/types";
 import { apiFetch } from "../lib/api";
 import { createLearner, listLearners, selectedLearner, selectLearner, type Learner } from "../lib/learners";
 import { deleteSession, listSessions, loadData, newCode, saveData, saveSession, updateSession, type SessionMeta } from "../lib/session";
-import { ChalkFilter } from "./Chalk";
 import { ModeToggle, type Mode } from "./ModeToggle";
+import { HOME_TOUR, Tour, tourDue } from "./Tour";
 import { Setup } from "./Setup";
 
 function ago(t: number): string {
@@ -99,6 +99,15 @@ export function Home({ onOpen, onProgress, onSwitchMode }: { onOpen: (id: string
     };
   }, [profileOpen]);
 
+  // The first time the home screen shows (not the profile picker), a short guided tour.
+  const pickerShown = learners !== null && (adding || (learners.length > 0 && (picking || !current)));
+  const [touring, setTouring] = useState(false);
+  useEffect(() => {
+    if (learners === null || pickerShown || creating || !tourDue("home")) return;
+    const t = setTimeout(() => setTouring(true), 700);
+    return () => clearTimeout(t);
+  }, [learners, pickerShown, creating]);
+
   const choose = (id: string) => {
     setCurrent(id);
     selectLearner(id);
@@ -157,11 +166,10 @@ export function Home({ onOpen, onProgress, onSwitchMode }: { onOpen: (id: string
   );
 
   // "Who's learning?": one chalk profile per learner, and one to add a learner.
-  if (learners !== null && (adding || (learners.length > 0 && (picking || !current)))) {
+  if (pickerShown) {
     return (
       <main className="home home-board profile-picker">
-        <ChalkFilter />
-        <header className="home-head">
+          <header className="home-head">
           <span className="wordmark">
             <span className="wordmark-tile" aria-hidden="true">
               श
@@ -210,7 +218,6 @@ export function Home({ onOpen, onProgress, onSwitchMode }: { onOpen: (id: string
 
   return (
     <main className="home home-board">
-      <ChalkFilter />
       <header className="home-head">
         <div className="home-head-left">
           <a className="wordmark" href="#/" aria-label="Shikshak home">
@@ -266,6 +273,15 @@ export function Home({ onOpen, onProgress, onSwitchMode }: { onOpen: (id: string
                     }}
                   >
                     <UserPlus /> Add learner
+                  </button>
+                  <button
+                    role="menuitem"
+                    onClick={() => {
+                      setProfileOpen(false);
+                      setTouring(true);
+                    }}
+                  >
+                    <Signpost /> Show me around
                   </button>
                 </div>
               )}
@@ -424,6 +440,7 @@ export function Home({ onOpen, onProgress, onSwitchMode }: { onOpen: (id: string
           </ul>
         </section>
       )}
+      {touring && <Tour name="home" steps={HOME_TOUR} onClose={() => setTouring(false)} />}
     </main>
   );
 }

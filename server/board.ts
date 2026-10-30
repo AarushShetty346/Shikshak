@@ -88,9 +88,12 @@ export function highlight(s: Session, p: Params): Reply {
   const target = parseTarget(p.target);
   const block = target && findBlock(s, target.label);
   if (!target || !block || block.erased) return { ok: false, error: `Name a block on the board, like "B2" or "B2 line 3". ${boardMap(s)}` };
-  const line = target.line && target.line <= block.lines ? target.line : null;
+  // On a photo of the student's paper working, "B5 line 2" points at that line of the photo.
+  const photoLines = s.photoLines?.[block.label];
+  const band = photoLines && target.line ? photoLines[target.line - 1] : undefined;
+  const line = band ? target.line : target.line && target.line <= block.lines ? target.line : null;
   const style = (MARKS.includes(str(p.style) as MarkStyle) ? str(p.style) : "underline") as MarkStyle;
-  emit(s, { type: "highlight", id: randomUUID(), target: block.label, line, style, note: str(p.note).slice(0, 60) });
+  emit(s, { type: "highlight", id: randomUUID(), target: block.label, line, style, note: str(p.note).slice(0, 60), ...(band ? { band: { top: band[0], bottom: band[1] } } : {}) });
   return { ok: true, note: `Marked ${block.label}${line ? ` line ${line}` : ""}. Refer to it as you speak ("yeh dekho...").` };
 }
 
