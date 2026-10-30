@@ -156,11 +156,33 @@ test("the Student / Teacher switch wipes the board and changes mode, both ways",
   await expect(page.getByRole("switch", { name: "Teacher mode" })).toHaveAttribute("aria-checked", "false");
 });
 
-test("Scan a question: the camera button is there, and says clearly when the reader isn't set up", async ({ page }) => {
+test("Scan a question: under From paper, and says clearly when the reader isn't set up", async ({ page }) => {
   await openClass(page);
-  const scan = page.getByRole("button", { name: "Scan a question" });
-  await expect(scan).toBeVisible();
+  await page.getByRole("button", { name: "From paper" }).click();
+  await expect(page.getByRole("menuitem", { name: /Add a question/ })).toBeVisible();
+  await page.keyboard.press("Escape");
   const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
-  await page.locator('input[type=file][capture="environment"]').setInputFiles({ name: "q.png", mimeType: "image/png", buffer: png });
+  await page.locator('input[data-paper="question"]').setInputFiles({ name: "q.png", mimeType: "image/png", buffer: png });
   await expect(page.getByText(/Couldn't scan it: .*isn't set up/)).toBeVisible();
+});
+
+test("Paper mode: a photo of my working is pinned on the board, checked, and marked on the photo", async ({ page }) => {
+  const id = await openClass(page);
+  await tool(page, "next_problem", { session_code: id, problem_id: "quad.fact.01" });
+  await page.getByRole("button", { name: "From paper" }).click();
+  await expect(page.getByRole("menuitem", { name: /Send my working/ })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.locator('input[data-paper="work"]').setInputFiles("e2e/paper-working.jpg");
+  const photo = page.locator(".photo-page");
+  await expect(photo.locator("img")).toBeVisible({ timeout: 15_000 });
+  await expect(photo).toContainText("Your working");
+  const card = page.locator(".submission");
+  await expect(card).toHaveAttribute("data-state", "done", { timeout: 20_000 });
+  await expect(card).toContainText("Simulated check");
+  // The circle sits on the photo.
+  const circle = page.locator(".mark-note");
+  await expect(circle).toBeVisible();
+  const [p, c] = [(await photo.boundingBox())!, (await circle.boundingBox())!];
+  expect(c.y).toBeGreaterThan(p.y);
+  expect(c.y).toBeLessThan(p.y + p.height);
 });

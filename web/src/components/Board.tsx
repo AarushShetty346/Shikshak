@@ -10,13 +10,13 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { diagramPieces, type Diagram } from "../../../shared/diagram";
 import { groupIntoLines, strokeBox } from "../../../shared/lines";
-import type { Box, ClientMessage, CorrectState, HighlightState, HintLevel, MarkState, Place, Point, SectionInfo, Stroke, WriteStyle } from "../../../shared/types";
+import type { Box, ClientMessage, CorrectState, HighlightState, HintLevel, MarkState, PhotoBand, Place, Point, SectionInfo, Stroke, WriteStyle } from "../../../shared/types";
 import { makeSnapshot } from "../lib/snapshot";
 import { getDoc } from "../lib/docStore";
 import { renderPdfPage } from "../lib/files";
 import { DiagramView, diagramHeight } from "./DiagramView";
 import { MathText } from "./MathText";
-import { ArrowCounterClockwise, ArrowDown, BookOpenText, Check, CheckCircle, Eraser, HandGrabbing, Lightbulb, PauseCircle, PencilSimple, SealCheck, Trash } from "@phosphor-icons/react";
+import { ArrowCounterClockwise, ArrowDown, BookOpenText, Camera, Check, CheckCircle, Eraser, HandGrabbing, Lightbulb, PauseCircle, PencilSimple, SealCheck, Trash } from "@phosphor-icons/react";
 
 const PAD_L = 38; // room for the student's line numbers
 const PAD_R = 22;
@@ -36,7 +36,7 @@ export type TutorBlock =
   | { kind: "problem"; id: string; label?: string; problem: string; questionKind?: "practice" | "diagnostic" | "transfer"; instant: boolean }
   | { kind: "plan"; id: string; label?: string; title: string; items: string[]; instant: boolean }
   | { kind: "page"; id: string; instant: boolean }
-  | { kind: "source"; id: string; label: string; docId: string; docName: string; page: number | null; caption: string; instant: boolean }
+  | { kind: "source"; id: string; label: string; docId: string; docName: string; page: number | null; caption: string; photo?: boolean; instant: boolean }
   | { kind: "hint"; id: string; label: string; level: HintLevel; rung: number; of: number; text: string; instant: boolean };
 
 /** Where the student's latest Done submission is. */
@@ -213,7 +213,7 @@ export function Board(props: Props) {
     }
   }
   const estimate = (b: TutorBlock, width: number) =>
-    b.kind === "draw" ? diagramHeight(b.diagram, width) + 40 : b.kind === "page" ? 40 : b.kind === "source" ? width * 0.9 : 60 + piecesOf(b) * 46;
+    b.kind === "draw" ? diagramHeight(b.diagram, width) + 40 : b.kind === "page" ? 40 : b.kind === "source" ? (b.photo ? width * 0.75 : width * 0.9) : 60 + piecesOf(b) * 46;
 
   // A block that is still being written stays below any ink the student has added since it arrived,
   // so the tutor never writes over the student's work (the student can't see a block's space
@@ -415,6 +415,13 @@ export function Board(props: Props) {
     const rects: Record<string, { x: number; y: number; w: number; h: number }> = {};
     for (const h of highlights) {
       const el = blockEls.current.get(h.target);
+      // A line of a photo of paper working: that strip of the picture.
+      const img = h.band ? (el?.querySelector("img") as HTMLElement | null) : null;
+      if (h.band && img) {
+        const r = img.getBoundingClientRect();
+        rects[h.id] = { x: r.left - pr.left, y: r.top - pr.top + r.height * h.band.top, w: r.width, h: r.height * (h.band.bottom - h.band.top) };
+        continue;
+      }
       const target = (h.line ? (el?.querySelector(`[data-line="${h.line}"]`) as HTMLElement | null) : null) ?? el;
       if (!target) continue;
       const r = target.getBoundingClientRect();
@@ -699,14 +706,28 @@ export function Board(props: Props) {
   };
 
   // ---------- marks on the student's work ----------
-  // The circle's position comes with the mark itself, so it reappears after a reload.
-  const markedLine = mark?.box ? { box: mark.box, index: mark.line } : undefined;
+  // The circle's position comes with the mark itself, so it reappears after a reload. On a photo of
+  // paper working it's a strip of the photo, measured where the photo is on screen now.
+  const [bandBoxes, setBandBoxes] = useState<{ mark: Box | null; correct: Box | null }>({ mark: null, correct: null });
+  useLayoutEffect(() => {
+    const page = pageRef.current;
+    if (!page || (!mark?.on && !correct?.on)) return setBandBoxes((b) => (b.mark || b.correct ? { mark: null, correct: null } : b));
+    const pr = page.getBoundingClientRect();
+    const boxOf = (on: PhotoBand | null | undefined): Box | null => {
+      const img = on ? (blockEls.current.get(on.label)?.querySelector("img") as HTMLElement | null) : null;
+      if (!on || !img || !scale) return null;
+      const r = img.getBoundingClientRect();
+      return { x: (r.left - pr.left) / scale, y: (r.top - pr.top + r.height * on.top) / scale, w: r.width / scale, h: (r.height * (on.bottom - on.top)) / scale };
+    };
+    setBandBoxes({ mark: boxOf(mark?.on), correct: boxOf(correct?.on) });
+  }, [mark, correct, layout, heights, view, scale]);
+  const markedLine = mark?.box ? { box: mark.box, index: mark.line } : mark && bandBoxes.mark ? { box: bandBoxes.mark, index: mark.line } : undefined;
   // Fade the circle once the student starts fixing their work.
   const markBase = useRef({ key: "", count: 0 });
   const markKey = mark ? `${mark.captureId}:${mark.line}` : "";
   if (markBase.current.key !== markKey) markBase.current = { key: markKey, count: strokes.length };
   const drewSinceMark = strokes.length > markBase.current.count;
-  const correctAt = correct?.box ?? null;
+  const correctAt = correct?.box ?? bandBoxes.correct;
 
   const erasedSet = useMemo(() => {
     const set = new Set(erased);
@@ -1060,6 +1081,15 @@ function SourcePage({ block, sessionCode }: { block: Extract<TutorBlock, { kind:
       cancelled = true;
     };
   }, [sessionCode, block.docId, block.page]);
+  if (block.photo)
+    return (
+      <figure className="photo-page" data-line={1}>
+        {src ? <img className="hl-text" src={src} alt={block.docName} /> : <div className="source-wait">{error ?? "Opening the photo…"}</div>}
+        <figcaption>
+          <Camera weight="bold" /> {block.docName}
+        </figcaption>
+      </figure>
+    );
   return (
     <figure className="source-page" data-line={1}>
       {src ? <img className="hl-text" src={src} alt={`${block.docName}${block.page ? `, page ${block.page}` : ""}`} /> : <div className="source-wait">{error ?? "Opening the page…"}</div>}

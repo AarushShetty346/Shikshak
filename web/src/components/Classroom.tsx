@@ -23,7 +23,7 @@ import { talkKey, talkKeyHint } from "../lib/pushToTalk";
 import { QuestionBar, QuickCheck } from "./ClassTools";
 import { ReportCard } from "./ReportCard";
 import { VoiceOrb, type VoiceState } from "./VoiceOrb";
-import { ArrowLeft, ChartBar, FileText, Scan, HandPalm, List, Microphone, MicrophoneSlash, Pause, PencilSimpleLine, Play, Question, SignOut, UploadSimple } from "@phosphor-icons/react";
+import { ArrowLeft, Camera, ChartBar, FileText, Scan, HandPalm, List, Microphone, MicrophoneSlash, Pause, PencilSimpleLine, Play, Question, SignOut, UploadSimple } from "@phosphor-icons/react";
 
 function toBlock(e: BlockEvent & { erased?: boolean }, instant: boolean): TutorBlock {
   switch (e.type) {
@@ -40,7 +40,7 @@ function toBlock(e: BlockEvent & { erased?: boolean }, instant: boolean): TutorB
     case "page":
       return { kind: "page", id: e.id, instant };
     case "source":
-      return { kind: "source", id: e.id, label: e.label, docId: e.docId, docName: e.docName, page: e.page, caption: e.caption, instant };
+      return { kind: "source", id: e.id, label: e.label, docId: e.docId, docName: e.docName, page: e.page, caption: e.caption, photo: e.photo, instant };
     case "hint":
       return { kind: "hint", id: e.id, label: e.label, level: e.level, rung: e.rung, of: e.of, text: e.text, instant };
   }
@@ -341,7 +341,44 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
     }
   };
 
-  // ---------- scan a question from the notebook ----------
+  // ---------- paper mode: photos from the notebook ----------
+  // For students without a stylus: send a photo of your working (pinned on the board and checked like
+  // Done), or of a question (copied out and put on the board).
+  const workInput = useRef<HTMLInputElement>(null);
+  const [paperOpen, setPaperOpen] = useState(false);
+  useEffect(() => {
+    if (!paperOpen) return;
+    const close = (e: Event) => {
+      if (e instanceof KeyboardEvent ? e.key === "Escape" : !(e.target as Element | null)?.closest(".paper-menu, .paper-pop")) setPaperOpen(false);
+    };
+    window.addEventListener("pointerdown", close);
+    window.addEventListener("keydown", close);
+    return () => {
+      window.removeEventListener("pointerdown", close);
+      window.removeEventListener("keydown", close);
+    };
+  }, [paperOpen]);
+  const sendWork = async (list: FileList | null) => {
+    const file = list?.[0];
+    if (!file || !serverId) return;
+    const captureId = crypto.randomUUID();
+    clearTimeout(submitTimer.current);
+    setSubmission({ captureId, state: "submitting" });
+    try {
+      const prepared = { ...(await prepareFile(file)), id: `paper-${crypto.randomUUID().slice(0, 8)}` };
+      // Saved on this device first, so the photo shows on the board as soon as the server pins it.
+      await putDoc({ sessionId, docId: prepared.id, name: "Your working", mediaType: prepared.mediaType, data: prepared.data, pages: prepared.pages });
+      const r = await apiFetch<{ docs: DocMeta[] }>(`/sessions/${serverId}/paper`, { body: { file: prepared, captureId } });
+      setDocs(r.docs);
+      saveData(sessionId, { docs: r.docs });
+      if (active) voice.sendDone(); // the tutor looks at it, as after Done
+    } catch (e) {
+      setSubmission((cur) => (cur.captureId === captureId ? { ...cur, state: "failed", summary: (e as Error).message } : cur));
+    } finally {
+      if (workInput.current) workInput.current.value = "";
+    }
+  };
+
   const scanInput = useRef<HTMLInputElement>(null);
   const [scanning, setScanning] = useState(false);
   const scan = async (list: FileList | null) => {
@@ -349,9 +386,9 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
     if (!file || !serverId) return;
     setScanning(true);
     try {
-      const prepared = { ...(await prepareFile(file)), id: crypto.randomUUID().slice(0, 8) };
+      const prepared = { ...(await prepareFile(file)), id: `paper-${crypto.randomUUID().slice(0, 8)}` };
+      await putDoc({ sessionId, docId: prepared.id, name: "Question from your notebook", mediaType: prepared.mediaType, data: prepared.data, pages: prepared.pages });
       const r = await apiFetch<{ questions: string[]; placed: string | null; note: string; checked: boolean; docs: DocMeta[] }>(`/sessions/${serverId}/scan`, { body: { file: prepared } });
-      await putDoc({ sessionId, docId: prepared.id, name: prepared.name, mediaType: prepared.mediaType, data: prepared.data, pages: prepared.pages });
       setDocs(r.docs);
       saveData(sessionId, { docs: r.docs });
       // Tell the tutor (keypad 4, as for any upload): she reads the photo and can help with it.
@@ -424,9 +461,18 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
           <HandPalm /> Stop
         </button>
       )}
-      <button onClick={() => scanInput.current?.click()} disabled={scanning || !serverId} aria-label="Scan a question" title="Photograph a question from your notebook and put it on the board">
-        {scanning ? <span className="spin" /> : <Scan />}
-      </button>
+      <div className="paper-menu">
+        <button
+          onClick={() => setPaperOpen((o) => !o)}
+          disabled={scanning || !serverId}
+          aria-label="From paper"
+          aria-haspopup="menu"
+          aria-expanded={paperOpen}
+          title="Working on paper? Send a photo"
+        >
+          {scanning ? <span className="spin" /> : <Camera />}
+        </button>
+      </div>
       <button onClick={() => fileInput.current?.click()} disabled={uploading || !serverId} aria-label="Upload material" title="Upload a PDF or photos of your book or notes">
         {uploading ? <span className="spin" /> : <UploadSimple />}
       </button>
@@ -553,7 +599,31 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
       <VoiceOrb state={orb} level={orb === "teacher" ? Math.min(1, voice.volume * 3) : orb === "student" ? mic : 0} />
 
       <input ref={fileInput} type="file" accept="application/pdf,image/*" multiple hidden onChange={(e) => void upload(e.target.files)} />
-      <input ref={scanInput} type="file" accept="image/*" capture="environment" hidden onChange={(e) => void scan(e.target.files)} />
+      <input ref={scanInput} type="file" accept="image/*" capture="environment" hidden data-paper="question" onChange={(e) => void scan(e.target.files)} />
+      <input ref={workInput} type="file" accept="image/*" capture="environment" hidden data-paper="work" onChange={(e) => void sendWork(e.target.files)} />
+    {paperOpen && (
+      <div className="menu paper-pop" role="menu">
+        <p className="paper-pop-title">Working on paper?</p>
+        <button
+          role="menuitem"
+          onClick={() => {
+            setPaperOpen(false);
+            workInput.current?.click();
+          }}
+        >
+          <Camera /> <span><strong>Send my working</strong><small>A photo of your steps. Your teacher checks it like Done.</small></span>
+        </button>
+        <button
+          role="menuitem"
+          onClick={() => {
+            setPaperOpen(false);
+            scanInput.current?.click();
+          }}
+        >
+          <Scan /> <span><strong>Add a question</strong><small>A photo of a question from your book or notebook.</small></span>
+        </button>
+      </div>
+    )}
       {setupError && (
         <div className="toast" role="alert">
           {setupError}
