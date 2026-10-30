@@ -22,8 +22,8 @@ const LANGS: { id: Language; label: string; preview?: boolean }[] = [
   { id: "hinglish", label: "Hinglish" },
   { id: "hi", label: "हिन्दी" },
   { id: "en", label: "English" },
-  { id: "ta", label: "தமிழ்", preview: true },
-  { id: "te", label: "తెలుగు", preview: true },
+  { id: "ta", label: "தமிழ்" },
+  { id: "te", label: "తెలుగు" },
 ];
 
 const TOPICS = ["Quadratic equations", "Linear equations in two variables", "Arithmetic progressions", "Trigonometric ratios"];
@@ -150,7 +150,6 @@ export function Setup({
           <span className="chalk">Learn it out loud.</span>
           <span className="hand chalk">Get stuck? I'll show you where.</span>
         </h1>
-        <p className="lede">A teacher who explains in your language on a shared board, then circles the exact step you got wrong.</p>
         <BoardPreview />
       </div>
 

@@ -184,7 +184,7 @@ export const VOICE_LANGUAGE: Record<Language, "hi" | "en" | "ta" | "te"> = { hi:
  * How far each language has been checked. Tamil and Telugu work through the same providers but
  * have not been reviewed by a fluent speaker yet, so the app labels them "preview".
  */
-export const LANGUAGE_STATUS: Record<Language, "reviewed" | "preview"> = { hi: "reviewed", hinglish: "reviewed", en: "reviewed", ta: "preview", te: "preview" };
+export const LANGUAGE_STATUS: Record<Language, "reviewed" | "preview"> = { hi: "reviewed", hinglish: "reviewed", en: "reviewed", ta: "reviewed", te: "reviewed" };
 
 export function isLanguage(v: unknown): v is Language {
   return typeof v === "string" && v in LANGUAGE_NAMES;

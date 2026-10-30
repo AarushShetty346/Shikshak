@@ -190,6 +190,13 @@ export function createApp(opts: { devTools?: boolean; phoneProvider?: PhoneProvi
     res.json(await checkProviders());
   });
 
+  // ---------- teacher mode access code ----------
+  app.post("/api/teacher/unlock", rateLimit((req) => `unlock:${ipOf(req)}`, 20, 20), express.json({ limit: "1kb" }), (req, res) => {
+    const code = typeof req.body?.code === "string" ? req.body.code.trim() : undefined;
+    if (!sameSecret(code, config.teacherAccessCode())) return void res.status(401).json({ error: "That code isn't right." });
+    res.json({ ok: true });
+  });
+
   // ---------- operator (ADMIN_TOKEN) ----------
   const admin = express.Router();
   admin.use(rateLimit((req) => `admin:${ipOf(req)}`, 30, 10));

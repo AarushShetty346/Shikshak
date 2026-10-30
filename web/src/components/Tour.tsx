@@ -1,9 +1,10 @@
 // A first-time guided tour, like a game's tutorial: the screen dims, one control is lit up at a
-// time, and the teacher explains it in a speech bubble (and reads it aloud with the browser's own
-// voice, which costs nothing). It runs once per device for each screen and can be replayed.
+// time, and the teacher explains it in a speech bubble. It runs once per device for each screen and
+// can be replayed. (No narration: the browser's voice didn't sound like the teacher, and Bolna's
+// voice only exists inside a paid call.)
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { ArrowLeft, ArrowRight, SpeakerHigh, SpeakerSlash } from "@phosphor-icons/react";
+import { ArrowLeft, ArrowRight } from "@phosphor-icons/react";
 
 export interface TourStep {
   /** CSS selector of the control to light up; none for a message in the middle of the screen. */
@@ -13,7 +14,6 @@ export interface TourStep {
 }
 
 const SEEN = (name: string) => `shikshak.tour.${name}.v1`;
-const MUTED = "shikshak.tour.muted";
 
 function read(key: string): string | null {
   try {
@@ -33,30 +33,15 @@ function write(key: string, value: string) {
 /** True if this tour hasn't been shown on this device yet. */
 export const tourDue = (name: string) => read(SEEN(name)) !== "1";
 
-/** The teacher's voice for the tour: the browser's speech, an Indian English voice if there is one. */
-function speak(text: string) {
-  if (typeof speechSynthesis === "undefined") return;
-  speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  const voices = speechSynthesis.getVoices();
-  const voice = voices.find((v) => /en-IN/i.test(v.lang)) ?? voices.find((v) => /hi-IN/i.test(v.lang)) ?? voices.find((v) => /^en/i.test(v.lang));
-  if (voice) u.voice = voice;
-  u.lang = voice?.lang ?? "en-IN";
-  u.rate = 0.95;
-  speechSynthesis.speak(u);
-}
-
 export function Tour({ name, steps, onClose }: { name: string; steps: TourStep[]; onClose: () => void }) {
   // Only steps whose control is on screen right now (a Talk button only exists during a call, etc.).
   const [live] = useState(() => steps.filter((s) => !s.target || document.querySelector(s.target)));
   const [i, setI] = useState(0);
-  const [muted, setMuted] = useState(() => read(MUTED) === "1");
   const [rect, setRect] = useState<DOMRect | null>(null);
   const nextRef = useRef<HTMLButtonElement>(null);
   const step = live[i];
 
   const close = useCallback(() => {
-    if (typeof speechSynthesis !== "undefined") speechSynthesis.cancel();
     write(SEEN(name), "1");
     onClose();
   }, [name, onClose]);
@@ -77,10 +62,8 @@ export function Tour({ name, steps, onClose }: { name: string; steps: TourStep[]
   }, [step]);
 
   useEffect(() => {
-    if (!step) return;
-    nextRef.current?.focus();
-    if (!muted) speak(`${step.title}. ${step.text}`);
-  }, [step, muted]);
+    if (step) nextRef.current?.focus();
+  }, [step]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -91,8 +74,6 @@ export function Tour({ name, steps, onClose }: { name: string; steps: TourStep[]
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [close, live.length]);
-
-  useEffect(() => () => void (typeof speechSynthesis !== "undefined" && speechSynthesis.cancel()), []);
 
   if (!step) return null;
   const last = i === live.length - 1;
@@ -118,19 +99,6 @@ export function Tour({ name, steps, onClose }: { name: string; steps: TourStep[]
             श
           </span>
           <h2 id="tour-title">{step.title}</h2>
-          <button
-            className="tour-mute"
-            aria-label={muted ? "Read it aloud" : "Stop reading aloud"}
-            aria-pressed={!muted}
-            onClick={() => {
-              const m = !muted;
-              setMuted(m);
-              write(MUTED, m ? "1" : "0");
-              if (m && typeof speechSynthesis !== "undefined") speechSynthesis.cancel();
-            }}
-          >
-            {muted ? <SpeakerSlash /> : <SpeakerHigh />}
-          </button>
         </div>
         <p className="tour-text" aria-live="polite">
           {step.text}

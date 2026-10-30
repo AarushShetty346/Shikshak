@@ -103,7 +103,7 @@ export async function mintVoice(s: Session, opts: { speed: Speed; resuming: bool
   if (!agentLanguages().includes(VOICE_LANGUAGE[s.language]))
     return {
       status: 409,
-      body: { error: `${LANGUAGE_NAMES[s.language]} voice isn't set up on this server yet (preview). The board still works; for a voice class, pick Hindi, Hinglish or English.` },
+      body: { error: `${LANGUAGE_NAMES[s.language]} voice isn't switched on on this server yet. The board still works; for a voice class, pick Hindi, Hinglish or English.` },
     };
   const agentId = agentForSpeed(opts.speed) ?? process.env.BOLNA_AGENT_ID!;
   const userData = buildUserData(s, opts);
