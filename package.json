@@ -16,6 +16,7 @@
     "bolna:tools": "tsx scripts/print-bolna-tools.ts",
     "bolna:setup": "tsx scripts/setup-bolna.ts",
     "eval:checker": "tsx scripts/eval-checker.ts",
+    "tour:voice": "tsx scripts/tour-voice.ts",
     "bolna:model": "tsx scripts/llm-model.ts",
     "bench:calls": "tsx scripts/bench/calls.ts",
     "bench:models": "tsx scripts/bench/models.ts",

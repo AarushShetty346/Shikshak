@@ -28,6 +28,8 @@ startSweeper();
 if (production) {
   const dist = path.join(root, "dist");
   app.use(express.static(dist, { index: false, maxAge: "1h" }));
+  // A tour clip that hasn't been recorded is a 404, not the page (the tour then stays silent).
+  app.use("/tour", (_req, res) => void res.status(404).end());
   app.use((req, res, next) => (req.method === "GET" ? res.sendFile(path.join(dist, "index.html")) : next()));
 } else {
   const { createServer: createVite } = await import("vite");
