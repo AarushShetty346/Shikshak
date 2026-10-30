@@ -111,12 +111,17 @@ test("BUG-09: Start with no voice on the server stays Start, never 'Paused' or '
   await expect(page.getByText("Paused", { exact: true })).toHaveCount(0);
 });
 
-test("BUG-03 + BUG-12: the quick check wants an expanded answer and shows an example of the right shape", async ({ page }) => {
-  await page.goto("/");
-  await page.getByRole("button", { name: /New session/ }).first().click();
-  await page.getByPlaceholder("e.g. Quadratic equations").fill("Quadratic equations");
-  await page.getByRole("button", { name: "Create session" }).click();
-  await page.getByRole("button", { name: "Start quick check" }).click();
+test("no quick-check pop-up when a new class opens", async ({ page }) => {
+  await openClass(page);
+  await page.waitForTimeout(1500);
+  await expect(page.getByText("New topic?")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Start quick check" })).toHaveCount(0);
+});
+
+test("BUG-03 + BUG-12: a quick check the tutor starts wants an expanded answer and shows an example of the right shape", async ({ page }) => {
+  const id = await openClass(page);
+  // The pop-up is gone; the voice tutor can still start one if the student asks to be tested.
+  await tool(page, "diagnostic", { session_code: id, action: "start", chapter: "quadratic" });
   await expect(page.getByText(/Expand/).first()).toBeVisible();
   const box = page.getByRole("textbox", { name: "Your answer" });
   await expect(box).toHaveAttribute("placeholder", /x\^2/);

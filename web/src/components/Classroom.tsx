@@ -19,10 +19,10 @@ import { useMicLevel } from "../lib/useMicLevel";
 import { useVoiceCall } from "../lib/useVoiceCall";
 import { Board, type BoardStatus, type Submission, type TutorBlock } from "./Board";
 import { DevPanel } from "./DevPanel";
-import { QuestionBar, QuickCheck, QuickCheckOffer } from "./ClassTools";
+import { QuestionBar, QuickCheck } from "./ClassTools";
 import { ReportCard } from "./ReportCard";
 import { VoiceOrb, type VoiceState } from "./VoiceOrb";
-import { ArrowLeft, ChartBar, Exam, FileText, HandPalm, List, Microphone, MicrophoneSlash, Pause, PencilSimpleLine, Play, Question, SignOut, UploadSimple } from "@phosphor-icons/react";
+import { ArrowLeft, ChartBar, FileText, HandPalm, List, Microphone, MicrophoneSlash, Pause, PencilSimpleLine, Play, Question, SignOut, UploadSimple } from "@phosphor-icons/react";
 
 function toBlock(e: BlockEvent & { erased?: boolean }, instant: boolean): TutorBlock {
   switch (e.type) {
@@ -70,7 +70,6 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
   const [started, setStarted] = useState(meta.started);
   const [uploading, setUploading] = useState(false);
   const [showReport, setShowReport] = useState<"view" | "end" | null>(null);
-  const [quickOffered, setQuickOffered] = useState(Boolean(initial.quickOffered));
   const fileInput = useRef<HTMLInputElement>(null);
   const voice = useVoiceCall(serverId);
   const active = voice.state === "active";
@@ -492,17 +491,6 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
             <button
               role="menuitem"
               disabled={!serverId}
-              onClick={async () => {
-                setMenuOpen(false);
-                const r = await apiFetch<{ ok: boolean; error?: string }>(`/sessions/${serverId}/diagnostic`, { body: { action: "start" } }).catch((e: Error) => ({ ok: false, error: e.message }));
-                if (!r.ok && r.error) showToast(r.error);
-              }}
-            >
-              <Exam /> Quick check
-            </button>
-            <button
-              role="menuitem"
-              disabled={!serverId}
               onClick={() => {
                 setMenuOpen(false);
                 setShowReport("view");
@@ -546,19 +534,6 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
       )}
       {serverId && <QuestionBar serverId={serverId} snapshot={snapshot} onToast={showToast} />}
       {serverId && <QuickCheck serverId={serverId} snapshot={snapshot} onToast={showToast} />}
-      {serverId && !quickOffered && !started && snapshot.blocks.length === 0 && (
-        <QuickCheckOffer
-          serverId={serverId}
-          onStarted={() => {
-            setQuickOffered(true);
-            saveData(sessionId, { quickOffered: true });
-          }}
-          onDismiss={() => {
-            setQuickOffered(true);
-            saveData(sessionId, { quickOffered: true });
-          }}
-        />
-      )}
       {showReport && serverId && (
         <ReportCard
           serverId={serverId}
