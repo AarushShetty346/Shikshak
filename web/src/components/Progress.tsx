@@ -29,7 +29,7 @@ export function Progress({ learnerId, onBack }: { learnerId: string; onBack: () 
 
   if (error) {
     return (
-      <main className="home">
+      <main className="home home-board">
         <button className="back-link" onClick={onBack}>
           <ArrowLeft /> Back
         </button>
@@ -39,7 +39,7 @@ export function Progress({ learnerId, onBack }: { learnerId: string; onBack: () 
   }
   if (!data) {
     return (
-      <main className="home">
+      <main className="home home-board">
         <div className="skeleton" style={{ height: 40, width: 220 }} />
         <div className="skeleton" style={{ height: 160, marginTop: 20 }} />
       </main>
@@ -48,7 +48,7 @@ export function Progress({ learnerId, onBack }: { learnerId: string; onBack: () 
   const { learner, memory: m } = data;
 
   return (
-    <main className="home progress">
+    <main className="home home-board progress">
       <button className="back-link" onClick={onBack}>
         <ArrowLeft /> Classes
       </button>

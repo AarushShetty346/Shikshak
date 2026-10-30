@@ -2612,8 +2612,9 @@ body:has(.home-board) {
   overflow: hidden;
 }
 
-/* Chalk lettering: hand font, a soft dusty glow, rough edges and gaps. */
-.home-board .chalk {
+/* Chalk lettering: hand font, a soft dusty glow, rough edges and gaps. Every board page title is chalk. */
+.home-board .chalk,
+.home-board .home-title {
   font-family: var(--font-hand);
   font-weight: 700;
   letter-spacing: 0.01em;
@@ -3803,4 +3804,48 @@ body:has(.home-board) {
   .home-board .home-head-actions {
     gap: 10px;
   }
+}
+
+/* ---------- Every page on the board: card headings in the hand font ---------- */
+.home-board .panel h2,
+.home-board .progress h2 {
+  font-family: var(--font-hand);
+  font-size: clamp(22px, 1.7vw, 28px);
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+/* The class report is a page of paper laid on the board. */
+.report-card {
+  --surface: #fffdf6;
+  --surface-2: #f1ead6;
+  --line: #e2d9c0;
+  background:
+    linear-gradient(90deg, transparent 18px, #e98b8b 18px 20px, transparent 20px),
+    #fffdf6;
+  border-radius: 6px 6px 14px 6px;
+  padding: 24px 26px 22px 40px;
+  transform: rotate(-0.4deg);
+  box-shadow: 0 30px 70px -20px rgb(0 0 0 / 0.7), 0 2px 0 rgb(0 0 0 / 0.08);
+}
+
+.report-head h2,
+.report-body h3 {
+  font-family: var(--font-hand);
+  font-weight: 700;
+}
+
+.report-head h2 {
+  font-size: 28px;
+}
+
+.report-body h3 {
+  font-size: 20px;
+  color: #13203a;
+}
+
+.report-body li {
+  color: var(--pen);
+  font-family: var(--font-hand);
+  font-size: 17px;
 }

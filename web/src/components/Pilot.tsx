@@ -51,7 +51,7 @@ export function Pilot({ onBack }: { onBack: () => void }) {
     );
 
   return (
-    <main className="home">
+    <main className="home home-board">
       <button className="back-link" onClick={onBack}>
         <ArrowLeft /> Classes
       </button>
@@ -218,7 +218,7 @@ function QuizRunner({ pid, code, form, onDone }: { pid: string; code: string; fo
     }
   };
   return (
-    <main className="home quiz">
+    <main className="home home-board quiz">
       <p className="muted-line">
         {code} · {form.title} · question {i + 1} of {form.items.length}
       </p>
@@ -259,7 +259,7 @@ function FeedbackForm({ pid, code, onDone }: { pid: string; code: string; onDone
     </label>
   );
   return (
-    <main className="home">
+    <main className="home home-board">
       <h1 className="home-title">Feedback from {code}</h1>
       <form
         className="panel"

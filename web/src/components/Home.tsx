@@ -10,7 +10,6 @@ import { LANGUAGE_NAMES, LANGUAGE_STATUS, type Language } from "../../../shared/
 import { apiFetch } from "../lib/api";
 import { createLearner, listLearners, selectedLearner, selectLearner, type Learner } from "../lib/learners";
 import { deleteSession, listSessions, loadData, newCode, saveData, saveSession, updateSession, type SessionMeta } from "../lib/session";
-import { ChalkFilter } from "./Chalk";
 import { ModeToggle, type Mode } from "./ModeToggle";
 import { Setup } from "./Setup";
 
@@ -160,8 +159,7 @@ export function Home({ onOpen, onProgress, onSwitchMode }: { onOpen: (id: string
   if (learners !== null && (adding || (learners.length > 0 && (picking || !current)))) {
     return (
       <main className="home home-board profile-picker">
-        <ChalkFilter />
-        <header className="home-head">
+          <header className="home-head">
           <span className="wordmark">
             <span className="wordmark-tile" aria-hidden="true">
               श
@@ -210,7 +208,6 @@ export function Home({ onOpen, onProgress, onSwitchMode }: { onOpen: (id: string
 
   return (
     <main className="home home-board">
-      <ChalkFilter />
       <header className="home-head">
         <div className="home-head-left">
           <a className="wordmark" href="#/" aria-label="Shikshak home">

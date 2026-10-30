@@ -6,7 +6,6 @@ import { prepareFile, type PreparedFile } from "../lib/files";
 import type { PublicPlan } from "../lib/session";
 import { ArrowLeft, ArrowsClockwise, Check, NotePencil, Sparkle, UploadSimple, X } from "@phosphor-icons/react";
 import { MathText } from "./MathText";
-import { ChalkFilter } from "./Chalk";
 
 /** What the new class needs from setup. The plan's answers stay on the server. */
 export interface StudentSetup {
@@ -141,7 +140,6 @@ export function Setup({
 
   return (
     <main className="setup home-board setup-board">
-      <ChalkFilter />
       <div className="setup-intro">
         {onCancel && (
           <button type="button" className="back-link" onClick={onCancel}>

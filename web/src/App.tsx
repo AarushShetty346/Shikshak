@@ -3,6 +3,7 @@ import { Classroom } from "./components/Classroom";
 import { Home } from "./components/Home";
 import { Pilot } from "./components/Pilot";
 import { Progress } from "./components/Progress";
+import { ChalkFilter } from "./components/Chalk";
 import { DusterWipe, type Mode } from "./components/ModeToggle";
 import { TeacherView } from "./components/Teacher";
 import { getSession, sessionFromHash } from "./lib/session";
@@ -46,6 +47,7 @@ export function App() {
 
   return (
     <>
+      <ChalkFilter />
       {page()}
       {wipe}
     </>
