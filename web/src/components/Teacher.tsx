@@ -39,7 +39,9 @@ export function ShareWithTeacher({ learnerId, learnerName }: { learnerId: string
           <button className="btn-icon" aria-label="Copy code" onClick={() => void navigator.clipboard?.writeText(code.code)}>
             <Copy />
           </button>
-          <span className="muted-line">Ask the teacher to open Teacher view in Shikshak and enter it.</span>
+          <span className="muted-line">
+            Ask the teacher to open <strong>{`${location.origin}/#/teacher`}</strong> and enter it.
+          </span>
         </div>
       ) : (
         <button

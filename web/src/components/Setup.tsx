@@ -1,11 +1,12 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { DocMeta, Language } from "../../../shared/types";
 import { apiFetch } from "../lib/api";
 import { putDoc } from "../lib/docStore";
 import { prepareFile, type PreparedFile } from "../lib/files";
 import type { PublicPlan } from "../lib/session";
-import { ArrowLeft, Sparkle, UploadSimple } from "@phosphor-icons/react";
+import { ArrowLeft, ArrowsClockwise, Check, NotePencil, Sparkle, UploadSimple, X } from "@phosphor-icons/react";
 import { MathText } from "./MathText";
+import { ChalkFilter } from "./Chalk";
 
 /** What the new class needs from setup. The plan's answers stay on the server. */
 export interface StudentSetup {
@@ -54,6 +55,8 @@ export function Setup({
   const [files, setFiles] = useState<File[]>([]);
   const [plan, setPlan] = useState<{ draftId: string; plan: PublicPlan } | null>(null);
   const [planning, setPlanning] = useState(false);
+  // The plan opens on a notepad over the board (a pop-up), not inside the form.
+  const [notepad, setNotepad] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const prepared = useRef<{ files: File[]; out: Prepared[] } | null>(null);
   const [saving, setSaving] = useState(false);
@@ -123,10 +126,22 @@ export function Setup({
     invalidate();
   };
 
-  const canPlan = (topic.trim() || files.length > 0) && !planning;
+  // A plan is made from the student's own book or notes, so it needs something uploaded.
+  const canPlan = files.length > 0 && !planning;
+  const openNotepad = () => {
+    setNotepad(true);
+    if (!plan && !planning) void makePlan();
+  };
+  useEffect(() => {
+    if (!notepad) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setNotepad(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [notepad]);
 
   return (
-    <main className="setup">
+    <main className="setup home-board setup-board">
+      <ChalkFilter />
       <div className="setup-intro">
         {onCancel && (
           <button type="button" className="back-link" onClick={onCancel}>
@@ -134,14 +149,14 @@ export function Setup({
           </button>
         )}
         <h1>
-          Learn it out loud.
-          <span className="hand">Get stuck? I'll show you where.</span>
+          <span className="chalk">Learn it out loud.</span>
+          <span className="hand chalk">Get stuck? I'll show you where.</span>
         </h1>
         <p className="lede">A teacher who explains in your language on a shared board, then circles the exact step you got wrong.</p>
         <BoardPreview />
       </div>
 
-      <form className="setup-card" onSubmit={(e) => e.preventDefault()}>
+      <form className="setup-card sticky-note" onSubmit={(e) => e.preventDefault()}>
         <div className="row">
           <label className="field">
             <span>Your name</span>
@@ -215,40 +230,34 @@ export function Setup({
           </span>
           <span>
             {files.length === 0
-              ? `Add photos (up to ${MAX_PHOTOS}) or a PDF of your notes (optional)`
+              ? `Add your book: a PDF or up to ${MAX_PHOTOS} photos of it or your notes (optional; needed to make a plan)`
               : files.length === 1
                 ? files[0].name
                 : `${files.length} photos of your notes`}
           </span>
         </label>
 
-        {plan && (
-          <div className="plan">
-            {plan.plan.readable === "partly" && <p className="plan-warn">Some of your notes were hard to read: {plan.plan.readable_note}</p>}
-            <p className="plan-title">{plan.plan.title}</p>
-            <ol>
-              {plan.plan.sections.map((s, i) => (
-                <li key={i}>
-                  <strong>{s.title}</strong> {s.from_notes && <span className="from-notes">from your notes</span>}
-                </li>
-              ))}
-            </ol>
-            {plan.plan.practice[0] && (
-              <p className="plan-practice">
-                Practice: <MathText text={plan.plan.practice[0].problem} />
-              </p>
-            )}
-          </div>
+        {plan && !notepad && (
+          <p className="plan-ready">
+            <NotePencil /> Plan ready: <strong>{plan.plan.title}</strong>
+            <button type="button" className="link-button" onClick={() => setNotepad(true)}>
+              View
+            </button>
+          </p>
         )}
-        {error && <p className="form-error">{error}</p>}
+        {error && !notepad && <p className="form-error">{error}</p>}
 
         <div className="actions">
-          {!plan && (
-            <button type="button" className="btn-secondary" disabled={!canPlan} onClick={makePlan}>
-              {planning ? <span className="spin" /> : <Sparkle />}
-              {planning ? (files.length ? "Reading your notes…" : "Making your plan…") : "Make a plan"}
-            </button>
-          )}
+          <button
+            type="button"
+            className="btn-secondary"
+            disabled={!canPlan && !plan}
+            title={files.length ? undefined : "Upload your book or notes first"}
+            onClick={openNotepad}
+          >
+            {plan ? <NotePencil /> : <Sparkle />}
+            {plan ? "View plan" : "Make a plan"}
+          </button>
           <button
             type="button"
             className="btn-primary"
@@ -260,6 +269,83 @@ export function Setup({
           </button>
         </div>
       </form>
+
+      {notepad && (
+        <div className="notepad-backdrop" onClick={(e) => e.target === e.currentTarget && setNotepad(false)}>
+          <section className="notepad" role="dialog" aria-modal="true" aria-labelledby="notepad-title">
+            <div className="notepad-rings" aria-hidden="true" />
+            <button type="button" className="notepad-close btn-icon" aria-label="Close" onClick={() => setNotepad(false)} autoFocus>
+              <X />
+            </button>
+            <div className="notepad-page">
+              <h2 id="notepad-title" className="notepad-heading">
+                {plan ? plan.plan.title : "Today's plan"}
+              </h2>
+              {planning && (
+                <p className="notepad-writing" role="status">
+                  Reading your {files.length === 1 && files[0].type === "application/pdf" ? "book" : "notes"} and writing a plan
+                  <span className="notepad-dots" aria-hidden="true">
+                    <span>.</span>
+                    <span>.</span>
+                    <span>.</span>
+                  </span>
+                </p>
+              )}
+              {error && !planning && <p className="notepad-error">Couldn't make a plan: {error}</p>}
+              {plan && (
+                <>
+                  {plan.plan.goal && <p className="notepad-goal">{plan.plan.goal}</p>}
+                  {plan.plan.readable === "partly" && <p className="notepad-warn">Some of your notes were hard to read: {plan.plan.readable_note}</p>}
+                  <ol className="notepad-steps">
+                    {plan.plan.sections.map((sec, i) => (
+                      <li key={i}>
+                        <MathText text={sec.title} />
+                        {sec.from_notes && <span className="from-notes">from your notes</span>}
+                      </li>
+                    ))}
+                  </ol>
+                  {plan.plan.practice[0] && (
+                    <p className="notepad-practice">
+                      Practice: <MathText text={plan.plan.practice[0].problem} />
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+            <div className="notepad-actions">
+              {plan && (
+                <button
+                  type="button"
+                  className="btn-secondary btn-small"
+                  onClick={() => {
+                    invalidate();
+                    setNotepad(false);
+                  }}
+                >
+                  Don't use a plan
+                </button>
+              )}
+              {(plan || error) && !planning && (
+                <button
+                  type="button"
+                  className="btn-secondary btn-small"
+                  onClick={() => {
+                    invalidate();
+                    void makePlan();
+                  }}
+                >
+                  <ArrowsClockwise /> {plan ? "Make it again" : "Try again"}
+                </button>
+              )}
+              {plan && (
+                <button type="button" className="btn-primary btn-small" onClick={() => setNotepad(false)}>
+                  <Check weight="bold" /> Use this plan
+                </button>
+              )}
+            </div>
+          </section>
+        </div>
+      )}
     </main>
   );
 }
