@@ -29,7 +29,7 @@ export function Splash({ onStart }: { onStart: () => void }) {
           श
         </span>
         <h1 className="splash-title chalk">Shikshak</h1>
-        <p className="splash-line chalk">I am Shikshak, your tutor.</p>
+        <p className="splash-line chalk">Shikshak, your own tutor</p>
         <button className="btn-primary splash-start" onClick={start} autoFocus>
           Start Shiksha <ArrowRight weight="bold" />
         </button>

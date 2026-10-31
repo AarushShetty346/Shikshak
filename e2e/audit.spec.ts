@@ -360,6 +360,7 @@ test("session layout: start, the typing field and the mic at the bottom; the pen
 test("start screen: Shikshak in the middle, Start Shiksha, then a new device makes its account", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Shikshak" })).toBeVisible();
+  await expect(page.getByText("Shikshak, your own tutor")).toBeVisible();
   await page.getByRole("button", { name: /Start Shiksha/ }).click();
   await expect(page.getByRole("heading", { name: "Create your account" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Cancel" })).toHaveCount(0);

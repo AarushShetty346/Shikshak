@@ -1,11 +1,48 @@
 # Shikshak
 
-Shikshak, your tutor: it talks to you in your language, writes on a chalkboard while explaining, and checks your
-handwritten work, circling the exact step that went wrong.
+Shikshak, your own tutor: a voice maths tutor for Indian students (classes 8 to 12). It talks with you in Hinglish,
+Hindi or English, writes on a shared chalkboard while it explains, and checks your handwritten working, circling the
+exact step that went wrong.
 
 Built for the [Bolna Buildathon at Symphony 2026](https://www.bolna.ai/symphony/buildathon). Voice runs on
 [Bolna](https://www.bolna.ai) (web call SDK + custom function calls). Gemini (free tier) or Claude reads the
 student's handwriting.
+
+## Try it
+
+**Live: https://shikshak-o0l8.onrender.com** (no keys or sign-in needed; allow the microphone).
+
+1. **Start Shiksha**, make your account (name, class, language), then **New session** and pick a topic.
+2. Press **▶ Play**: the tutor starts talking and writes on the board. Hold the **mic** (or Space / Caps Lock) to
+   talk back; **Stop** cuts her off for a doubt.
+3. Solve on the board with the pen (or type steps in the bar at the bottom) and press **Done**: she reads your
+   steps and circles the first wrong one.
+4. **+** sends a photo of your notebook working; **Fix it** on the photo marks the slips on it and writes the answer
+   out exam-style.
+5. Also try: the class menu (**Focus mode**, report, practice question), **Download notes as PDF**, and
+   **Study group** on the home screen (open the invite link on a second device).
+
+Teacher mode (top-left switch) asks for an access code: **123456**. The first visit has a guided tour, read by the
+tutor's own voice. Free hosting sleeps when idle, so the first load can take about a minute.
+
+## What's in it
+
+| | |
+| --- | --- |
+| **Voice class** | Bolna web call; the tutor's tool calls drive the board in real time (write, draw, steps, problems, hints, highlight), paced with her speech; interrupt any time and she picks up where she stopped |
+| **Checking** | Handwriting read by a vision model, then an exact maths engine checks every line, finds the first wrong step, gives follow-through and CBSE-style practice marks (labelled not official) |
+| **Paper mode** | A photo of notebook working is pinned on the board and marked on the photo; ink drawn over it is read too; **Fix it** circles slips on the photo and writes an exam-style answer (=, ⇒, ∵, ∴) |
+| **Typing** | Type steps instead of writing (with maths symbols); checked exactly like handwriting |
+| **Graphs** | The tutor draws graphs, number lines, triangles and tables; graphs can have sliders (a, b, c) the student drags to see the curve and its roots change |
+| **Notes** | Upload a book or notes (PDF or photos) and she teaches from your pages; download the whole class as PDF notes |
+| **Memory** | Progress per skill, recurring mistakes and next exercise, only from recorded attempts; end-of-class report |
+| **Together** | Study groups: invite by link, QR or code; each studies with their own tutor and can open the others' notes, reports and progress. Teachers see students who share a code with them |
+| **Focus** | Focus mode (30 min to 2 h): leave the class and the tutor calls you back; hide the controls for just the board |
+| **Languages** | Hinglish, Hindi, English; Tamil and Telugu on the board (voice needs the agent set up for them) |
+
+Tests: 359 unit tests and 59 browser tests (phone and desktop) run with `npm run check` and `npm run test:e2e`.
+Not yet measured: handwriting-reading accuracy on real students' writing, and learning gains. Fix it's written
+answers come from the vision model and aren't checked by the maths engine (the board says so).
 
 ## How it works
 
@@ -28,7 +65,7 @@ Browser                                Server (Node, one process)               
   never routes a tool call to a session other than the one named in it.
 - **Start / Pause / Resume.** One button. Pause ends the (billed) call but keeps the board; Resume starts a new call
   that's told where the lesson stopped.
-- **Push-to-talk.** The mic is muted except while **Hold to talk** (or Space) is held, so room noise doesn't
+- **Push-to-talk.** The mic is muted except while the mic button (or Space / Caps Lock) is held, so room noise doesn't
   interrupt. **Stop teacher** cuts the tutor off to ask something. Hands-free is in the session menu.
 - **Books and notes.** Upload a PDF or photos before or during a class. The tutor gets `read_material` (answers only
   from the pages, with page numbers) and `show_page` (puts the real page on the board, labelled with its source).
@@ -71,8 +108,8 @@ Browser                                Server (Node, one process)               
   through a one-time code that the family can revoke.
 - **Phone revision (off by default).** Short keypad revision calls for basic phones, with guardian consent, an
   operator allowlist, call windows and opt-out. Tested only against a mock; no real calls have been placed.
-- **Languages.** Hindi, Hinglish and English. Tamil and Telugu are in preview: the providers support them, but no
-  fluent speaker has reviewed the experience yet.
+- **Languages.** Hindi, Hinglish and English. Tamil and Telugu work on the board; their voice needs the agents set up
+  with those languages (`BOLNA_AGENT_LANGUAGES`), and no fluent speaker has reviewed the experience yet.
 - **Pilot tools.** Pseudonymous participants, consent, equivalent quiz forms and an anonymised export
   ([docs/PILOT.md](docs/PILOT.md)). No pilot has been run yet.
 
