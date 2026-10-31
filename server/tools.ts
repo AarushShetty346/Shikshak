@@ -77,7 +77,10 @@ async function lookAtBoard(req: Request, res: Response) {
   const fromBoard = await awaitCapture(s, requestId);
   // A photo of paper working counts as the latest work when nothing newer was handed in on the board.
   const photo = latestPhotoWork(s);
-  const capture = photo && (!fromBoard?.png || fromBoard.lineCount === 0 || photo.at >= lastBoardDone(s)) ? photo : fromBoard;
+  let capture = photo && (!fromBoard?.png || fromBoard.lineCount === 0 || photo.at >= lastBoardDone(s)) ? photo : fromBoard;
+  // Nothing new on the board since the student pressed Done (with no question up, Done starts a fresh
+  // page for the next work): the work they just handed in is what the tutor should look at.
+  if (fromBoard && (!capture?.png || (capture.lineCount === 0 && !capture.photo))) capture = latestDoneWork(s) ?? capture;
 
   if (!capture) {
     signal(s, { type: "unclear", note: "Couldn't get your latest work" });
@@ -119,6 +122,13 @@ async function lookAtBoard(req: Request, res: Response) {
 function latestPhotoWork(s: Session): Capture | null {
   const q = s.problem?.id ?? null;
   return [...s.captures.values()].filter((c) => c.photo && c.png && c.questionId === q).at(-1) ?? null;
+}
+
+/** The latest board work handed in with Done for the question on the board now (a few minutes old at most). */
+function latestDoneWork(s: Session): Capture | null {
+  const q = s.problem?.id ?? null;
+  const recent = Date.now() - 10 * 60_000;
+  return [...s.captures.values()].filter((c) => c.reason === "done" && c.png && c.lineCount > 0 && c.questionId === q && c.at >= recent).at(-1) ?? null;
 }
 
 /** When the student last pressed Done on board work for this question. */

@@ -117,6 +117,18 @@ describe("board tools", () => {
     t.ws.close();
   });
 
+  it("with no question up, the tutor sees the work just handed in with Done (the board has started a fresh page)", async () => {
+    const id = await session();
+    const t = await tab(id, { png: "", lineCount: 0 });
+    askJson.mockResolvedValue(MISTAKE);
+    t.done("done1", { png: PNG("d"), lineCount: 2 });
+    await vi.waitFor(() => expect(askJson).toHaveBeenCalledTimes(1));
+    const res = await post("look_at_board", { session_code: id });
+    expect(res).toMatchObject({ status: "mistake", line: 2 });
+    expect(askJson).toHaveBeenCalledTimes(1);
+    t.ws.close();
+  });
+
   it("an empty board says so without calling the model", async () => {
     const id = await session();
     const t = await tab(id, { png: "", lineCount: 0 });

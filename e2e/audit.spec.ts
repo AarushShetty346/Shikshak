@@ -560,6 +560,18 @@ test("the board keeps everything: an erased or replaced block stays, and new wri
   expect(b.y).toBeGreaterThan(a.y + a.height - 1);
 });
 
+test("the board never ends: scrolling to the bottom adds more blank board", async ({ page }) => {
+  await openClass(page);
+  const scroller = page.locator(".board-scroll");
+  const before = await scroller.evaluate((el) => el.scrollHeight);
+  for (let i = 0; i < 3; i++) {
+    await scroller.evaluate((el) => el.scrollTo({ top: el.scrollHeight }));
+    await page.waitForTimeout(150);
+  }
+  const after = await scroller.evaluate((el) => el.scrollHeight);
+  expect(after).toBeGreaterThan(before + 2 * (await scroller.evaluate((el) => el.clientHeight)) - 10);
+});
+
 test("study group: after joining, My classes takes you to your own classes", async ({ browser }) => {
   const ctx = await browser.newContext();
   await ctx.addInitScript(() => {
