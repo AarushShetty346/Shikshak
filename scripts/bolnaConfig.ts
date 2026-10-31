@@ -374,11 +374,12 @@ export function rollbackLlm(cfg: LlmConfig, today: string): LlmConfig {
 
 // Defaults: Sarvam for Indian-language speech in and out (a buildathon sponsor), a fast GPT for the conversation.
 export const DEFAULT_VOICE: VoiceOptions = {
-  // Tamil and Telugu: supported by Soniox (ta, te) and Sarvam bulbul:v3 (ta-IN, te-IN); preview.
+  // Tamil and Telugu: supported by Sarvam saaras:v4 and bulbul:v3; preview.
   languages: ["hi", "en", "ta", "te"],
-  // Soniox: understands Hindi-English mixing and detects when the student has finished a thought
-  // (semantic end of turn) instead of a fixed silence timer, so it doesn't cut in when they pause.
-  transcriber: { provider: "soniox", model: "stt-rt-v5" },
+  // Sarvam saaras:v4: built for Indian languages (Hindi, Hinglish, Tamil, Telugu, Indian English).
+  // Switched from Soniox stt-rt-v5 on 31 Oct 2026. Unlike Soniox it has no end-of-turn detection of
+  // its own, so the 700 ms endpointing below decides when the student has finished.
+  transcriber: { provider: "sarvam", model: "saaras:v4" },
   synthesizer: { provider: "sarvam", model: "bulbul:v3", voice: "suhani", voice_id: "suhani" },
   llm: currentLlm(),
   telephony: "plivo",

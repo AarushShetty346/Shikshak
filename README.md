@@ -75,7 +75,7 @@ Browser                                Server (Node, one process)               
  │        └─ keypad tone "1#" over the call ─────────────────────────────▶ "dtmf_number: 1"
  │                                     /tools/look_at_board  ◀────────────── tutor looks
  ├─ red circle / Shabash  ◀── WebSocket ◀── result (usually instant, already read)
- └─ Voice (Bolna Web Call SDK, Soniox speech-to-text, Sarvam voice) ◀─────▶ live audio
+ └─ Voice (Bolna Web Call SDK, Sarvam speech-to-text and voice) ◀─────▶ live audio
 ```
 
 - **Sessions.** The home screen lists the student's classes, like chats (for example "Maths: AP" and
@@ -102,8 +102,8 @@ Browser                                Server (Node, one process)               
 - **Notes.** Photos (up to 6) or a PDF become a study plan in the chosen language: sections the tutor writes
   on the board one at a time (`show_section`) and practice problems whose answers stay on the server
   (`give_practice`, checked by `look_at_board`).
-- **Turn-taking.** Soniox detects when the student has finished a thought instead of a fixed silence timer;
-  in hands-free mode the tutor stops after two words from the student.
+- **Turn-taking.** Sarvam speech-to-text; the tutor replies after 700 ms of silence and stops talking after three
+  words from the student.
 - See [PLAN.md](PLAN.md) for the plan, schedule, and risks.
 
 ## Teaching features
