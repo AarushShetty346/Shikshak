@@ -23,6 +23,11 @@ export default defineConfig({
       ANTHROPIC_API_KEY: "",
       BOLNA_API_KEY: "",
       BOLNA_AGENT_ID: "",
+      // Cleared so a developer's .env (loaded by the server) can't turn on auth or production settings here.
+      TOOLS_TOKEN: "",
+      ADMIN_TOKEN: "",
+      PUBLIC_URL: "",
+      BOLNA_AGENT_LANGUAGES: "",
       FAKE_CHECKER: "1",
       PHONE_CALLS_ENABLED: "",
       // Every test is a new browser from 127.0.0.1; the production sign-up limit would throttle the suite.
