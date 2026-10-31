@@ -55,7 +55,8 @@ describe("board actions", () => {
     expect(events().at(-1)).toMatchObject({ type: "write", replaces: "B1" });
     expect(write(s, { kind: "text", content: "x", replace: "B7" }).ok).toBe(false);
     expect(erase(s, { target: "all" })).toMatchObject({ ok: true });
-    expect(events().at(-1)).toMatchObject({ type: "page" });
+    expect(events().slice(-2)).toEqual([{ type: "erase", target: "B2" }, expect.objectContaining({ type: "page" })]); // B1 was already gone
+    expect(erase(s, { target: "B9" })).toMatchObject({ ok: false });
   });
 
   it("remembers where the lesson was when the student interrupted, and resumes there", () => {

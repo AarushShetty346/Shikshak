@@ -542,14 +542,14 @@ test("no wrong screen flashes: account first on a new device, and a group page n
   expect(await seen()).not.toContain("Study together");
 });
 
-test("the board keeps everything: an erased or replaced block stays, and new writing goes below", async ({ page }) => {
+test("the board keeps everything the tutor corrects, and rubs out only what the student asks her to erase", async ({ page }) => {
   const id = await openClass(page);
   const written = await tool(page, "write", { session_code: id, style: "heading", lines: ["First idea"] });
   const label = written.label as string;
   expect(label).toMatch(/^B\d+$/);
   const first = page.locator(".tblock", { hasText: "First idea" });
   await expect(first).toBeVisible();
-  await tool(page, "erase", { session_code: id, target: label });
+  // A correction goes below and the old line stays.
   await tool(page, "write", { session_code: id, style: "heading", lines: ["Second idea"], replace: label });
   const second = page.locator(".tblock", { hasText: "Second idea" });
   await expect(second).toBeVisible();
@@ -558,7 +558,13 @@ test("the board keeps everything: an erased or replaced block stays, and new wri
   expect(await first.evaluate((el) => getComputedStyle(el).opacity)).toBe("1");
   const [a, b] = [(await first.boundingBox())!, (await second.boundingBox())!];
   expect(b.y).toBeGreaterThan(a.y + a.height - 1);
+  // "Isse mita do": the erase really rubs it off the board.
+  const rubbed = await tool(page, "erase", { session_code: id, target: label });
+  expect(rubbed.ok).toBe(true);
+  await expect(first).toBeHidden();
+  await expect(second).toBeVisible();
 });
+
 
 test("the board never ends: scrolling to the bottom adds more blank board", async ({ page }) => {
   await openClass(page);
