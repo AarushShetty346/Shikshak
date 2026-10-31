@@ -288,7 +288,10 @@ export function Board(props: Props) {
   }, [blocks, heights, W, strokes, revealed, TOP]);
 
   const contentBottom = Math.max(layout.bottom, inkBottom(strokes));
-  const pageHeightUnits = contentBottom + (view.h / scale) * 0.85 + 60;
+  // The board never ends: scrolling near the bottom adds another screen of blank board to write on.
+  const [extraScreens, setExtraScreens] = useState(0);
+  const viewUnits = scale ? view.h / scale : 0;
+  const pageHeightUnits = contentBottom + viewUnits * (1 + extraScreens) + 60;
 
   // The latest question (problem / "your turn") and where it ends, for the "write here" hint.
   const latestQuestion = [...blocks].reverse().find((b) => b.kind === "problem" || (b.kind === "write" && b.style === "your_turn"));
@@ -564,6 +567,7 @@ export function Board(props: Props) {
       redraw();
       const s = scrollRef.current;
       if (s && s.scrollTop + s.clientHeight >= (layout.bottom - 20) * scale) setNewBelow(false);
+      if (s && s.clientHeight && s.scrollTop + s.clientHeight * 1.5 >= s.scrollHeight) setExtraScreens((n) => n + 1);
       checkQuestionAbove();
     });
   };
@@ -963,7 +967,8 @@ export function Board(props: Props) {
           className="board-page"
           ref={pageRef}
           style={{
-            height: px(pageHeightUnits),
+            // Printed notes stop at the last writing, not at the blank board scrolled past.
+            height: px(printInk.length ? contentBottom + 60 : pageHeightUnits),
             ["--s" as string]: scale,
             // Printing: the page keeps its screen width and is shrunk to fit A4 (about 718px between margins).
             ...(printInk.length ? { ["--print-w" as string]: `${view.w}px`, ["--print-zoom" as string]: Math.min(1, 718 / Math.max(1, view.w)) } : {}),
