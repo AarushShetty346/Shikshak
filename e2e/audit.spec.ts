@@ -507,6 +507,37 @@ test("classes belong to an account: a class with no account is cleared, the acco
   await expect(page.getByText("Arithmetic progressions").first()).toBeVisible();
 });
 
+test("no wrong screen flashes: account first on a new device, and a group page never shows the start page", async ({ page }) => {
+  // Every heading the page ever shows, in order (even for one frame), with a slow server.
+  await page.addInitScript(() => {
+    const w = window as unknown as { __seen: string[] };
+    w.__seen = [];
+    const look = () => {
+      for (const h of document.querySelectorAll("h1, h2")) {
+        const t = (h.textContent || "").trim();
+        if (t && w.__seen.at(-1) !== t) w.__seen.push(t);
+      }
+    };
+    new MutationObserver(look).observe(document, { subtree: true, childList: true, characterData: true });
+  });
+  await page.route("**/api/**", async (r) => {
+    await new Promise((x) => setTimeout(x, 500));
+    await r.continue();
+  });
+  const seen = () => page.evaluate(() => (window as unknown as { __seen: string[] }).__seen);
+  await page.goto("/");
+  await page.getByLabel("Name or nickname").fill("Harsh");
+  await page.getByRole("button", { name: "Create account" }).click();
+  await expect(page.getByRole("heading", { name: "Harsh's classes" })).toBeVisible();
+  expect(await seen()).not.toContain("Your classes");
+  await page.goto("/#/group");
+  await page.getByRole("button", { name: /Start a group/ }).click();
+  await expect(page.getByRole("heading", { name: "Harsh's study group" })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Harsh's study group" })).toBeVisible();
+  expect(await seen()).not.toContain("Study together");
+});
+
 test("guided tour: the first visit walks through the controls, once, and can be replayed", async ({ page }) => {
   const clips: string[] = [];
   page.on("request", (r) => r.url().includes("/tour/") && clips.push(r.url()));

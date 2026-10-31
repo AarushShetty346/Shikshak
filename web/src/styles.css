@@ -82,7 +82,8 @@ body,
 
 body {
   margin: 0;
-  background: var(--bg);
+  /* Every page is on the blackboard: the page behind it is board green too (no light flash). */
+  background: #1d3329;
   color: var(--ink);
   font-family: var(--font-ui);
   font-size: 16px;
