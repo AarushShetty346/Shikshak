@@ -1,5 +1,15 @@
 {
   "note": "The conversation model on the Bolna agent. Change it only with npm run bolna:model (it keeps the previous one for rollback). Applied by npm run bolna:setup.",
-  "current": { "provider": "openai", "model": "gpt-5.4-mini", "since": "before 2026-10-23", "evidence": "In use on the live agents before the benchmark harness existed; measured in benchmark/results/calls-2026-10-23T16-04-08.md" },
-  "previous": null
+  "current": {
+    "provider": "openai",
+    "model": "gpt-6-luna",
+    "since": "2026-10-31",
+    "evidence": "benchmark/results/model-switch-2026-10-31-gpt-6-luna.md"
+  },
+  "previous": {
+    "provider": "openai",
+    "model": "gpt-5.4-mini",
+    "since": "before 2026-10-23",
+    "evidence": "In use on the live agents before the benchmark harness existed; measured in benchmark/results/calls-2026-10-23T16-04-08.md"
+  }
 }

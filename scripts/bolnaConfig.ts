@@ -506,6 +506,10 @@ export function buildAgentPayload(opts: { publicUrl: string; toolsToken?: string
                 // Tool calls carry several board lines, so leave room beyond the 100-token default.
                 max_tokens: 400,
                 temperature: 1,
+                // Quick, short replies: a voice turn can't wait for long thinking, and thinking
+                // counts against max_tokens.
+                reasoning_effort: "low",
+                verbosity: "low",
               },
             },
             synthesizer: { ...synthesizerFor(base), stream: true, buffer_size: 250, audio_format: "wav" },
