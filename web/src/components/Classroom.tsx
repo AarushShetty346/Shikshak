@@ -313,10 +313,10 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
   const toggleHandsFree = () => {
     const next = !handsFree;
     setHandsFree(next);
-    saveData(sessionId, { handsFree: next });
+    saveData(sessionId, { handsFree: next, micOff: !next });
     voice.setHandsFree(next);
     setMenuOpen(false);
-    showToast(next ? "Hands-free on: the teacher hears everything, including room noise." : `Push-to-talk on: hold Talk, or ${talkKeyHint()}.`);
+    showToast(next ? "Mic on: I'm listening." : `Mic off. Tap the mic to talk to me, or ${talkKeyHint()}.`);
   };
 
   const cycleSpeed = () => {
@@ -519,33 +519,29 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
           <HandPalm /> Stop
         </button>
       )}
-      {active && !handsFree ? (
+      {active ? (
+        // In a class the mic is a plain on/off switch: on, she hears you all the time (like a call);
+        // off, nothing reaches her except while Space or Caps Lock is held.
         <button
-          className="btn-talk dock-round"
-          data-on={voice.talking}
-          onPointerDown={(e) => {
-            e.currentTarget.setPointerCapture(e.pointerId);
-            talkDown();
-          }}
-          onPointerUp={talkUp}
-          onPointerCancel={talkUp}
-          onLostPointerCapture={talkUp}
-          onContextMenu={(e) => e.preventDefault()}
-          aria-label={voice.talking ? "Listening" : "Hold to talk"}
-          title={`Hold to talk (or ${talkKeyHint()})`}
+          className="btn-mic dock-round"
+          data-live={handsFree || voice.talking}
+          onClick={toggleHandsFree}
+          aria-pressed={handsFree}
+          aria-label={handsFree ? "Mute the mic" : "Unmute the mic"}
+          title={handsFree ? "I'm listening. Tap to mute." : `Muted. Tap to talk to me (or hold ${talkKeyHint().replace(/^hold /, "")}).`}
         >
-          <Microphone weight={voice.talking ? "fill" : "bold"} />
+          {handsFree || voice.talking ? <Microphone weight="fill" /> : <MicrophoneSlash weight="bold" />}
         </button>
       ) : (
         <button
           className="btn-mic dock-round"
-          data-live={active}
-          onClick={active ? undefined : startOrResume}
-          disabled={!serverId || (live && !active)}
-          aria-label={active ? "Listening all the time" : "Start talking"}
-          title={active ? "Hands-free: I'm always listening" : "Start the class and talk"}
+          data-live={false}
+          onClick={startOrResume}
+          disabled={!serverId || live}
+          aria-label="Start talking"
+          title="Start the class and talk"
         >
-          {active ? <Microphone weight="fill" /> : <MicrophoneSlash weight="bold" />}
+          <MicrophoneSlash weight="bold" />
         </button>
       )}
     </>
@@ -626,7 +622,7 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
               <PencilSimpleLine /> Rename
             </button>
             <button role="menuitem" onClick={toggleHandsFree}>
-              {handsFree ? <MicrophoneSlash /> : <Microphone />} {handsFree ? "Use push-to-talk" : "Hands-free (always listening)"}
+              {handsFree ? <MicrophoneSlash /> : <Microphone />} {handsFree ? "Mute my mic" : "Unmute my mic"}
             </button>
             <button
               role="menuitem"
