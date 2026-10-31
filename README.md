@@ -12,7 +12,8 @@ with an exact maths engine, and circles the first step that went wrong, then hel
 the answer.
 
 It remembers what you've practised and where you slip, gives you a report after each class, and lets you study
-alongside friends, each with your own tutor.
+alongside friends, each with your own tutor. When you're ready, it sets you a practice exam in the CBSE board
+pattern, invigilates it if you like, and marks your answer sheets the way a board examiner would.
 
 Built for the [Bolna Buildathon at Symphony 2026](https://www.bolna.ai/symphony/buildathon). The voice runs on
 [Bolna](https://www.bolna.ai) (web call SDK and custom function calls); Gemini (free tier) or Claude reads the
@@ -29,11 +30,14 @@ To see each other's notes and progress, start a **study group** and invite them.
 
 1. Press **Start Shiksha** and make your account (name, class, language).
 2. Press **New session**, pick a topic, and optionally add your textbook or notes.
-3. Press **▶ Play**. The tutor starts talking and writing. Hold the **mic** button (or Space / Caps Lock) to talk
-   back; press **Stop** to interrupt with a doubt.
+3. Press **▶ Play**. The tutor starts talking and writing. Just talk back: the mic listens (tap it to mute; while
+   muted, hold Space or Caps Lock to talk). Press **Stop** to interrupt her with a doubt.
 4. When it's your turn, write your steps on the board, one per line, and press **Done**.
 5. Working on paper? Tap **+** to send a photo of it, then **Fix it** to see the slips marked on your photo and the
    answer written out exam-style.
+6. **Exam** on the home screen: pick a chapter, how many questions and how long. A **mock exam** gives you the paper
+   (on the site and as a PDF); an **exam** adds an invigilator. Upload photos of your answer sheets to have them
+   marked.
 
 The first visit has a short guided tour, read in the tutor's own voice. The free hosting sleeps when nobody is using
 it, so the first load can take about a minute.
@@ -50,12 +54,14 @@ it, so the first load can take about a minute.
 | **Notes** | Upload a book or notes (PDF or photos) and she teaches from your pages; download the whole class as PDF notes |
 | **Memory** | Progress per skill, recurring mistakes and next exercise, only from recorded attempts; end-of-class report |
 | **Together** | Study groups: invite by link, QR or code; each studies with their own tutor and can open the others' notes, reports and progress. |
+| **Exams** | Practice papers in the CBSE board pattern (sections A to E: MCQs and assertion-reason, short and long answers, case studies, internal choices), 5 to 30 questions, 30 min to 3 hours; class 10 Maths Standard or Basic. Mock (the paper, also as a PDF) or Exam: the questions stay hidden until it starts, the camera and the whole screen are shared, fullscreen; switching screens is called out by the invigilator out loud and on screen and goes in a report. Answer sheets are marked like a board examiner: step marks, presentation (neatness, handwriting, steps, final answers) and what to improve; then a class on the weakest question |
 | **Focus** | Focus mode (30 min to 2 h): leave the class and the tutor calls you back; hide the controls for just the board |
 | **Languages** | Hinglish, Hindi, English, Tamil and Telugu (Tamil and Telugu voice needs the agents set up with them and `BOLNA_AGENT_LANGUAGES=hi,en,ta,te`) |
 
-Tests: 359 unit tests and 59 browser tests (phone and desktop) run with `npm run check` and `npm run test:e2e`.
+Tests: 363 unit tests and 71 browser tests (phone and desktop) run with `npm run check` and `npm run test:e2e`.
 Not yet measured: handwriting-reading accuracy on real students' writing, and learning gains. Fix it's written
-answers come from the vision model and aren't checked by the maths engine (the board says so).
+answers and the exam papers and marking come from the vision model and aren't checked by the maths engine (the app
+says so); exam marks are practice marks, not official ones.
 
 ## How it works
 
