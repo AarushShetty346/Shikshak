@@ -51,7 +51,7 @@ it, so the first load can take about a minute.
 | **Memory** | Progress per skill, recurring mistakes and next exercise, only from recorded attempts; end-of-class report |
 | **Together** | Study groups: invite by link, QR or code; each studies with their own tutor and can open the others' notes, reports and progress. |
 | **Focus** | Focus mode (30 min to 2 h): leave the class and the tutor calls you back; hide the controls for just the board |
-| **Languages** | Hinglish, Hindi, English; Tamil and Telugu on the board (voice needs the agent set up for them) |
+| **Languages** | Hinglish, Hindi, English, Tamil and Telugu (Tamil and Telugu voice needs the agents set up with them and `BOLNA_AGENT_LANGUAGES=hi,en,ta,te`) |
 
 Tests: 359 unit tests and 59 browser tests (phone and desktop) run with `npm run check` and `npm run test:e2e`.
 Not yet measured: handwriting-reading accuracy on real students' writing, and learning gains. Fix it's written
@@ -196,7 +196,7 @@ if something breaks live.
 | `TOOLS_TOKEN` | **Required in production.** Tool calls must send `Authorization: Bearer <token>`; set the same value before `bolna:setup` |
 | `DATA_DIR` | Where learners, classes and records are stored (default `data/`). Needs a persistent disk to survive deploys |
 | `ADMIN_TOKEN` | Operator endpoints (phone revision). Off when empty |
-| `BOLNA_AGENT_LANGUAGES` | Languages the agents were set up with (default `hi,en`) |
+| `BOLNA_AGENT_LANGUAGES` | Languages the agents were set up with (default `hi,en`; `hi,en,ta,te` for Tamil and Telugu voice, after `bolna:setup`) |
 | `PHONE_*` | Phone revision calls, off by default |
 | `FAKE_CHECKER` | `1` to fake the checker for UI work |
 

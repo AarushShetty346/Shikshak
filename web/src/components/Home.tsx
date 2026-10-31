@@ -76,8 +76,23 @@ export function Home({
   const sessions = all.filter((s) => (showArchived || !s.archived) && mine(s));
   const archivedCount = all.filter((s) => s.archived && mine(s)).length;
   const learner = learners?.find((l) => l.id === current) ?? null;
-  // Classes made before learners existed: shown separately so they can be linked to someone.
-  const unlinked = learner ? all.filter((s) => !s.learnerId && !s.archived) : [];
+  // Classes made before a profile was picked belong to nobody. With one profile on the device
+  // they're simply added to that profile's classes (with several, they stay where they are).
+  const unlinkedKey = all
+    .filter((s) => !s.learnerId && !s.archived)
+    .map((s) => s.id)
+    .join(",");
+  useEffect(() => {
+    if (!learner || learners?.length !== 1 || !unlinkedKey) return;
+    const orphans = all.filter((s) => !s.learnerId && !s.archived);
+    void Promise.all(
+      orphans.map(async (s) => {
+        if (s.serverId) await apiFetch(`/sessions/${s.serverId}`, { method: "PATCH", body: { learnerId: learner.id } }).catch(() => {});
+        updateSession(s.id, { learnerId: learner.id, updatedAt: s.updatedAt });
+      }),
+    ).then(() => refresh((n) => n + 1));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [learner?.id, learners?.length, unlinkedKey]);
 
   // Close a row menu on outside click or Escape.
   const menuRef = useRef<HTMLDivElement>(null);
@@ -436,33 +451,6 @@ export function Home({
         <button className="link-button" onClick={() => setShowArchived((v) => !v)}>
           {showArchived ? "Hide archived" : `Show archived (${archivedCount})`}
         </button>
-      )}
-      {learner && unlinked.length > 0 && (
-        <section className="panel panel-quiet">
-          <h2>Classes not in anyone's list yet</h2>
-          <p className="muted-line">Made on this device before a profile was picked. Add one to {learner.name}'s classes so it counts in their progress and reports.</p>
-          <ul className="grant-list">
-            {unlinked.map((s) => (
-              <li key={s.id}>
-                <span>{s.name}</span>
-                <button
-                  className="link-button"
-                  onClick={async () => {
-                    try {
-                      if (s.serverId) await apiFetch(`/sessions/${s.serverId}`, { method: "PATCH", body: { learnerId: learner.id } });
-                      updateSession(s.id, { learnerId: learner.id, updatedAt: s.updatedAt });
-                      refresh((n) => n + 1);
-                    } catch (err) {
-                      window.alert((err as Error).message);
-                    }
-                  }}
-                >
-                  Add to {learner.name}'s classes
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
       )}
       {touring && <Tour name="home" steps={HOME_TOUR} onClose={() => setTouring(false)} />}
     </main>
