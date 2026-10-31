@@ -8,7 +8,8 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-/** Spoken while a tool runs. Keyed by language; Bolna plays the one matching the language the agent is speaking. */
+/** Spoken while a tool runs. Board tools that write at once get one or two words ("Look."), so the
+ * filler is the start of her explanation, not a second voice before it. Keyed by language; Bolna plays the one matching the language the agent is speaking. */
 export type Spoken = Record<"hi" | "en", string> & Partial<Record<"ta" | "te", string>>;
 
 /** Tamil and Telugu are in preview (not yet reviewed by fluent speakers): tools use a short neutral filler. */
@@ -62,7 +63,7 @@ export function buildTools(publicUrl: string, toolsToken?: string): ToolDef[] {
       name: "write",
       description:
         "Write on the shared blackboard. Use it the way a teacher uses chalk: a heading when starting a topic, a short definition, an equation, or a worked solution built step by step. Lines appear one by one while you speak, so explain them in the same order. Keep it to what matters; never write whole paragraphs.",
-      pre_call_message: { hi: "एक मिनट, बोर्ड पर लिखती हूँ।", en: "Give me a moment, I'll write it down." },
+      pre_call_message: { hi: "देखो।", en: "Look." },
       properties: {
         kind: {
           type: "string",
@@ -82,7 +83,7 @@ export function buildTools(publicUrl: string, toolsToken?: string): ToolDef[] {
       description:
         "Draw a diagram on the board when a picture explains it better: an AP as a chain of terms, a number line, a graph, a triangle, or a table. It draws itself piece by piece as you talk, so describe the pieces in order. Formats: " +
         DIAGRAM_EXAMPLES.join("  /  "),
-      pre_call_message: { hi: "चलो, इसे बना के देखते हैं।", en: "Let me draw this." },
+      pre_call_message: { hi: "चलो, बनाते हैं।", en: "Let me draw it." },
       properties: {
         diagram: { type: "string", description: "One line in one of the formats, e.g. 'ap: 2, 5, 8, 11 | d = 3'." },
         caption: { type: "string", description: "Optional short caption." },
@@ -114,7 +115,7 @@ export function buildTools(publicUrl: string, toolsToken?: string): ToolDef[] {
     tool(base, token, {
       name: "give_problem",
       description: "Put a practice problem on the board with space below it for the student to solve. Use when it is the student's turn to solve something you made up.",
-      pre_call_message: { hi: "लो, अब आपकी बारी।", en: "Your turn now." },
+      pre_call_message: { hi: "यह लो।", en: "Here you go." },
       properties: {
         problem: { type: "string", description: "The problem as plain text, e.g. 'Find the 10th term of 2, 5, 8, ...'." },
         answer: { type: "string", description: "The correct final answer, for checking. Never read it aloud." },
@@ -138,7 +139,7 @@ export function buildTools(publicUrl: string, toolsToken?: string): ToolDef[] {
       name: "continue_lesson",
       description:
         "Call this right after you have answered a student's doubt or question that interrupted your explanation. It un-pauses the board and tells you exactly where the lesson was, so you can pick up from there.",
-      pre_call_message: { hi: "चलो, जहाँ थे वहीं से आगे बढ़ते हैं।", en: "Let's pick up where we were." },
+      pre_call_message: { hi: "चलो।", en: "Right." },
       properties: {},
       required: [],
     }),
@@ -146,7 +147,7 @@ export function buildTools(publicUrl: string, toolsToken?: string): ToolDef[] {
       name: "show_section",
       description:
         "Write the next part of today's prepared study plan on the board (made from the student's own notes if they uploaded any). Pass 'next' to move on, or a section number to go back or jump. Returns a short line to say and a question to ask. Only when the lesson plan lists sections.",
-      pre_call_message: { hi: "दो मिनट दीजिए, अगला हिस्सा लिखती हूँ।", en: "Give me two minutes, I'll write the next part." },
+      pre_call_message: { hi: "अब अगला हिस्सा।", en: "Now the next part." },
       properties: { section: { type: "string", description: "'next', or a section number from the lesson plan, e.g. '3'." } },
       required: ["section"],
     }),

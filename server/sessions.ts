@@ -141,6 +141,8 @@ export interface SessionRecord {
 }
 
 export interface Session extends SessionRecord {
+  /** The work the tutor was last told about by look_at_board, and when (so she doesn't say it twice). */
+  lastLook?: { key: string; at: number };
   sockets: Set<WebSocket>;
   docs: SessionDoc[];
   captures: Map<string, Capture>;

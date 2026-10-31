@@ -383,7 +383,11 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
   }, [paperOpen]);
   const sendWork = async (list: FileList | null) => {
     const file = list?.[0];
-    if (!file || !serverId) return;
+    if (!file) return;
+    if (!serverId) {
+      if (workInput.current) workInput.current.value = "";
+      return showToast("The class is still connecting. Send the photo again in a moment.");
+    }
     const captureId = crypto.randomUUID();
     clearTimeout(submitTimer.current);
     setSubmission({ captureId, state: "submitting" });
@@ -406,7 +410,11 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
   const [scanning, setScanning] = useState(false);
   const scan = async (list: FileList | null) => {
     const file = list?.[0];
-    if (!file || !serverId) return;
+    if (!file) return;
+    if (!serverId) {
+      if (scanInput.current) scanInput.current.value = "";
+      return showToast("The class is still connecting. Send the photo again in a moment.");
+    }
     setScanning(true);
     try {
       const prepared = { ...(await prepareFile(file)), id: `paper-${crypto.randomUUID().slice(0, 8)}` };
@@ -761,9 +769,9 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
       {focusEndsAt && <FocusMode endsAt={focusEndsAt} onEnd={() => setFocusEndsAt(null)} />}
       <VoiceOrb state={orb} level={orb === "teacher" ? Math.min(1, voice.volume * 3) : orb === "student" ? mic : 0} />
 
-      <input ref={fileInput} type="file" accept="application/pdf,image/*" multiple hidden onChange={(e) => void upload(e.target.files)} />
-      <input ref={scanInput} type="file" accept="image/*" capture="environment" hidden data-paper="question" onChange={(e) => void scan(e.target.files)} />
-      <input ref={workInput} type="file" accept="image/*" capture="environment" hidden data-paper="work" onChange={(e) => void sendWork(e.target.files)} />
+      <input ref={fileInput} type="file" accept="application/pdf,image/*" multiple className="file-picker" tabIndex={-1} aria-hidden="true" onChange={(e) => void upload(e.target.files)} />
+      <input ref={scanInput} type="file" accept="image/*" capture="environment" className="file-picker" tabIndex={-1} aria-hidden="true" data-paper="question" onChange={(e) => void scan(e.target.files)} />
+      <input ref={workInput} type="file" accept="image/*" capture="environment" className="file-picker" tabIndex={-1} aria-hidden="true" data-paper="work" onChange={(e) => void sendWork(e.target.files)} />
     {paperOpen && (
       <div className="menu paper-pop" role="menu">
         <p className="paper-pop-title">Add to the class</p>

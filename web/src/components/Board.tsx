@@ -29,8 +29,19 @@ const TOP_PX = 92;
 const INK = "#9fd3ff";
 const PEN_WIDTH = 3.2;
 const ERASER_RADIUS = 18;
-/** Seconds of the tutor's speech per revealed line or diagram piece. */
-const SPEECH_PER_PIECE = 1.4;
+/**
+ * Seconds of the tutor's speech before the next line or diagram piece appears: about one short
+ * spoken sentence per line, a little longer for a long line, so the board keeps pace with her
+ * explanation instead of racing ahead of it.
+ */
+function speechFor(b: TutorBlock, piece: number): number {
+  const text = b.kind === "write" ? b.lines[piece] : b.kind === "steps" ? b.steps[piece] : undefined;
+  if (text === undefined) return 2.4;
+  return Math.min(4.5, Math.max(2.2, 1.6 + text.length * 0.05));
+}
+/** When she has stopped talking but lines are still to come: wait this long, then show them at this pace. */
+const QUIET_BEFORE_CATCH_UP = 3;
+const CATCH_UP_PER_PIECE = 0.9;
 
 export type TutorBlock =
   | { kind: "write"; id: string; label: string; style: WriteStyle; lines: string[]; place: Place; replaces: string | null; instant: boolean }
@@ -400,13 +411,14 @@ export function Board(props: Props) {
       } else if (teacherSpeaking) {
         sp.quiet = 0;
         sp.talk += TICK;
-        step = sp.talk >= SPEECH_PER_PIECE;
+        step = sp.talk >= speechFor(next, rv[next.id] ?? 0);
       } else {
         sp.quiet += TICK;
-        // If she wrote something but isn't talking about it, don't leave it half-written forever.
-        if (sp.quiet > 5) {
+        // She has finished talking (or wrote something without talking about it): show the rest
+        // soon, so the student isn't left looking at a half-written block.
+        if (sp.quiet > QUIET_BEFORE_CATCH_UP) {
           sp.talk += TICK;
-          step = sp.talk >= 1.8;
+          step = sp.talk >= CATCH_UP_PER_PIECE;
         }
       }
       if (step) {
