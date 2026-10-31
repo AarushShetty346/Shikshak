@@ -398,6 +398,8 @@ export const TRANSCRIBER_KEYWORDS: Record<"hi" | "en" | "ta" | "te", string> = {
 };
 const CLASS = "A class 10 maths tutoring session in India.";
 const WORKING = "talks about equations, steps and their working, and often pauses mid-sentence while thinking or writing.";
+/** The agent-wide context and keywords: no language named, since Bolna's dashboard shows them on every language's tab. */
+const SHARED_CONTEXT = `${CLASS} The student ${WORKING}`;
 /** What the speech recogniser is told about each class language (Bolna keeps one per language). */
 export const TRANSCRIBER_CONTEXT: Record<"hi" | "en" | "ta" | "te", string> = {
   hi: `${CLASS} The student speaks Hindi, ${WORKING}`,
@@ -524,8 +526,8 @@ export function buildAgentPayload(opts: { publicUrl: string; toolsToken?: string
               sampling_rate: 16000,
               // Fallback silence before replying, for transcribers without their own turn detection.
               endpointing: 700,
-              keywords: TRANSCRIBER_KEYWORDS[base],
-              context: TRANSCRIBER_CONTEXT[base],
+              keywords: MATHS_TERMS,
+              context: SHARED_CONTEXT,
             },
             input: { provider: v.telephony, format: "wav" },
             output: { provider: v.telephony, format: "wav" },
