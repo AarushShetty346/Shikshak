@@ -23,18 +23,18 @@ if (!key) {
   console.error("Set BOLNA_API_KEY in .env to read call records.");
   process.exit(1);
 }
-const agents = Object.entries({ normal: process.env.BOLNA_AGENT_ID, slower: process.env.BOLNA_AGENT_ID_SLOW, faster: process.env.BOLNA_AGENT_ID_FAST }).filter(([, id]) => id) as [string, string][];
+const agents = Object.entries({ normal: process.env.BOLNA_AGENT_ID }).filter(([, id]) => id) as [string, string][];
 
 const records: CallRecord[] = [];
-for (const [speed, id] of agents) {
+for (const [name, id] of agents) {
   const r = await fetch(`https://api.bolna.ai/v2/agent/${id}/executions?page_size=${Math.min(limit, 100)}`, { headers: { Authorization: `Bearer ${key}` } });
   if (!r.ok) {
-    console.error(`Bolna said ${r.status} for the ${speed} agent`);
+    console.error(`Bolna said ${r.status} for the ${name} agent`);
     continue;
   }
   const data = (await r.json()) as { data?: unknown[] } | unknown[];
   const list = (Array.isArray(data) ? data : (data.data ?? [])) as Record<string, any>[]; // eslint-disable-line @typescript-eslint/no-explicit-any
-  for (const e of list.slice(0, limit)) records.push({ ...turnsFromExecution(e), agent: speed });
+  for (const e of list.slice(0, limit)) records.push({ ...turnsFromExecution(e), agent: name });
 }
 
 const s = summarise(records);

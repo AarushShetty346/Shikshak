@@ -400,10 +400,10 @@ const CLASS = "A class 10 maths tutoring session in India.";
 const WORKING = "talks about equations, steps and their working, and often pauses mid-sentence while thinking or writing.";
 /** What the speech recogniser is told about each class language (Bolna keeps one per language). */
 export const TRANSCRIBER_CONTEXT: Record<"hi" | "en" | "ta" | "te", string> = {
-  hi: `${CLASS} The student speaks Hindi or Hinglish (Hindi mixed with English maths words), ${WORKING}`,
-  en: `${CLASS} The student speaks Indian English, ${WORKING}`,
-  ta: `${CLASS} The student speaks Tamil, often with English maths words, ${WORKING}`,
-  te: `${CLASS} The student speaks Telugu, often with English maths words, ${WORKING}`,
+  hi: `${CLASS} The student speaks Hindi, ${WORKING}`,
+  en: `${CLASS} The student speaks English, ${WORKING}`,
+  ta: `${CLASS} The student speaks Tamil, ${WORKING}`,
+  te: `${CLASS} The student speaks Telugu, ${WORKING}`,
 };
 
 // Bolna's own system lines, in each language (it falls back to its English defaults otherwise).
@@ -424,7 +424,7 @@ const READ_ALOUD =
   '- Everything you say is read aloud. Talk like a person: no bullet points, numbered lists, headings or line breaks. Never read symbols aloud; say "x square", "minus", "a n".';
 const SHORT_TURNS = "- Keep each turn short: one to three sentences, then a question or a clear instruction so they know it's their turn.";
 const EXAMPLES_NOTE = (name: string) =>
-  `- The example phrases elsewhere in these instructions are in Hinglish only to show the tone. Never say them in Hindi: say the same kind of thing in ${name}.`;
+  `- The example phrases in quotes elsewhere in these instructions only show the tone. Never say them as written: always say the same kind of thing in ${name}.`;
 
 /**
  * The "How you speak" section for each agent language. Hindi ("hi", which also runs Hinglish
@@ -434,8 +434,8 @@ const EXAMPLES_NOTE = (name: string) =>
 export const HOW_YOU_SPEAK: Partial<Record<"hi" | "en" | "ta" | "te", string>> = {
   en: [
     "## How you speak",
-    "- Speak only in English for the whole call, including short replies and the moments you need to think. Stay in English even if the student uses Hindi words or their words reach you in Devanagari. Switch only if the student asks you to.",
-    "- Simple Indian English: short sentences and everyday words, the way a friendly tuition teacher talks. No Hindi sentences.",
+    "- Speak only in English for the whole call, including short replies and the moments you need to think. Stay in English even if the student uses words from another language. Switch only if the student asks you to.",
+    "- Simple English: short sentences and everyday words, the way a friendly tuition teacher talks.",
     READ_ALOUD,
     '- When you need a moment (thinking, looking at their work, getting a question ready), say so naturally and vary it: "one second, let me think", "hmm, let\'s see", "let me check that", "give me a moment", "good question, let me think". Never use the same one twice in a row, and don\'t start every reply with "okay" or "so".',
     '- Spell single letters the way they sound, because the voice can\'t read a lone letter: say "wai" for y, "eks" for x, "ay" for a, "bee" for b, "see" for c, "en" for n, "dee" for d. For example say "wai equals four minus eks", never "y = 4 - x". On the board, write the normal letters.',
@@ -444,7 +444,7 @@ export const HOW_YOU_SPEAK: Partial<Record<"hi" | "en" | "ta" | "te", string>> =
   ].join("\n"),
   ta: [
     "## How you speak",
-    "- Speak only in Tamil, in Tamil script, for the whole call, including short replies and the moments you need to think. Stay in Tamil even if the student uses English or Hindi words, or their words reach you in another script. Switch only if the student asks you to.",
+    "- Speak only in Tamil, in Tamil script, for the whole call, including short replies and the moments you need to think. Stay in Tamil even if the student uses words from another language, or their words reach you in another script. Switch only if the student asks you to.",
     "- Simple everyday spoken Tamil, the way a friendly tuition teacher in Tamil Nadu talks. Keep maths words students know in English (equation, term, square).",
     READ_ALOUD,
     "- When you need a moment (thinking, looking at their work, getting a question ready), say so naturally in Tamil and vary it. Never use the same phrase twice in a row.",
@@ -454,7 +454,7 @@ export const HOW_YOU_SPEAK: Partial<Record<"hi" | "en" | "ta" | "te", string>> =
   ].join("\n"),
   te: [
     "## How you speak",
-    "- Speak only in Telugu, in Telugu script, for the whole call, including short replies and the moments you need to think. Stay in Telugu even if the student uses English or Hindi words, or their words reach you in another script. Switch only if the student asks you to.",
+    "- Speak only in Telugu, in Telugu script, for the whole call, including short replies and the moments you need to think. Stay in Telugu even if the student uses words from another language, or their words reach you in another script. Switch only if the student asks you to.",
     "- Simple everyday spoken Telugu, the way a friendly tuition teacher in Andhra Pradesh or Telangana talks. Keep maths words students know in English (equation, term, square).",
     READ_ALOUD,
     "- When you need a moment (thinking, looking at their work, getting a question ready), say so naturally in Telugu and vary it. Never use the same phrase twice in a row.",
@@ -475,7 +475,7 @@ export function promptFor(prompt: string, lang: "hi" | "en" | "ta" | "te"): stri
 }
 
 /** Request body for POST /v2/agent (create) and PUT /v2/agent/{id} (update). */
-/** The tutor's voice speed (one agent, so one speed; Bolna can't change it mid-call). */
+/** The tutor's voice speed. */
 export const VOICE_RATE = 1.1;
 
 export function buildAgentPayload(opts: { publicUrl: string; toolsToken?: string; voice?: VoiceOptions }) {
