@@ -12,11 +12,22 @@ test.beforeEach(async ({ page }, info) => {
   });
 });
 
+/** No account on this device: the home screen asks for one first (classes belong to an account). */
+async function ensureAccount(page: Page, name = "Tester") {
+  const form = page.getByRole("heading", { name: "Create your account" });
+  await expect(page.getByRole("button", { name: /New session/ }).first().or(form)).toBeVisible({ timeout: 15_000 });
+  if (await form.isVisible()) {
+    await page.getByLabel("Name or nickname").fill(name);
+    await page.getByRole("button", { name: "Create account" }).click();
+    await expect(page.getByRole("button", { name: /New session/ }).first()).toBeVisible();
+  }
+}
+
 async function addLearner(page: Page, name: string) {
   await page.goto("/");
   await page.getByRole("button", { name: "Add learner" }).click();
   await page.getByPlaceholder("Asha").fill(name);
-  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await page.getByRole("button", { name: /^(Add|Create account)$/ }).click();
   // Learners are profiles: the new one is picked and shows as the profile button, with "My progress".
   await expect(page.getByRole("button", { name: `Profile: ${name}` })).toBeVisible();
   await expect(page.getByRole("button", { name: "My progress" })).toBeVisible();
@@ -24,6 +35,7 @@ async function addLearner(page: Page, name: string) {
 
 test("a learner can be added and a class created and opened, with no horizontal scrolling", async ({ page }) => {
   await addLearner(page, "Asha");
+  await ensureAccount(page);
   await page.getByRole("button", { name: /New session/ }).first().click();
   await page.getByPlaceholder("e.g. Quadratic equations").fill("Arithmetic progressions");
   await page.getByRole("button", { name: "Create session" }).click();
@@ -60,6 +72,7 @@ test("health says what is configured without claiming providers work", async ({ 
 
 test("practice question, write on the board, press Done: marked, with practice marks labelled as not official", async ({ page }) => {
   await addLearner(page, "Meera");
+  await ensureAccount(page);
   await page.getByRole("button", { name: /New session/ }).first().click();
   await page.getByPlaceholder("e.g. Quadratic equations").fill("Arithmetic progressions");
   await page.getByRole("button", { name: "Create session" }).click();

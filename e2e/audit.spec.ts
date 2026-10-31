@@ -14,8 +14,20 @@ test.beforeEach(async ({ page }, info) => {
   });
 });
 
+/** No account on this device: the home screen asks for one first (classes belong to an account). */
+async function ensureAccount(page: Page, name = "Tester") {
+  const form = page.getByRole("heading", { name: "Create your account" });
+  await expect(page.getByRole("button", { name: /New session/ }).first().or(form)).toBeVisible({ timeout: 15_000 });
+  if (await form.isVisible()) {
+    await page.getByLabel("Name or nickname").fill(name);
+    await page.getByRole("button", { name: "Create account" }).click();
+    await expect(page.getByRole("button", { name: /New session/ }).first()).toBeVisible();
+  }
+}
+
 async function openClass(page: Page, topic = "Quadratic equations") {
   await page.goto("/");
+  await ensureAccount(page);
   await page.getByRole("button", { name: /New session/ }).first().click();
   await page.getByPlaceholder("e.g. Quadratic equations").fill(topic);
   await page.getByRole("button", { name: "Create session" }).click();
@@ -98,6 +110,7 @@ test("BUG-06: after three hints the question is still on screen", async ({ page 
 
 test("BUG-07: the first screen says what Shikshak is", async ({ page }) => {
   await page.goto("/");
+  await ensureAccount(page);
   const pitch = page.locator(".home-empty");
   await expect(pitch).toContainText(/I am Shikshak, your tutor/);
   await expect(pitch).toContainText(/handwritten/i);
@@ -106,6 +119,7 @@ test("BUG-07: the first screen says what Shikshak is", async ({ page }) => {
 
 test("BUG-11: a class can't be created without a topic", async ({ page }) => {
   await page.goto("/");
+  await ensureAccount(page);
   await page.getByRole("button", { name: /New session/ }).first().click();
   const create = page.getByRole("button", { name: "Create session" });
   await expect(create).toBeDisabled();
@@ -156,6 +170,7 @@ test("BUG-18: a fake check is labelled as simulated on the student's screen", as
 
 test("a new session: the duster wipes the board, then the class opens", async ({ page }) => {
   await page.goto("/");
+  await ensureAccount(page);
   await page.getByRole("button", { name: /New session/ }).first().click();
   await page.getByPlaceholder("e.g. Quadratic equations").fill("Quadratic equations");
   await page.getByRole("button", { name: "Create session" }).click();
@@ -393,7 +408,7 @@ test("study group: start one, a friend joins with the link, and opens my notes, 
     await page.goto("/");
     await page.getByRole("button", { name: "Add learner" }).click();
     await page.getByPlaceholder("Asha").fill(name);
-    await page.getByRole("button", { name: "Add", exact: true }).click();
+    await page.getByRole("button", { name: /^(Add|Create account)$/ }).click();
     await expect(page.getByRole("button", { name: `Profile: ${name}` })).toBeVisible();
     return { ctx, page };
   };
@@ -466,10 +481,35 @@ test("study group: a friend on a new device makes their account right on the joi
   await other.close();
 });
 
+test("classes belong to an account: a class with no account is cleared, the account's own stay", async ({ page }) => {
+  await page.goto("/");
+  // A class left on the device from before (no account), like after the server was reset.
+  await page.evaluate(() => {
+    const t = Date.now();
+    const stray = { id: "OLD123", name: "Old class", studentName: "", grade: "10", language: "hinglish", topic: "Old class", createdAt: t, updatedAt: t, archived: false, started: false, learnerId: null };
+    localStorage.setItem("shikshak.sessions", JSON.stringify([stray]));
+  });
+  await page.reload();
+  // No account: making one comes first, and there's no way round it.
+  await expect(page.getByRole("heading", { name: "Create your account" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Cancel" })).toHaveCount(0);
+  await ensureAccount(page, "Harsh");
+  await expect(page.getByText("Old class")).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => localStorage.getItem("shikshak.sessions") ?? "")).not.toContain("OLD123");
+  // A class made by this account stays after a reload.
+  await page.getByRole("button", { name: /New session/ }).first().click();
+  await page.getByPlaceholder("e.g. Quadratic equations").fill("Arithmetic progressions");
+  await page.getByRole("button", { name: "Create session" }).click();
+  await expect(page.locator("canvas.board-ink")).toBeVisible({ timeout: 20_000 });
+  await page.goto("/");
+  await expect(page.getByText("Arithmetic progressions").first()).toBeVisible();
+});
+
 test("guided tour: the first visit walks through the controls, once, and can be replayed", async ({ page }) => {
   const clips: string[] = [];
   page.on("request", (r) => r.url().includes("/tour/") && clips.push(r.url()));
   await page.goto("/");
+  await ensureAccount(page);
   const bubble = page.locator(".tour-bubble");
   await expect(bubble).toContainText("Namaste", { timeout: 5000 });
   await page.getByRole("button", { name: "Next" }).click();
@@ -487,6 +527,7 @@ test("guided tour: the first visit walks through the controls, once, and can be 
   await page.waitForTimeout(1500);
   await expect(page.locator(".tour")).toHaveCount(0);
   // The first class has its own tour, ending with how a class goes.
+  await ensureAccount(page);
   await page.getByRole("button", { name: /New session/ }).first().click();
   await page.getByPlaceholder("e.g. Quadratic equations").fill("Quadratic equations");
   await page.getByRole("button", { name: "Create session" }).click();
