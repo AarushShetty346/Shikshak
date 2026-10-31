@@ -5436,3 +5436,27 @@ button.group-card {
 .group-dot {
   border-radius: 24%;
 }
+
+/* The tour bubble is cream on every page: its buttons keep their own colours (on the home board the
+   page's yellow buttons made "Next" pale yellow on pale yellow). */
+.tour-bubble .btn-primary,
+.home-board .tour-bubble .btn-primary {
+  background: #23392f !important;
+  color: #fff8e1 !important;
+  box-shadow: 0 2px 0 rgb(0 0 0 / 0.25);
+  opacity: 1 !important;
+}
+.tour-bubble .btn-primary:hover,
+.home-board .tour-bubble .btn-primary:hover {
+  background: #2f4a3d !important;
+}
+.tour-bubble .btn-secondary,
+.home-board .tour-bubble .btn-secondary {
+  background: #fff !important;
+  color: #23392f !important;
+  box-shadow: inset 0 0 0 1.5px #b9c4bd !important;
+}
+.tour-bubble .tour-skip,
+.home-board .tour-bubble .tour-skip {
+  color: #4a5751 !important;
+}

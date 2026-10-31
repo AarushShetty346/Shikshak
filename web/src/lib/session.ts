@@ -47,6 +47,8 @@ export interface SessionData {
   docs: DocMeta[];
   speed: Speed;
   handsFree: boolean;
+  /** The student turned the mic off in this class (otherwise it listens). */
+  micOff?: boolean;
   /** The quick check was offered (started or skipped) for this class. */
   quickOffered?: boolean;
 }
@@ -121,7 +123,7 @@ export function updateSession(id: string, patch: Partial<SessionMeta>) {
   if (meta) saveSession({ ...meta, ...patch, updatedAt: patch.updatedAt ?? Date.now() });
 }
 
-const DEFAULT_DATA = (): SessionData => ({ snapshot: emptySnapshot(), plan: null, docs: [], speed: "normal", handsFree: false });
+const DEFAULT_DATA = (): SessionData => ({ snapshot: emptySnapshot(), plan: null, docs: [], speed: "normal", handsFree: true });
 
 /** Older versions kept a list of events instead of a snapshot: replay them once. */
 function migrate(raw: Record<string, unknown>): SessionData {
@@ -132,7 +134,9 @@ function migrate(raw: Record<string, unknown>): SessionData {
     plan: null,
     docs: Array.isArray(raw.docs) ? (raw.docs as DocMeta[]) : d.docs,
     speed: raw.speed === "slower" || raw.speed === "faster" ? raw.speed : "normal",
-    handsFree: raw.handsFree === true,
+    // The mic listens unless the student turned it off (older saves stored push-to-talk as the default).
+    handsFree: raw.micOff !== true,
+    micOff: raw.micOff === true,
     quickOffered: raw.quickOffered === true,
   };
   if (!raw.snapshot && Array.isArray(raw.events)) {

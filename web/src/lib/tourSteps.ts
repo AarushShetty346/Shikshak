@@ -40,7 +40,7 @@ export const HOME_TOUR: TourStep[] = [
 export const CLASS_TOUR: TourStep[] = [
   { title: "This is our blackboard", text: "I teach on this board, and you write on it too. Let me show you the buttons." },
   { target: ".btn-start", title: "Start the class", text: "Press Play and I'll begin talking. Then just talk back to me, like a real class." },
-  { target: ".btn-mic, .btn-talk", title: "How to talk to me", text: "Once we start, hold the mic button, or hold Space or Caps Lock, while you speak. Let go when you're done. Need to stop me? Press Stop." },
+  { target: ".btn-mic", title: "How to talk to me", text: "Once we start, I'm listening. Just talk to me, like a real class. Tap the mic to mute it, and press Stop if you want to cut me off." },
   { target: ".pen-fab", title: "Your pen", text: "Tap the pen for your tools: pen, eraser, scroll and undo. Write your working with your finger, mouse or stylus, one step on each line." },
   { target: ".dock-input input", title: "Rather type?", text: "No stylus? Type a step here and press Enter. Tap T for maths symbols like therefore and implies." },
   { target: "button.btn-done", title: "Press Done", text: "When you finish, press Done. I'll read your steps and circle the first one that went wrong." },
