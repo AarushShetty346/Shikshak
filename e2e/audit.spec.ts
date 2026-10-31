@@ -6,7 +6,7 @@ import { expect, test, type Page } from "@playwright/test";
 // These tests aren't about the first-time tour (its own test is in audit.spec.ts): mark it as seen.
 test.beforeEach(async ({ page }, info) => {
   // The start screen has its own test.
-  if (!info.title.includes("start screen")) await page.addInitScript(() => sessionStorage.setItem("shikshak.splashSeen", "1"));
+  if (!info.title.includes("start screen")) await page.addInitScript(() => sessionStorage.setItem("shikshak.test.skipSplash", "1"));
   if (info.title.includes("guided tour")) return;
   await page.addInitScript(() => {
     localStorage.setItem("shikshak.tour.home.v1", "1");
@@ -344,6 +344,8 @@ test("session layout: start, the typing field and the mic at the bottom; the pen
 });
 
 test("start screen: Shikshak in the middle, Start Shiksha, then a new device makes its account", async ({ page }) => {
+  // A tab from an older version still carries its old "seen" mark: the start screen shows anyway.
+  await page.addInitScript(() => sessionStorage.setItem("shikshak.splashSeen", "1"));
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Shikshak" })).toBeVisible();
   await expect(page.getByText("Shikshak, your own tutor")).toBeVisible();
@@ -400,7 +402,7 @@ test("study group: start one, a friend joins with the link, and opens my notes, 
   const device = async (name: string) => {
     const ctx = await browser.newContext();
     await ctx.addInitScript(() => {
-      sessionStorage.setItem("shikshak.splashSeen", "1");
+      sessionStorage.setItem("shikshak.test.skipSplash", "1");
       localStorage.setItem("shikshak.tour.home.v1", "1");
       localStorage.setItem("shikshak.tour.class.v1", "1");
     });
@@ -455,7 +457,7 @@ test("study group: start one, a friend joins with the link, and opens my notes, 
 test("study group: a friend on a new device makes their account right on the join screen", async ({ browser }) => {
   const ctx = await browser.newContext();
   await ctx.addInitScript(() => {
-    sessionStorage.setItem("shikshak.splashSeen", "1");
+    sessionStorage.setItem("shikshak.test.skipSplash", "1");
     localStorage.setItem("shikshak.tour.home.v1", "1");
     localStorage.setItem("shikshak.tour.class.v1", "1");
   });

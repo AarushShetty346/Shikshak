@@ -5,7 +5,7 @@
 import { ArrowRight } from "@phosphor-icons/react";
 
 /** Set by the browser tests to skip the start screen. */
-const SKIP = "shikshak.splashSeen";
+const SKIP = "shikshak.test.skipSplash";
 
 export function splashDue(): boolean {
   try {
