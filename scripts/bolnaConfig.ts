@@ -541,7 +541,14 @@ export function buildAgentPayload(opts: { publicUrl: string; toolsToken?: string
                 v.languages.map((lang) => [
                   lang,
                   {
-                    transcriber: { language: lang, keywords: TRANSCRIBER_KEYWORDS[lang], context: TRANSCRIBER_CONTEXT[lang] },
+                    // Bolna needs the provider and model on each language once anything besides the language is set.
+                    transcriber: {
+                      provider: v.transcriber.provider,
+                      model: v.transcriber.model,
+                      language: lang,
+                      keywords: TRANSCRIBER_KEYWORDS[lang],
+                      context: TRANSCRIBER_CONTEXT[lang],
+                    },
                     synthesizer: synthesizerFor(lang),
                     system_prompt: promptFor(prompt, lang),
                     agent_name: "Shikshak",
