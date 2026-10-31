@@ -230,41 +230,107 @@ function Body({ d, w, h, shown, values }: { d: Diagram; w: number; h: number; sh
       );
     }
     case "triangle": {
-      const top = { x: w * 0.3, y: 30 };
-      const left = { x: w * 0.3, y: h - 40 };
-      const right = { x: w * 0.75, y: h - 40 };
-      // A is the top, B the corner (right angle when "right"), C the far end.
-      const A = d.right ? top : { x: w * 0.42, y: 30 };
-      const B = left;
-      const C = right;
-      const pos: Record<string, { x: number; y: number }> = { [d.labels[0].toUpperCase()]: A, [d.labels[1].toUpperCase()]: B, [d.labels[2].toUpperCase()]: C };
-      const mid = (p: { x: number; y: number }, q: { x: number; y: number }) => ({ x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 });
+      type P = { x: number; y: number };
+      const L = d.labels.map((l) => l.toUpperCase());
+      const len = (v?: string) => (v && /^\s*\d+(\.\d+)?\s*$/.test(v) ? Number(v) : null);
+      const sideOf = (p: string, q: string) => {
+        const k = [p, q].sort().join("");
+        const map: Record<string, string | undefined> = { [[L[0], L[1]].sort().join("")]: d.sides.AB, [[L[1], L[2]].sort().join("")]: d.sides.BC, [[L[2], L[0]].sort().join("")]: d.sides.CA };
+        return map[k];
+      };
+      const pos: Record<string, P> = {};
+      if (d.right) {
+        // The right angle (opposite the longest side) is the bottom-left corner; the other two corners
+        // go up and to the right, drawn to scale when both legs are numbers.
+        const corner = (d.rightAt ?? L[1]).toUpperCase();
+        const [up, across] = L.filter((l) => l !== corner);
+        const lu = len(sideOf(corner, up));
+        const la = len(sideOf(corner, across));
+        const maxH = h - 75;
+        const maxW = w * 0.5;
+        let hh = maxH;
+        let ww = maxW * 0.9;
+        if (lu && la) {
+          const k = Math.min(maxH / lu, maxW / la);
+          hh = Math.max(60, lu * k);
+          ww = Math.max(60, la * k);
+        }
+        const B0 = { x: Math.max(50, (w - ww) / 2), y: h - 40 };
+        pos[corner] = B0;
+        pos[up] = { x: B0.x, y: B0.y - hh };
+        pos[across] = { x: B0.x + ww, y: B0.y };
+      } else {
+        pos[L[0]] = { x: w * 0.42, y: 30 };
+        pos[L[1]] = { x: w * 0.3, y: h - 40 };
+        pos[L[2]] = { x: w * 0.75, y: h - 40 };
+      }
+      const [A, B, C] = L.map((l) => pos[l]);
+      const centre = { x: (A.x + B.x + C.x) / 3, y: (A.y + B.y + C.y) / 3 };
+      // Labels sit outside the triangle: pushed away from its centre.
+      const away = (p: P, dist: number) => {
+        const dx = p.x - centre.x;
+        const dy = p.y - centre.y;
+        const m = Math.hypot(dx, dy) || 1;
+        return { x: p.x + (dx / m) * dist, y: p.y + (dy / m) * dist };
+      };
+      const mid = (p: P, q: P) => ({ x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 });
       const sideLabels = [
-        { key: "AB", at: mid(A, B), dx: -30, dy: 0, text: d.sides.AB },
-        { key: "BC", at: mid(B, C), dx: 0, dy: 28, text: d.sides.BC },
-        { key: "CA", at: mid(C, A), dx: 28, dy: -10, text: d.sides.CA },
-      ].filter((s) => s.text);
+        { key: "AB", at: away(mid(A, B), 30), text: d.sides.AB },
+        { key: "BC", at: away(mid(B, C), 30), text: d.sides.BC },
+        { key: "CA", at: away(mid(C, A), 30), text: d.sides.CA },
+      ].filter((x) => x.text);
+      const corner = d.right ? pos[(d.rightAt ?? L[1]).toUpperCase()] : null;
       const ang = d.angle ? pos[d.angle.at] : null;
+      // The marked angle: an arc between its two sides, with the name just inside it on the bisector.
+      const arc = (() => {
+        if (!ang || !d.angle) return null;
+        const others = L.filter((l) => l !== d.angle!.at).map((l) => pos[l]);
+        const unit = (q: P) => {
+          const m = Math.hypot(q.x - ang.x, q.y - ang.y) || 1;
+          return { x: (q.x - ang.x) / m, y: (q.y - ang.y) / m };
+        };
+        const [u, v] = others.map(unit);
+        const shortest = Math.min(...others.map((q) => Math.hypot(q.x - ang.x, q.y - ang.y)));
+        const r = Math.max(18, Math.min(30, shortest * 0.3));
+        const sweep = u.x * v.y - u.y * v.x > 0 ? 1 : 0;
+        const bis = { x: u.x + v.x, y: u.y + v.y };
+        const bm = Math.hypot(bis.x, bis.y) || 1;
+        // Far enough along the bisector for the name to fit between the two sides (narrow angles
+        // push it out), but not beyond the middle of the shorter side.
+        const cosHalf = Math.min(1, bm / 2);
+        const sinHalf = Math.max(0.12, Math.sqrt(1 - cosHalf * cosHalf));
+        const half = (prettify(d.angle.label).length * 12) / 2 + 6;
+        const dist = Math.min(Math.max(r + 14, half / sinHalf), shortest * 0.5);
+        return {
+          d: `M ${ang.x + u.x * r} ${ang.y + u.y * r} A ${r} ${r} 0 0 ${sweep} ${ang.x + v.x * r} ${ang.y + v.y * r}`,
+          label: { x: ang.x + (bis.x / bm) * dist, y: ang.y + (bis.y / bm) * dist },
+        };
+      })();
       return (
         <>
           <Piece on={shown > 0}>
             <path d={`M ${A.x} ${A.y} L ${B.x} ${B.y} L ${C.x} ${C.y} Z`} fill="none" stroke={CHALK} strokeWidth={3} strokeLinejoin="round" pathLength={1} className="dline" />
-            {d.right && <path d={`M ${B.x} ${B.y - 22} L ${B.x + 22} ${B.y - 22} L ${B.x + 22} ${B.y}`} fill="none" stroke={CHALK} strokeWidth={2.5} />}
-            <Text x={A.x - 18} y={A.y - 4}>{d.labels[0]}</Text>
-            <Text x={B.x - 20} y={B.y + 14}>{d.labels[1]}</Text>
-            <Text x={C.x + 20} y={C.y + 14}>{d.labels[2]}</Text>
+            {corner && <path d={`M ${corner.x} ${corner.y - 22} L ${corner.x + 22} ${corner.y - 22} L ${corner.x + 22} ${corner.y}`} fill="none" stroke={CHALK} strokeWidth={2.5} />}
+            {L.map((l, i) => {
+              const at = away(pos[l], 24);
+              return (
+                <Text key={l} x={at.x} y={at.y}>
+                  {d.labels[i]}
+                </Text>
+              );
+            })}
           </Piece>
-          {sideLabels.map((s, i) => (
-            <Piece key={s.key} on={shown > 1 + i}>
-              <Text x={s.at.x + s.dx} y={s.at.y + s.dy} fill={YELLOW} fontSize={24}>
-                {prettify(s.text!)}
+          {sideLabels.map((x, i) => (
+            <Piece key={x.key} on={shown > 1 + i}>
+              <Text x={x.at.x} y={x.at.y} fill={YELLOW} fontSize={24}>
+                {prettify(x.text!)}
               </Text>
             </Piece>
           ))}
-          {ang && d.angle && (
+          {arc && d.angle && (
             <Piece on={shown > 1 + sideLabels.length}>
-              <circle cx={ang.x} cy={ang.y} r={34} fill="none" stroke={YELLOW} strokeWidth={2} strokeDasharray="4 5" />
-              <Text x={ang.x + (ang === C ? -52 : 30)} y={ang.y + (ang === A ? 48 : -22)} fill={YELLOW} fontSize={24}>
+              <path d={arc.d} fill="none" stroke={YELLOW} strokeWidth={2.5} />
+              <Text x={arc.label.x} y={arc.label.y} fill={YELLOW} fontSize={22}>
                 {prettify(d.angle.label)}
               </Text>
             </Piece>

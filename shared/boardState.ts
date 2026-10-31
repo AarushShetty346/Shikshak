@@ -35,8 +35,8 @@ export function applyEvent(snap: BoardSnapshot, e: BoardEvent, maxBlocks = 400):
   if (isBlockEvent(e)) {
     if (snap.blocks.some((b) => "id" in b && b.id === e.id)) return next; // same block twice
     let blocks = [...snap.blocks, { ...e }];
-    // A block that replaces another rubs the old one out.
-    if ((e.type === "write" || e.type === "draw") && e.replaces) blocks = blocks.map((b) => (blockLabel(b) === e.replaces ? { ...b, erased: true } : b));
+    // A block that "replaces" another is a correction written below it: the old one stays (the board
+    // keeps everything). Only an explicit erase, which the student asks for, rubs a block out.
     next.blocks = trimBlocks(blocks, maxBlocks);
     if (e.type === "steps" && e.section) next.section = e.section.n;
     const q = questionOf(e);

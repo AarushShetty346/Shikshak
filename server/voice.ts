@@ -3,7 +3,7 @@
 // variables). Enforces per-device and server-wide limits on concurrent calls and on estimated
 // minutes per day, so a bug or a misbehaving client can't run up the bill.
 
-import { greetingFor, LANGUAGE_NAMES, VOICE_LANGUAGE } from "../shared/types";
+import { greetingFor, LANGUAGE_NAMES, VOICE_LANGUAGE, type Language } from "../shared/types";
 import { randomId } from "./auth";
 import { lessonState } from "./board";
 import { config } from "./config";
@@ -13,6 +13,20 @@ import { outlineFor } from "./plan";
 import { save, type Session } from "./sessions";
 
 export type Speed = "slower" | "normal" | "faster";
+
+/**
+ * What "Speak in: {{language_name}}" tells the tutor. The student's words often reach her in
+ * Devanagari (the Hindi transcriber writes Hinglish that way), which pulled an English or Hinglish
+ * class into pure Hindi; each rule says to stay in the class's language regardless.
+ */
+export const SPOKEN_LANGUAGE: Record<Language, string> = {
+  hi: "Hindi: simple everyday Hindi in Devanagari, keeping maths words in English (equation, term, square)",
+  hinglish:
+    "Hinglish: a natural Hindi-English mix in Roman script, the way a friendly tuition teacher in India talks, with plenty of English words (\"Dekho, yahan humein x ko alag karna hai\"). Never pure Hindi and never Devanagari, even when the student's words reach you in Devanagari",
+  en: "English: simple Indian English only. No Hindi sentences, even when the student uses Hindi words or their words reach you in Devanagari",
+  ta: "Tamil",
+  te: "Telugu",
+};
 
 interface ActiveCall {
   id: string;
@@ -79,7 +93,7 @@ export function buildUserData(s: Session, opts: { speed: Speed; resuming: boolea
     student_name: s.studentName || "student",
     grade: s.grade,
     language: s.language,
-    language_name: LANGUAGE_NAMES[s.language],
+    language_name: SPOKEN_LANGUAGE[s.language],
     topic,
     speed: opts.speed,
     lesson_plan: plan ? outlineFor(plan) : "No prepared plan. Ask the student what they are stuck on, then teach it on the board with write and draw.",

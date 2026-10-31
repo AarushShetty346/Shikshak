@@ -7,6 +7,7 @@ import { DIAGRAM_EXAMPLES, parseDiagram } from "../shared/diagram";
 import { splitSteps } from "../shared/mathText";
 import type { MarkStyle, Place, WriteStyle } from "../shared/types";
 import { randomId } from "./auth";
+import { arithmeticSlips } from "./marking";
 import { revealsAnswer } from "./teaching";
 import { boardMap, emit, findBlock, nextLabel, recordBlock, type Session } from "./sessions";
 
@@ -36,8 +37,7 @@ function replaced(s: Session, raw: unknown): { label: string | null; error?: str
   if (!r) return { label: null };
   const block = findBlock(s, r);
   if (!block) return { label: null, error: `There is no ${r.toUpperCase()} on the board. ${boardMap(s)}` };
-  block.erased = true; // its space is reused by the new block
-  return { label: block.label };
+  return { label: block.label }; // a correction: the old block stays, the new one goes below
 }
 
 export function write(s: Session, p: Params): Reply {
@@ -47,6 +47,10 @@ export function write(s: Session, p: Params): Reply {
   // Don't let an ordinary board write hand over the answer to the current question.
   if (style !== "your_turn" && revealsAnswer(s, lines))
     return { ok: false, error: `That would give away the answer to the question they're working on. Use give_hint (${s.problem?.rung ?? 0} of 3 shown so far), or show_solution if they asked to see it.` };
+  if (style !== "your_turn") {
+    const slips = arithmeticSlips(lines);
+    if (slips.length) return { ok: false, error: wrongSums(slips) };
+  }
   const rep = replaced(s, p.replace);
   if (rep.error) return { ok: false, error: rep.error };
   const label = nextLabel(s);
@@ -99,18 +103,23 @@ export function highlight(s: Session, p: Params): Reply {
 
 export function erase(s: Session, p: Params): Reply {
   const raw = str(p.target);
-  if (/^(all|everything|board|sab)$/i.test(raw)) {
-    for (const b of s.blocks) b.erased = true;
+  if (/^(all|everything|board|sab|poora|pura)$/i.test(raw)) {
+    for (const b of s.blocks) {
+      if (b.erased) continue;
+      b.erased = true;
+      emit(s, { type: "erase", target: b.label });
+    }
     emit(s, { type: "page", id: randomUUID() });
     s.recentBoard = [];
     s.problem = null;
-    return { ok: true, note: "A fresh page is open. The old one is still above if the student scrolls up." };
+    return { ok: true, note: "Your writing is rubbed off the student's board and a fresh page is open." };
   }
   const block = findBlock(s, raw);
-  if (!block || block.erased) return { ok: false, error: `Name a block to rub out, like "B2", or "all". ${boardMap(s)}` };
+  if (!block) return { ok: false, error: `Nothing is rubbed out yet: name a block from the board map, like "B2", or "all". ${boardMap(s)}` };
+  if (block.erased) return { ok: true, note: `${block.label} is already rubbed out.`, board: boardMap(s) };
   block.erased = true;
   emit(s, { type: "erase", target: block.label });
-  return { ok: true, note: `${block.label} is rubbed out; its space can be reused with replace.`, board: boardMap(s) };
+  return { ok: true, note: `${block.label} is rubbed off the student's board now.`, board: boardMap(s) };
 }
 
 /** After answering a doubt: unpause the board and remind the tutor exactly where the lesson was. */
@@ -155,4 +164,9 @@ export function lessonState(s: Session): string {
   const section = s.study && s.study.section > 0 ? `Plan section ${s.study.section} of ${s.study.plan.sections.length} ("${s.study.plan.sections[s.study.section - 1].title}") was the last one taught. ` : "";
   const at = s.interrupt?.label ? `The student had interrupted while you explained ${s.interrupt.label}. ` : "";
   return `This class was paused and is now resuming; the board is still on their screen. ${section}${at}Board so far: ${boardMap(s, 10)}`;
+}
+
+/** Tells the tutor which of her lines don't add up, so she fixes them before the student sees them. */
+export function wrongSums(slips: { line: number; note: string }[]): string {
+  return `Not written: ${slips.map((x) => `line ${x.line}: ${x.note}`).join("; ")}. Recheck the working and write it again. The student hasn't seen it, so don't mention it.`;
 }

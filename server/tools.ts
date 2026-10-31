@@ -10,7 +10,8 @@ import express, { type NextFunction, type Request, type Response } from "express
 import { randomUUID } from "node:crypto";
 import { splitSteps } from "../shared/mathText";
 import { randomId, sameSecret } from "./auth";
-import { continueLesson, draw, erase, highlight, newQuestionId, write } from "./board";
+import { continueLesson, draw, erase, highlight, newQuestionId, write, wrongSums } from "./board";
+import { arithmeticSlips } from "./marking";
 import { config } from "./config";
 import { allow } from "./limits";
 import { analyze, canLook, EMPTY_LOOK, isCurrent, publishResult } from "./look";
@@ -241,6 +242,8 @@ export function toolsRouter() {
     const steps = splitSteps(p.steps);
     if (steps.length === 0) return void res.json({ ok: false, error: "No steps given. Pass steps separated by ||." });
     if (revealsAnswer(s, steps)) return void res.json(GIVES_AWAY(s));
+    const slips = arithmeticSlips(steps);
+    if (slips.length) return void res.json({ ok: false, error: wrongSums(slips) });
     const label = nextLabel(s);
     const title = String(p.title ?? "").trim().slice(0, 200);
     recordBlock(s, { label, kind: "steps", summary: `${title ? title + ": " : ""}${steps.join(" / ")}`.slice(0, 120), lines: steps.length });

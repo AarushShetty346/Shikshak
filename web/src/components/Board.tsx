@@ -966,7 +966,18 @@ export function Board(props: Props) {
   const drewSinceMark = strokes.length > markBase.current.count;
   const correctAt = correct?.box ?? bandBoxes.correct;
 
+  // Blocks rubbed out because the student asked. (A block the tutor replaced stays: corrections go below.)
+  const erasedSet = useMemo(() => new Set(erased), [erased]);
+
   const sub = props.submission;
+  // The teacher's verdict card fades after a few seconds (the mark stays on the board, and she says it).
+  const cardKey = `${sub.captureId}:${sub.state}`;
+  const [cardGone, setCardGone] = useState<string | null>(null);
+  useEffect(() => {
+    if (sub.state !== "done" && sub.state !== "stale") return;
+    const t = setTimeout(() => setCardGone(cardKey), 5000);
+    return () => clearTimeout(t);
+  }, [cardKey, sub.state]);
   const busy = sub.state === "submitting" || sub.state === "reviewing";
   const canDone = response.length > 0 && responseKey !== lastDone && !busy;
   const doneLabel =
@@ -994,6 +1005,7 @@ export function Board(props: Props) {
                 key={b.id}
                 ref={measure(b)}
                 className={`tblock tblock-${b.kind}${b.kind === "write" ? ` tblock-${b.style}` : ""}`}
+                data-erased={label ? erasedSet.has(label) : false}
                 data-held={held.has(b.id)}
                 style={{ top: px(p.y), left: px(p.x), width: px(p.w) }}
               >
@@ -1085,7 +1097,7 @@ export function Board(props: Props) {
           New on the board <ArrowDown />
         </button>
       )}
-      {sub.state !== "idle" && <SubmissionCard sub={sub} onRetry={done} canRetry={response.length > 0} />}
+      {sub.state !== "idle" && cardGone !== cardKey && <SubmissionCard sub={sub} onRetry={done} canRetry={response.length > 0} />}
 
       {typing && <TypePanel onAdd={addTyped} onClose={() => setTyping(false)} />}
       <div className="board-tray" data-open={trayOpen} role="toolbar" aria-label="Board tools">

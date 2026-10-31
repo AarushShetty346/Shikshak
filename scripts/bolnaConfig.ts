@@ -107,7 +107,7 @@ export function buildTools(publicUrl: string, toolsToken?: string): ToolDef[] {
     tool(base, token, {
       name: "erase",
       description:
-        "Rub out a block that is no longer needed or was wrong (its space can be reused with write's replace), or 'all' to start a fresh page for a new topic when the board is crowded.",
+        "Rub out your own writing from the student's board, only when the student asks you to: a block label from the board map (e.g. 'B3'), or 'all' to clear your writing and start a fresh page. Say it's gone only after this returns ok.",
       pre_call_message: { hi: "बस एक पल।", en: "Just a moment." },
       properties: { target: { type: "string", description: "A block label like 'B3', or 'all'." } },
       required: ["target"],

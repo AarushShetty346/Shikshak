@@ -71,6 +71,7 @@ const DiagramSchema = z.union([
       sides: z.object({ AB: text(20).optional(), BC: text(20).optional(), CA: text(20).optional() }).strict(),
       angle: z.object({ at: text(4), label: text(20) }).strict().nullable(),
       right: z.boolean(),
+      rightAt: text(4).optional(),
     })
     .strict(),
   z.object({ type: z.literal("table"), header: z.array(text(40)).max(8), rows: z.array(z.array(text(40)).max(8)).max(8) }).strict(),

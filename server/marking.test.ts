@@ -190,3 +190,14 @@ describe("audit regressions: no false accusations across the library", () => {
       }
   });
 });
+
+import { arithmeticSlips } from "./marking";
+
+describe("the tutor's own arithmetic", () => {
+  it("finds a sum that doesn't hold, and leaves everything else alone", () => {
+    expect(arithmeticSlips(["2x + 3 = 7", "2x = 7 - 3 = 5", "x = 2"])).toEqual([{ line: 2, note: "7 - 3 is 4, not 5" }]);
+    expect(arithmeticSlips(["a_10 = 2 + 9 × 3 = 29", "d = 5 - 2 = 3", "sqrt(2) = 1.414", "22/7 = 3.14"])).toEqual([]);
+    expect(arithmeticSlips(["sin 30 = 1/2", "tan 45 = 1", "theta = 30°", "x = 2 or x = 3", "3 cm + 4 cm = 7 cm"])).toEqual([]);
+    expect(arithmeticSlips(["7 - 3 = 5 ✗ (wrong)", "galat: 2 + 2 = 5"])).toEqual([]);
+  });
+});
