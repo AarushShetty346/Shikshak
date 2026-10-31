@@ -29,7 +29,18 @@ function initial(s: SessionMeta): string {
   return (s.topic || s.name).trim().charAt(0).toUpperCase() || "श";
 }
 
-export function Home({ onOpen, onProgress, onSwitchMode }: { onOpen: (id: string) => void; onProgress: (learnerId: string) => void; onSwitchMode: (to: Mode) => void }) {
+export function Home({
+  onOpen,
+  onProgress,
+  onSwitchMode,
+  createAccount = false,
+}: {
+  onOpen: (id: string) => void;
+  onProgress: (learnerId: string) => void;
+  onSwitchMode: (to: Mode) => void;
+  /** Coming from the start screen on a new device: making your account comes first. */
+  createAccount?: boolean;
+}) {
   const [creating, setCreating] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
   const [menuFor, setMenuFor] = useState<string | null>(null);
@@ -101,6 +112,11 @@ export function Home({ onOpen, onProgress, onSwitchMode }: { onOpen: (id: string
 
   // The first time the home screen shows (not the profile picker), a short guided tour.
   const pickerShown = learners !== null && (adding || (learners.length > 0 && (picking || !current)));
+  // Only when coming from the start screen: otherwise the picker just adds a learner.
+  const newAccount = createAccount && learners !== null && learners.length === 0;
+  useEffect(() => {
+    if (newAccount) setAdding(true);
+  }, [newAccount]);
   const [touring, setTouring] = useState(false);
   useEffect(() => {
     if (learners === null || pickerShown || creating || !tourDue("home")) return;
@@ -155,6 +171,8 @@ export function Home({ onOpen, onProgress, onSwitchMode }: { onOpen: (id: string
 
   const addForm = adding && (
     <AddLearner
+      submitLabel={newAccount ? "Create account" : "Add"}
+      required={newAccount}
       onDone={(l) => {
         setAdding(false);
         if (l) {
@@ -179,8 +197,9 @@ export function Home({ onOpen, onProgress, onSwitchMode }: { onOpen: (id: string
         </header>
         <section className="picker" aria-labelledby="picker-title">
           <h1 id="picker-title" className="picker-title chalk">
-            Who's learning?
+            {newAccount ? "Create your account" : "Who's learning?"}
           </h1>
+          {newAccount && <p className="picker-lede">Tell me your name, your class and how you like to learn. It stays on this device.</p>}
           <ul className="profiles">
             {learners.map((l, i) => (
               <li key={l.id}>
@@ -206,7 +225,7 @@ export function Home({ onOpen, onProgress, onSwitchMode }: { onOpen: (id: string
           </ul>
           {addForm}
           {learnerError && <p className="form-error">{learnerError}</p>}
-          {adding && learners.length === 0 && (
+          {adding && learners.length === 0 && !createAccount && (
             <button className="link-button" onClick={() => setAdding(false)}>
               Back
             </button>
@@ -445,7 +464,7 @@ export function Home({ onOpen, onProgress, onSwitchMode }: { onOpen: (id: string
   );
 }
 
-function AddLearner({ onDone }: { onDone: (l: Learner | null) => void }) {
+function AddLearner({ onDone, submitLabel = "Add", required = false }: { onDone: (l: Learner | null) => void; submitLabel?: string; required?: boolean }) {
   const [name, setName] = useState("");
   const [grade, setGrade] = useState("10");
   const [language, setLanguage] = useState<Language>("hinglish");
@@ -490,11 +509,13 @@ function AddLearner({ onDone }: { onDone: (l: Learner | null) => void }) {
         </select>
       </label>
       <div className="actions">
-        <button type="button" className="btn-secondary btn-small" onClick={() => onDone(null)}>
-          Cancel
-        </button>
+        {!required && (
+          <button type="button" className="btn-secondary btn-small" onClick={() => onDone(null)}>
+            Cancel
+          </button>
+        )}
         <button className="btn-primary btn-small" disabled={saving || !name.trim()}>
-          {saving ? "Adding…" : "Add"}
+          {saving ? "Saving…" : submitLabel}
         </button>
       </div>
       {error && <p className="form-error">{error}</p>}

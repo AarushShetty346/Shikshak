@@ -23,8 +23,9 @@ import { talkKey, talkKeyHint } from "../lib/pushToTalk";
 import { QuestionBar, QuickCheck } from "./ClassTools";
 import { CLASS_TOUR, Tour, tourDue } from "./Tour";
 import { ReportCard } from "./ReportCard";
+import { FocusMode, FocusSetup } from "./Focus";
 import { VoiceOrb, type VoiceState } from "./VoiceOrb";
-import { ArrowLeft, Camera, ChartBar, DownloadSimple, Notebook, Plus, FileText, Scan, Signpost, HandPalm, List, Microphone, MicrophoneSlash, Pause, PencilSimpleLine, Play, Question, SignOut, UploadSimple } from "@phosphor-icons/react";
+import { ArrowLeft, Camera, ChartBar, DownloadSimple, Eye, EyeSlash, Timer, Notebook, Plus, FileText, Scan, Signpost, HandPalm, List, Microphone, MicrophoneSlash, Pause, PencilSimpleLine, Play, Question, SignOut, UploadSimple } from "@phosphor-icons/react";
 
 function toBlock(e: BlockEvent & { erased?: boolean }, instant: boolean): TutorBlock {
   switch (e.type) {
@@ -550,6 +551,11 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
     </>
   );
 
+  // ---------- hide the controls; focus mode ----------
+  const [hideUi, setHideUi] = useState(false);
+  const [focusSetup, setFocusSetup] = useState(false);
+  const [focusEndsAt, setFocusEndsAt] = useState<number | null>(null);
+
   // ---------- notes as a PDF ----------
   const [printTick, setPrintTick] = useState(0);
   const downloadNotes = () => {
@@ -561,7 +567,7 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
   };
 
   return (
-    <div className="classroom">
+    <div className="classroom" data-hide-ui={hideUi}>
       <Board
         sessionCode={sessionId}
         blocks={blocks}
@@ -638,6 +644,16 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
             </button>
             <button
               role="menuitem"
+              disabled={Boolean(focusEndsAt)}
+              onClick={() => {
+                setMenuOpen(false);
+                setFocusSetup(true);
+              }}
+            >
+              <Timer /> Focus mode
+            </button>
+            <button
+              role="menuitem"
               onClick={() => {
                 setMenuOpen(false);
                 setTouring(true);
@@ -687,7 +703,25 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
         <button onClick={downloadNotes} aria-label="Download notes as PDF" title="Download this whole class as PDF notes">
           <DownloadSimple weight="bold" />
         </button>
+        <button onClick={() => setHideUi(true)} aria-label="Hide the controls" title="Hide the controls (just the board)">
+          <EyeSlash weight="bold" />
+        </button>
       </div>
+      {hideUi && (
+        <button className="show-ui" onClick={() => setHideUi(false)} aria-label="Show the controls" title="Show the controls">
+          <Eye weight="bold" />
+        </button>
+      )}
+      {focusSetup && (
+        <FocusSetup
+          onClose={() => setFocusSetup(false)}
+          onStart={(minutes) => {
+            setFocusSetup(false);
+            setFocusEndsAt(Date.now() + minutes * 60_000);
+          }}
+        />
+      )}
+      {focusEndsAt && <FocusMode endsAt={focusEndsAt} onEnd={() => setFocusEndsAt(null)} />}
       <VoiceOrb state={orb} level={orb === "teacher" ? Math.min(1, voice.volume * 3) : orb === "student" ? mic : 0} />
 
       <input ref={fileInput} type="file" accept="application/pdf,image/*" multiple hidden onChange={(e) => void upload(e.target.files)} />

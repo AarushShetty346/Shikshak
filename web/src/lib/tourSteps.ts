@@ -24,7 +24,7 @@ export function clipName(s: TourStep): string {
   return `tour-${h.toString(16).padStart(8, "0")}.mp3`;
 }
 
-export const ALL_TOURS = () => [...HOME_TOUR, ...CLASS_TOUR];
+export const ALL_TOURS = () => [...HOME_TOUR, ...CLASS_TOUR, ...FOCUS_LINES];
 
 /** The home screen, the first time. */
 export const HOME_TOUR: TourStep[] = [
@@ -52,4 +52,12 @@ export const CLASS_TOUR: TourStep[] = [
     title: "How we'll learn",
     text: "First I explain on the board. Then it's your turn to try. Press Done, and I check it and circle any slip. Stuck? Ask me for a hint. Ready? Press Start!",
   },
+];
+
+/** What the teacher says in focus mode when the student leaves the class, and when it's over. */
+export const FOCUS_LINES: TourStep[] = [
+  { title: "Eyes on the board", text: "Hello! Where did you go? Come back to the board, please." },
+  { title: "Back to class", text: "Focus time is still on. Come back, we were doing so well." },
+  { title: "Pay attention", text: "I saw you switch away. Let's get back to work together." },
+  { title: "Well done!", text: "Your focus time is over. Take a short break, you've earned it." },
 ];

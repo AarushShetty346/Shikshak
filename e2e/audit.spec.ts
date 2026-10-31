@@ -5,6 +5,8 @@ import { expect, test, type Page } from "@playwright/test";
 
 // These tests aren't about the first-time tour (its own test is in audit.spec.ts): mark it as seen.
 test.beforeEach(async ({ page }, info) => {
+  // The start screen has its own test.
+  if (!info.title.includes("start screen")) await page.addInitScript(() => sessionStorage.setItem("shikshak.splashSeen", "1"));
   if (info.title.includes("guided tour")) return;
   await page.addInitScript(() => {
     localStorage.setItem("shikshak.tour.home.v1", "1");
@@ -347,6 +349,56 @@ test("session layout: start, the typing field and the mic at the bottom; the pen
   // The + holds paper and books.
   await dock.getByRole("button", { name: "Add from paper or a book" }).click();
   await expect(page.getByRole("menuitem", { name: /Upload my book or notes/ })).toBeVisible();
+});
+
+test("start screen: Shikshak in the middle, Start Shiksha, then a new device makes its account", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Shikshak" })).toBeVisible();
+  await page.getByRole("button", { name: /Start Shiksha/ }).click();
+  await expect(page.getByRole("heading", { name: "Create your account" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Cancel" })).toHaveCount(0);
+  await page.getByLabel("Name or nickname").fill("Meera");
+  await page.getByRole("button", { name: "Create account" }).click();
+  await expect(page.getByRole("heading", { name: "Meera's classes" })).toBeVisible();
+  // Once per visit: a reload goes straight on.
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Meera's classes" })).toBeVisible();
+});
+
+test("hide the controls: just the board, and one button brings them back", async ({ page }) => {
+  await openClass(page);
+  await page.getByRole("button", { name: "Hide the controls" }).click();
+  await expect(page.locator(".class-dock")).toBeHidden();
+  await expect(page.locator(".class-pill")).toBeHidden();
+  await expect(page.getByRole("toolbar", { name: "Board tools" })).toBeHidden();
+  await page.getByRole("button", { name: "Show the controls" }).click();
+  await expect(page.locator(".class-dock")).toBeVisible();
+});
+
+test("focus mode: pick a time from 30 minutes, and leaving the class gets a call back", async ({ page }) => {
+  await openClass(page);
+  await page.getByRole("button", { name: "Session menu" }).click();
+  await page.getByRole("menuitem", { name: "Focus mode" }).click();
+  await expect(page.getByRole("radio", { name: "30 min" })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByRole("radio")).toHaveCount(5);
+  await page.getByRole("radio", { name: "45 min" }).click();
+  await page.getByRole("button", { name: "Start focus" }).click();
+  await expect(page.getByRole("timer")).toContainText(/4[45]:\d\d/);
+  // Switching to another tab and back.
+  const flip = (hidden: boolean) =>
+    page.evaluate((h) => {
+      Object.defineProperty(document, "hidden", { configurable: true, get: () => h });
+      document.dispatchEvent(new Event("visibilitychange"));
+    }, hidden);
+  await flip(true);
+  await flip(false);
+  await expect(page.getByRole("alertdialog")).toContainText(/board|class|work/i);
+  await expect(page.getByRole("timer")).toContainText("left 1×");
+  await page.getByRole("button", { name: "I'm back" }).click();
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
+  page.once("dialog", (d) => d.accept());
+  await page.getByRole("button", { name: "Stop focus mode" }).click();
+  await expect(page.getByRole("timer")).toHaveCount(0);
 });
 
 test("guided tour: the first visit walks through the controls, once, and can be replayed", async ({ page }) => {

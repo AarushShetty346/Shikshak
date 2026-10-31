@@ -4874,3 +4874,142 @@ body:has(.home-board) {
     display: none !important;
   }
 }
+
+/* ---------- start screen ---------- */
+.splash {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+.splash-centre {
+  display: grid;
+  justify-items: center;
+  gap: clamp(14px, 2.4vh, 26px);
+  text-align: center;
+  zoom: var(--ui-zoom, 1);
+}
+.splash-tile {
+  display: grid;
+  place-items: center;
+  width: clamp(64px, 9vw, 104px);
+  height: clamp(64px, 9vw, 104px);
+  border: 3px solid var(--chalk-yellow, #f6d77a);
+  border-radius: 22px;
+  color: var(--chalk-yellow, #f6d77a);
+  font-size: clamp(34px, 5vw, 58px);
+  font-family: var(--font-hand);
+}
+.splash-title {
+  margin: 0;
+  font-size: clamp(64px, 13vw, 168px);
+  line-height: 1;
+}
+.splash-line {
+  margin: 0;
+  font-size: clamp(20px, 2.6vw, 32px);
+  color: var(--ink-soft, #c3cfc6);
+}
+.splash-start {
+  margin-top: 10px;
+  padding: 16px 34px !important;
+  font-size: clamp(18px, 2vw, 22px) !important;
+}
+.picker-lede {
+  margin: -18px 0 0;
+  color: var(--ink-soft, #c3cfc6);
+  font-size: 17px;
+}
+
+/* ---------- hide the controls ---------- */
+.classroom[data-hide-ui="true"] .class-dock,
+.classroom[data-hide-ui="true"] .board-tray,
+.classroom[data-hide-ui="true"] .pen-fab,
+.classroom[data-hide-ui="true"] .board > .btn-done,
+.classroom[data-hide-ui="true"] .class-pill,
+.classroom[data-hide-ui="true"] .session-menu,
+.classroom[data-hide-ui="true"] .orb {
+  display: none !important;
+}
+.show-ui {
+  position: fixed;
+  right: 16px;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border: 0;
+  border-radius: 999px;
+  background: rgb(247 249 247 / 0.85);
+  color: #1b2a23;
+  font-size: 22px;
+  box-shadow: 0 6px 18px rgb(8 20 15 / 0.4);
+  cursor: pointer;
+}
+
+/* ---------- focus mode ---------- */
+.focus-card h2 {
+  font-family: var(--font-hand);
+}
+.focus-choices {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+.focus-choices button {
+  padding: 8px 14px;
+  border: 1.5px solid rgb(244 241 230 / 0.4);
+  border-radius: 999px;
+  background: transparent;
+  color: #f4f1e6;
+  font-weight: 700;
+  cursor: pointer;
+}
+.focus-choices button.on {
+  background: #f6d77a;
+  border-color: #f6d77a;
+  color: #2c2414;
+}
+.focus-stat {
+  font-weight: 700;
+  color: #f6d77a !important;
+}
+.focus-chip {
+  position: fixed;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 4px 12px;
+  border-radius: 999px;
+  background: #f6d77a;
+  color: #2c2414;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 6px 18px rgb(8 20 15 / 0.4);
+  zoom: var(--ui-zoom, 1);
+}
+.focus-strays {
+  font-weight: 600;
+  opacity: 0.8;
+}
+.focus-chip button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 999px;
+  background: rgb(44 36 20 / 0.12);
+  color: inherit;
+  cursor: pointer;
+}
+.focus-callback {
+  z-index: 80;
+}

@@ -6,6 +6,7 @@ import { Progress } from "./components/Progress";
 import { ChalkFilter } from "./components/Chalk";
 import { DusterWipe, TeacherGate, teacherUnlocked, type Mode } from "./components/ModeToggle";
 import { TeacherView } from "./components/Teacher";
+import { Splash, splashDue } from "./components/Splash";
 import { getSession, sessionFromHash } from "./lib/session";
 
 type Route = { page: "home" } | { page: "class"; id: string } | { page: "progress"; learnerId: string } | { page: "teacher" } | { page: "pilot" };
@@ -27,6 +28,9 @@ function readRoute(): Route {
  */
 export function App() {
   const [route, setRoute] = useState<Route>(readRoute);
+  // The start screen first (each visit); from there, a new device makes its account.
+  const [splash, setSplash] = useState(splashDue);
+  const [fromSplash, setFromSplash] = useState(false);
 
   useEffect(() => {
     const onHash = () => setRoute(readRoute());
@@ -67,6 +71,19 @@ export function App() {
     />
   );
 
+  if (splash && route.page === "home")
+    return (
+      <>
+        <ChalkFilter />
+        <Splash
+          onStart={() => {
+            setSplash(false);
+            setFromSplash(true);
+          }}
+        />
+      </>
+    );
+
   return (
     <>
       <ChalkFilter />
@@ -88,7 +105,7 @@ export function App() {
     case "pilot":
       return <Pilot onBack={() => go("#/")} />;
     default:
-      return <Home onOpen={(id) => go(`#/s/${id}`)} onProgress={(lid) => go(`#/learner/${lid}`)} onSwitchMode={switchMode} />;
+      return <Home onOpen={(id) => go(`#/s/${id}`)} onProgress={(lid) => go(`#/learner/${lid}`)} onSwitchMode={switchMode} createAccount={fromSplash} />;
   }
   }
 }
