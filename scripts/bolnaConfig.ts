@@ -107,9 +107,9 @@ export function buildTools(publicUrl: string, toolsToken?: string): ToolDef[] {
     tool(base, token, {
       name: "erase",
       description:
-        "Rub out your own writing from the student's board, only when the student asks you to: a block label from the board map (e.g. 'B3'), or 'all' to clear your writing and start a fresh page. Say it's gone only after this returns ok.",
+        "Rub something off the board, only when the student asks you to. Your writing: a block label from the board map (e.g. 'B3'), or 'all' to clear your writing and start a fresh page. The student's own drawing or writing: 'student' for the last thing they drew or wrote, 'student all' for everything they wrote. Say it's gone only after this returns ok.",
       pre_call_message: { hi: "बस एक पल।", en: "Just a moment." },
-      properties: { target: { type: "string", description: "A block label like 'B3', or 'all'." } },
+      properties: { target: { type: "string", description: "A block label like 'B3', 'all', 'student' (their last drawing) or 'student all'." } },
       required: ["target"],
     }),
     tool(base, token, {
@@ -385,12 +385,25 @@ export const DEFAULT_VOICE: VoiceOptions = {
 };
 
 // Words the speech recogniser should expect in a maths class (no weights; Bolna strips them).
-const MATHS_KEYWORDS =
+const MATHS_TERMS =
   "quadratic, equation, factorise, factorisation, discriminant, square root, x square, polynomial, coefficient, " +
-  "arithmetic progression, trigonometry, theta, sine, cosine, tangent, Pythagoras, numerator, denominator, check karo, ho gaya, dekho";
-const TRANSCRIBER_CONTEXT =
-  "A class 10 maths tutoring session in India. The student speaks Hindi, English or a mix (Hinglish), " +
-  "talks about equations, steps and their working, and often pauses mid-sentence while thinking or writing.";
+  "arithmetic progression, trigonometry, theta, sine, cosine, tangent, Pythagoras, numerator, denominator";
+/** Keywords per class language: the maths terms, plus everyday Hinglish words only where they're spoken. */
+export const TRANSCRIBER_KEYWORDS: Record<"hi" | "en" | "ta" | "te", string> = {
+  hi: `${MATHS_TERMS}, check karo, ho gaya, dekho`,
+  en: MATHS_TERMS,
+  ta: MATHS_TERMS,
+  te: MATHS_TERMS,
+};
+const CLASS = "A class 10 maths tutoring session in India.";
+const WORKING = "talks about equations, steps and their working, and often pauses mid-sentence while thinking or writing.";
+/** What the speech recogniser is told about each class language (Bolna keeps one per language). */
+export const TRANSCRIBER_CONTEXT: Record<"hi" | "en" | "ta" | "te", string> = {
+  hi: `${CLASS} The student speaks Hindi or Hinglish (Hindi mixed with English maths words), ${WORKING}`,
+  en: `${CLASS} The student speaks Indian English, ${WORKING}`,
+  ta: `${CLASS} The student speaks Tamil, often with English maths words, ${WORKING}`,
+  te: `${CLASS} The student speaks Telugu, often with English maths words, ${WORKING}`,
+};
 
 // Bolna's own system lines, in each language (it falls back to its English defaults otherwise).
 const STILL_THERE: Spoken = {
@@ -406,14 +419,67 @@ const GOODBYE: Spoken = {
   te: "ఈరోజుకి ఇంతే. బాగా చేశారు, మళ్ళీ కలుద్దాం!",
 };
 
-/** Request body for POST /v2/agent (create) and PUT /v2/agent/{id} (update). */
-/** Voice speed per agent (Bolna can't change it mid-call, so each speed is its own agent). */
-export const SPEED_RATES = { slower: 0.95, normal: 1.1, faster: 1.3 } as const;
-export type SpeedName = keyof typeof SPEED_RATES;
+const READ_ALOUD =
+  '- Everything you say is read aloud. Talk like a person: no bullet points, numbered lists, headings or line breaks. Never read symbols aloud; say "x square", "minus", "a n".';
+const SHORT_TURNS = "- Keep each turn short: one to three sentences, then a question or a clear instruction so they know it's their turn.";
+const EXAMPLES_NOTE = (name: string) =>
+  `- The example phrases elsewhere in these instructions are in Hinglish only to show the tone. Never say them in Hindi: say the same kind of thing in ${name}.`;
 
-export function buildAgentPayload(opts: { publicUrl: string; toolsToken?: string; voice?: VoiceOptions; speed?: SpeedName }) {
+/**
+ * The "How you speak" section for each agent language. Hindi ("hi", which also runs Hinglish
+ * classes) keeps the section as written in bolna/agent-prompt.md; English, Tamil and Telugu get
+ * their own, so each language's prompt in Bolna is written for that language.
+ */
+export const HOW_YOU_SPEAK: Partial<Record<"hi" | "en" | "ta" | "te", string>> = {
+  en: [
+    "## How you speak",
+    "- Speak only in English for the whole call, including short replies and the moments you need to think. Stay in English even if the student uses Hindi words or their words reach you in Devanagari. Switch only if the student asks you to.",
+    "- Simple Indian English: short sentences and everyday words, the way a friendly tuition teacher talks. No Hindi sentences.",
+    READ_ALOUD,
+    '- When you need a moment (thinking, looking at their work, getting a question ready), say so naturally and vary it: "one second, let me think", "hmm, let\'s see", "let me check that", "give me a moment", "good question, let me think". Never use the same one twice in a row, and don\'t start every reply with "okay" or "so".',
+    '- Spell single letters the way they sound, because the voice can\'t read a lone letter: say "wai" for y, "eks" for x, "ay" for a, "bee" for b, "see" for c, "en" for n, "dee" for d. For example say "wai equals four minus eks", never "y = 4 - x". On the board, write the normal letters.',
+    SHORT_TURNS,
+    EXAMPLES_NOTE("English"),
+  ].join("\n"),
+  ta: [
+    "## How you speak",
+    "- Speak only in Tamil, in Tamil script, for the whole call, including short replies and the moments you need to think. Stay in Tamil even if the student uses English or Hindi words, or their words reach you in another script. Switch only if the student asks you to.",
+    "- Simple everyday spoken Tamil, the way a friendly tuition teacher in Tamil Nadu talks. Keep maths words students know in English (equation, term, square).",
+    READ_ALOUD,
+    "- When you need a moment (thinking, looking at their work, getting a question ready), say so naturally in Tamil and vary it. Never use the same phrase twice in a row.",
+    '- Spell single letters the way they sound, because the voice can\'t read a lone letter: say the English letter name in Tamil script, for example எக்ஸ் for x and வை for y. On the board, write the normal letters.',
+    SHORT_TURNS,
+    EXAMPLES_NOTE("Tamil"),
+  ].join("\n"),
+  te: [
+    "## How you speak",
+    "- Speak only in Telugu, in Telugu script, for the whole call, including short replies and the moments you need to think. Stay in Telugu even if the student uses English or Hindi words, or their words reach you in another script. Switch only if the student asks you to.",
+    "- Simple everyday spoken Telugu, the way a friendly tuition teacher in Andhra Pradesh or Telangana talks. Keep maths words students know in English (equation, term, square).",
+    READ_ALOUD,
+    "- When you need a moment (thinking, looking at their work, getting a question ready), say so naturally in Telugu and vary it. Never use the same phrase twice in a row.",
+    '- Spell single letters the way they sound, because the voice can\'t read a lone letter: say the English letter name in Telugu script, for example ఎక్స్ for x and వై for y. On the board, write the normal letters.',
+    SHORT_TURNS,
+    EXAMPLES_NOTE("Telugu"),
+  ].join("\n"),
+};
+
+/** The prompt for one agent language: the "How you speak" section swapped for that language's. */
+export function promptFor(prompt: string, lang: "hi" | "en" | "ta" | "te"): string {
+  const section = HOW_YOU_SPEAK[lang];
+  if (!section) return prompt;
+  const start = prompt.indexOf("## How you speak\n");
+  const end = prompt.indexOf("\n## ", start + 1);
+  if (start < 0 || end < 0) throw new Error('bolna/agent-prompt.md needs a "## How you speak" section followed by another "## " heading');
+  return prompt.slice(0, start) + section + "\n" + prompt.slice(end);
+}
+
+/** Request body for POST /v2/agent (create) and PUT /v2/agent/{id} (update). */
+/** The tutor's voice speed (one agent, so one speed; Bolna can't change it mid-call). */
+export const VOICE_RATE = 1.1;
+
+export function buildAgentPayload(opts: { publicUrl: string; toolsToken?: string; voice?: VoiceOptions }) {
   const v = opts.voice ?? DEFAULT_VOICE;
-  const rate = SPEED_RATES[opts.speed ?? "normal"];
+  const rate = VOICE_RATE;
   const base = v.languages[0];
   const { welcome, prompt } = readPrompt();
   const tools = buildTools(opts.publicUrl, opts.toolsToken);
@@ -424,7 +490,7 @@ export function buildAgentPayload(opts: { publicUrl: string; toolsToken?: string
 
   return {
     agent_config: {
-      agent_name: opts.speed && opts.speed !== "normal" ? `Shikshak (${opts.speed})` : "Shikshak",
+      agent_name: "Shikshak",
       agent_welcome_message: welcome,
       tasks: [
         {
@@ -452,8 +518,8 @@ export function buildAgentPayload(opts: { publicUrl: string; toolsToken?: string
               sampling_rate: 16000,
               // Fallback silence before replying, for transcribers without their own turn detection.
               endpointing: 700,
-              keywords: MATHS_KEYWORDS,
-              context: TRANSCRIBER_CONTEXT,
+              keywords: TRANSCRIBER_KEYWORDS[base],
+              context: TRANSCRIBER_CONTEXT[base],
             },
             input: { provider: v.telephony, format: "wav" },
             output: { provider: v.telephony, format: "wav" },
@@ -474,7 +540,12 @@ export function buildAgentPayload(opts: { publicUrl: string; toolsToken?: string
               languages: Object.fromEntries(
                 v.languages.map((lang) => [
                   lang,
-                  { transcriber: { language: lang }, synthesizer: synthesizerFor(lang), system_prompt: prompt, agent_name: "Shikshak" },
+                  {
+                    transcriber: { language: lang, keywords: TRANSCRIBER_KEYWORDS[lang], context: TRANSCRIBER_CONTEXT[lang] },
+                    synthesizer: synthesizerFor(lang),
+                    system_prompt: promptFor(prompt, lang),
+                    agent_name: "Shikshak",
+                  },
                 ]),
               ),
             },
@@ -488,10 +559,10 @@ export function buildAgentPayload(opts: { publicUrl: string; toolsToken?: string
             trigger_user_online_message_after: 45,
             check_user_online_message: STILL_THERE,
             call_hangup_message: GOODBYE,
-            // Stop talking as soon as the student says a word.
-            // Push-to-talk makes interruptions deliberate; 2 words avoids stray noise in hands-free mode.
-            number_of_words_for_interruption: 2,
-            incremental_delay: 400,
+            // The tutor stops only after 3 words, so a cough, "hmm" or a word read aloud while writing
+            // doesn't cut her off. The short delay makes her reply sooner once the student finishes.
+            number_of_words_for_interruption: 3,
+            incremental_delay: 200,
             // Keypad digits reach the LLM as "dtmf_number: 1": that's the board's Done button.
             dtmf_enabled: true,
           },

@@ -12,7 +12,6 @@ interface SipSession {
 }
 
 export interface StartOptions {
-  speed: "slower" | "normal" | "faster";
   resuming: boolean;
   handsFree: boolean;
 }
@@ -44,11 +43,11 @@ export function useVoiceCall(serverId: string | null) {
         ducked.current = false;
         return new BolnaWebCall({ getSession: async () => (await mint()).session as BolnaSession, audioElement: audioRef.current });
       },
-      mint: async ({ speed, resuming }) => {
+      mint: async ({ resuming }) => {
         const r = await fetch(`/api/sessions/${id}/voice`, {
           method: "POST",
           headers: { Authorization: `Bearer ${await deviceToken()}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ speed, resuming }),
+          body: JSON.stringify({ resuming }),
         });
         const data = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error((data as { error?: string }).error || "Couldn't start the class. Try again in a moment.");

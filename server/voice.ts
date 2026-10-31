@@ -12,8 +12,6 @@ import { docList } from "./material";
 import { outlineFor } from "./plan";
 import { save, type Session } from "./sessions";
 
-export type Speed = "slower" | "normal" | "faster";
-
 /**
  * What "Speak in: {{language_name}}" tells the tutor. The student's words often reach her in
  * Devanagari (the Hindi transcriber writes Hinglish that way), which pulled an English or Hinglish
@@ -36,12 +34,6 @@ interface ActiveCall {
 }
 const active = new Map<string, ActiveCall>();
 
-/** Bolna can't change voice speed mid-call, so there's one agent per speed (set up by bolna:setup). */
-export function agentForSpeed(speed: unknown): string | undefined {
-  if (speed === "slower") return process.env.BOLNA_AGENT_ID_SLOW || undefined;
-  if (speed === "faster") return process.env.BOLNA_AGENT_ID_FAST || undefined;
-  return undefined;
-}
 
 /**
  * Languages the deployed Bolna agents were set up with (BOLNA_AGENT_LANGUAGES, default "hi,en").
@@ -84,7 +76,7 @@ export function voiceUsage(deviceId: string, now = Date.now()) {
 }
 
 /** The lesson context the tutor's prompt needs, built from the session (never from the browser). */
-export function buildUserData(s: Session, opts: { speed: Speed; resuming: boolean; memory?: string }): Record<string, unknown> {
+export function buildUserData(s: Session, opts: { resuming: boolean; memory?: string }): Record<string, unknown> {
   const plan = s.study?.plan ?? null;
   const topic = s.topic || plan?.topic || "maths";
   return {
@@ -95,7 +87,6 @@ export function buildUserData(s: Session, opts: { speed: Speed; resuming: boolea
     language: s.language,
     language_name: SPOKEN_LANGUAGE[s.language],
     topic,
-    speed: opts.speed,
     lesson_plan: plan ? outlineFor(plan) : "No prepared plan. Ask the student what they are stuck on, then teach it on the board with write and draw.",
     lesson_state: lessonState(s) || "New class: nothing has been taught yet.",
     material: docList(s),
@@ -105,7 +96,7 @@ export function buildUserData(s: Session, opts: { speed: Speed; resuming: boolea
 
 export type MintResult = { status: number; body: unknown; callId?: string };
 
-export async function mintVoice(s: Session, opts: { speed: Speed; resuming: boolean; memory?: string }, fetchImpl: typeof fetch = fetch): Promise<MintResult> {
+export async function mintVoice(s: Session, opts: { resuming: boolean; memory?: string }, fetchImpl: typeof fetch = fetch): Promise<MintResult> {
   if (!voiceConfigured()) return { status: 503, body: { error: "Voice isn't set up on this server yet." } };
   const now = Date.now();
   const u = voiceUsage(s.deviceId, now);
@@ -119,7 +110,7 @@ export async function mintVoice(s: Session, opts: { speed: Speed; resuming: bool
       status: 409,
       body: { error: `${LANGUAGE_NAMES[s.language]} voice isn't switched on on this server yet. The board still works; for a voice class, pick Hindi, Hinglish or English.` },
     };
-  const agentId = agentForSpeed(opts.speed) ?? process.env.BOLNA_AGENT_ID!;
+  const agentId = process.env.BOLNA_AGENT_ID!;
   const userData = buildUserData(s, opts);
   const lang = VOICE_LANGUAGE[s.language];
   let r: Response;

@@ -88,8 +88,6 @@ Browser                                Server (Node, one process)               
   interrupt. **Stop teacher** cuts the tutor off to ask something. Hands-free is in the session menu.
 - **Books and notes.** Upload a PDF or photos before or during a class. The tutor gets `read_material` (answers only
   from the pages, with page numbers) and `show_page` (puts the real page on the board, labelled with its source).
-- **Speed.** Slower / normal / faster voice (0.95×, 1.1×, 1.3×). Bolna can't change speed mid-call, so each is its
-  own agent and the choice applies from the next Start or Resume.
 - **One board for both.** The page width is fixed per session in board units and scales to the screen, so the tutor's writing
   and the student's ink line up the same on a phone and a laptop. Tutor blocks stack below whatever is
   already written; only the visible part of the ink is drawn.
@@ -161,10 +159,10 @@ same calls the voice agent makes, and the fake checker always flags line 2.
    ```bash
    npm run bolna:setup
    ```
-   This creates three agents (normal, slower, faster voice) with the prompt, welcome message, voices (Sarvam), the
+   This creates the agent with the prompt, welcome message, voices (Sarvam), the
    board and book tools, and call limits suited to a class (20-minute calls, 2.5 minutes of silence allowed while
-   the student writes). It saves `BOLNA_AGENT_ID`, `BOLNA_AGENT_ID_SLOW` and `BOLNA_AGENT_ID_FAST` to `.env`; copy
-   them into Render's settings too (render.yaml has ours). Run it again any time to push prompt changes.
+   the student writes). It saves `BOLNA_AGENT_ID` to `.env`; copy
+   it into Render's settings too (render.yaml has ours). Run it again any time to push prompt changes.
    `npm run bolna:setup -- --dry` shows what it would send.
 4. **Try it.** Open `/api/health/providers` on the Render URL: Gemini and Bolna should say `verified: true`. Before
    the first production deploy, follow the token steps in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
@@ -197,7 +195,6 @@ if something breaks live.
 | `GEMINI_API_KEY` | Checking work and making lesson plans. Free tier. Model `gemini-3-flash-preview`, with automatic fallback to other Flash models when Google says it's busy; override with `GEMINI_MODEL` |
 | `ANTHROPIC_API_KEY` | Paid alternative, used only when `GEMINI_API_KEY` is empty (`claude-opus-5-5`, override with `CLAUDE_MODEL`) |
 | `BOLNA_API_KEY`, `BOLNA_AGENT_ID` | Starting web calls |
-| `BOLNA_AGENT_ID_SLOW`, `BOLNA_AGENT_ID_FAST` | Optional. The slower and faster voice; without them every speed uses the normal agent |
 | `PUBLIC_URL` | Public HTTPS URL of the server; the agent's tools call it |
 | `TOOLS_TOKEN` | **Required in production.** Tool calls must send `Authorization: Bearer <token>`; set the same value before `bolna:setup` |
 | `DATA_DIR` | Where learners, classes and records are stored (default `data/`). Needs a persistent disk to survive deploys |

@@ -1,4 +1,4 @@
-// Choose the conversation model for all three Bolna agents, with rollback. This only edits
+// Choose the conversation model for the Bolna agent, with rollback. This only edits
 // bolna/llm.json; nothing changes on Bolna until you run npm run bolna:setup.
 //
 //   npm run bolna:model                                         show current and previous
@@ -27,7 +27,7 @@ if (set) {
 }
 if (set || process.argv.includes("--rollback")) {
   writeFileSync(LLM_FILE, JSON.stringify(cfg, null, 2) + "\n");
-  console.log("Saved bolna/llm.json. Run npm run bolna:setup to apply it to all three agents.");
+  console.log("Saved bolna/llm.json. Run npm run bolna:setup to apply it to the agent.");
 }
 const show = (c: typeof cfg.current | null) => (c ? `${c.provider}:${c.model} (since ${c.since}; ${c.evidence})` : "none");
 console.log(`Current:  ${show(cfg.current)}\nPrevious: ${show(cfg.previous)}`);

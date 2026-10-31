@@ -63,9 +63,8 @@ import { answerItem, createParticipant, deleteParticipant, exportCsv, listPartic
 import { toolsRouter } from "./tools";
 import { checkProviders } from "./health";
 import { adminPhoneList, bolnaPhoneProvider, enrolPhone, optOut, PhoneError, placeRevisionCall, publicPhone, removePhone, type PhoneProvider } from "./phone";
-import { endVoice, mintVoice, voiceConfigured, voiceUsage, type Speed } from "./voice";
+import { endVoice, mintVoice, voiceConfigured, voiceUsage } from "./voice";
 
-export { agentForSpeed } from "./voice";
 
 /** "98765 43210" -> "+919876543210". Accepts full international numbers starting with +. */
 export function toE164(raw: unknown): string | null {
@@ -840,8 +839,7 @@ export function createApp(opts: { devTools?: boolean; phoneProvider?: PhoneProvi
   api.post("/sessions/:id/voice", small, async (req, res) => {
     const s = ownSession(req, res);
     if (!s) return;
-    const speed: Speed = ["slower", "normal", "faster"].includes(req.body?.speed) ? req.body.speed : "normal";
-    const r = await mintVoice(s, { speed, resuming: req.body?.resuming === true, memory: memoryForCall(s) });
+    const r = await mintVoice(s, { resuming: req.body?.resuming === true, memory: memoryForCall(s) });
     if (r.callId) res.setHeader("X-Shikshak-Call", r.callId);
     res.status(r.status).json(r.body);
   });

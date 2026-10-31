@@ -314,23 +314,23 @@ describe("voice limits", () => {
   it("builds the call's lesson context on the server and caps concurrent calls", async () => {
     const id = await kit.newSession(srv.base, token, { studentName: "Asha", topic: "AP" });
     const s = sessions.getSession(id)!;
-    const first = await mintVoice(s, { speed: "normal", resuming: false }, okFetch as unknown as typeof fetch);
+    const first = await mintVoice(s, { resuming: false }, okFetch as unknown as typeof fetch);
     expect(first.status).toBe(200);
     const body = JSON.parse((okFetch.mock.calls[0] as unknown as [string, { body: string }])[1].body);
     expect(body.user_data).toMatchObject({ session_code: id, student_name: "Asha", topic: "AP" });
-    const second = await mintVoice(s, { speed: "normal", resuming: false }, okFetch as unknown as typeof fetch);
+    const second = await mintVoice(s, { resuming: false }, okFetch as unknown as typeof fetch);
     expect(second.status).toBe(409); // one class at a time per device
   });
 
   it("refuses a Tamil or Telugu voice class until the agents have that language", async () => {
     const id = await kit.newSession(srv.base, token, { language: "ta" });
-    const r = await mintVoice(sessions.getSession(id)!, { speed: "normal", resuming: false }, okFetch as unknown as typeof fetch);
+    const r = await mintVoice(sessions.getSession(id)!, { resuming: false }, okFetch as unknown as typeof fetch);
     expect(r.status).toBe(409);
     expect(JSON.stringify(r.body)).toMatch(/Tamil voice isn't switched on/);
     expect(okFetch).not.toHaveBeenCalled();
     process.env.BOLNA_AGENT_LANGUAGES = "hi,en,ta,te";
     try {
-      const ok = await mintVoice(sessions.getSession(id)!, { speed: "normal", resuming: false }, okFetch as unknown as typeof fetch);
+      const ok = await mintVoice(sessions.getSession(id)!, { resuming: false }, okFetch as unknown as typeof fetch);
       expect(ok.status).toBe(200);
       const body = JSON.parse((okFetch.mock.calls[0] as unknown as [string, { body: string }])[1].body);
       expect(body.agent_data).toEqual({ language: "ta" });
@@ -343,7 +343,7 @@ describe("voice limits", () => {
     process.env.VOICE_MINUTES_PER_OWNER_PER_DAY = "0";
     try {
       const id = await kit.newSession(srv.base, token);
-      const r = await mintVoice(sessions.getSession(id)!, { speed: "normal", resuming: false }, okFetch as unknown as typeof fetch);
+      const r = await mintVoice(sessions.getSession(id)!, { resuming: false }, okFetch as unknown as typeof fetch);
       expect(r.status).toBe(429);
       expect(okFetch).not.toHaveBeenCalled();
     } finally {

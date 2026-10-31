@@ -167,7 +167,7 @@ export function Home({
             started: false,
           };
           saveSession(meta);
-          saveData(creating, { snapshot: emptySnapshot(), plan: s.plan, docs: s.docs, speed: "normal", handsFree: true });
+          saveData(creating, { snapshot: emptySnapshot(), plan: s.plan, docs: s.docs, handsFree: true });
           onOpen(creating, true);
         }}
       />

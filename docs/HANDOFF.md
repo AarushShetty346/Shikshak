@@ -26,10 +26,10 @@ All of roadmap Phases 1–10 are merged and **live since 24 Oct, 18:15 IST**:
 
 - `/api/health` says `ready: true`, production mode, tools token on.
 - `/api/health/providers` shows Gemini and Bolna as verified.
-- All three Bolna agents (normal, slower, faster) were updated the same day with the new prompt,
-  19 tools, the tools token, and 4 languages.
+- The Bolna agent was updated the same day with the new prompt, 19 tools, the tools token, and
+  4 languages. Since 31 Oct there is only one agent (the slower and faster ones were dropped).
 
-The first live test class went fine: linear equations, 4 minutes, ₹24.75. The tools fired (hint,
+The first live test class went fine: linear equations, 4 minutes, $0.25. The tools fired (hint,
 look at board) with no errors, and the tutor gave a problem, a hint, checked 3 answers and offered
 a harder one.
 
@@ -46,9 +46,9 @@ The numbers:
 - 319 unit and integration tests plus 10 Playwright browser tests, all passing. CI runs on GitHub
   for every push to `main` and every PR.
 - Measured from 23 real calls before the overhaul: response time about 1.56 s median and 2.36 s
-  p95, and about ₹6.5 per voice minute. See `benchmark/results/`.
-- Bolna wallet: **about ₹291** after the test call. No hackathon credits have arrived. At about
-  ₹6 a minute that's roughly 45 minutes of voice, so **keep test calls short**.
+  p95, and about $0.065 per voice minute (Bolna's account currency is US dollars; the API reports cents). See `benchmark/results/`.
+- Bolna wallet: **$5.48 on 31 Oct**, after the Buildathon credits. At about $0.06 a minute that's
+  roughly 90 minutes of voice, so **keep test calls short**.
 
 ## How it fits together
 

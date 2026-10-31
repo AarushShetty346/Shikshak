@@ -78,6 +78,8 @@ export type BoardEvent =
   | { type: "highlight"; id: string; target: string; line: number | null; style: MarkStyle; note: string; band?: { top: number; bottom: number } | null }
   /** Rub out a block (its space stays, so the student's writing never moves). */
   | { type: "erase"; target: string }
+  /** Rub out the student's own ink, because they asked: the last thing they drew, or all of it. */
+  | { type: "wipe_ink"; scope: "last" | "all" }
   /** The doubt is answered: continue writing what was paused. */
   | { type: "resume" }
   /** Circle a line of a capture the student sent. box is that line's place on the board (board units). */

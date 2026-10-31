@@ -13,7 +13,7 @@ import { LANGUAGE_STATUS, type BlockEvent, type BoardEvent, type BoardSnapshot, 
 import { apiFetch } from "../lib/api";
 import { putDoc, sessionDocs } from "../lib/docStore";
 import { prepareFile } from "../lib/files";
-import { ensureServerSession, getSession, isDev, loadData, onStorageFailure, saveData, updateSession, type Speed } from "../lib/session";
+import { ensureServerSession, getSession, isDev, loadData, onStorageFailure, saveData, updateSession } from "../lib/session";
 import { useBoardSocket } from "../lib/useBoardSocket";
 import { useMicLevel } from "../lib/useMicLevel";
 import { useVoiceCall } from "../lib/useVoiceCall";
@@ -50,9 +50,6 @@ export function toBlock(e: BlockEvent & { erased?: boolean }, instant: boolean):
   }
 }
 
-const SPEEDS: Speed[] = ["slower", "normal", "faster"];
-const SPEED_LABEL: Record<Speed, string> = { slower: "0.95×", normal: "1.1×", faster: "1.3×" };
-
 export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: () => void }) {
   const meta = getSession(sessionId)!;
   const initial = useRef(loadData(sessionId)).current;
@@ -66,10 +63,10 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
   const [captureRequest, setCaptureRequest] = useState<{ id: string; n: number } | null>(null);
   const [holdTick, setHoldTick] = useState(0);
   const [resumeTick, setResumeTick] = useState(0);
+  const [inkWipe, setInkWipe] = useState<{ n: number; scope: "last" | "all" } | null>(null);
   const [submission, setSubmission] = useState<Submission>({ captureId: null, state: "idle" });
   const [toast, setToast] = useState<string | null>(null);
   const [docs, setDocs] = useState<DocMeta[]>(initial.docs);
-  const [speed, setSpeed] = useState<Speed>(initial.speed);
   const [handsFree, setHandsFree] = useState(initial.handsFree);
   const [menuOpen, setMenuOpen] = useState(false);
   // The first class on this device starts with a guided tour of the board.
@@ -164,6 +161,7 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
       if (e.type === "problem" || (e.type === "write" && e.style === "your_turn")) setStatus("idle");
       if (e.type === "mark") setStatus("idle");
       if (e.type === "correct") setStatus("correct");
+      if (e.type === "wipe_ink") setInkWipe((w) => ({ n: (w?.n ?? 0) + 1, scope: e.scope }));
       if (e.type === "resume") {
         setResumeTick((n) => n + 1);
         setDoubt(false);
@@ -244,7 +242,7 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
   const startOrResume = () => {
     if (!serverId) return;
     setResumeTick((n) => n + 1);
-    void voice.start({ speed, resuming: started, handsFree });
+    void voice.start({ resuming: started, handsFree });
   };
 
   // The class counts as started once a call is actually connected ("connecting" can still fail). If Start fails (voice not set up, no
@@ -317,13 +315,6 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
     voice.setHandsFree(next);
     setMenuOpen(false);
     showToast(next ? "Mic on: I'm listening." : `Mic off. Tap the mic to talk to me, or ${talkKeyHint()}.`);
-  };
-
-  const cycleSpeed = () => {
-    const next = SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length];
-    setSpeed(next);
-    saveData(sessionId, { speed: next });
-    showToast(live ? `Speed ${SPEED_LABEL[next]} applies when you Pause and Resume.` : `Teacher speed ${SPEED_LABEL[next]}`);
   };
 
   // ---------- Done ----------
@@ -617,6 +608,7 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
         teacherSpeaking={teacherSpeaking}
         holdTick={holdTick}
         resumeTick={resumeTick}
+        inkWipe={inkWipe}
         paused={paused}
         submission={submission}
         send={send}
@@ -740,9 +732,6 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
       <div className="class-pill" role="toolbar" aria-label="Class">
         <button onClick={() => setShowReport("view")} disabled={!serverId} aria-label="Class report" title="Class report">
           <Notebook weight="bold" />
-        </button>
-        <button className="btn-speed" onClick={cycleSpeed} title="Teacher's speaking speed" aria-label={`Speaking speed ${SPEED_LABEL[speed]}`}>
-          {SPEED_LABEL[speed]}
         </button>
         <span className="class-pill-sep" aria-hidden="true" />
         <button onClick={downloadNotes} aria-label="Download notes as PDF" title="Download this whole class as PDF notes">

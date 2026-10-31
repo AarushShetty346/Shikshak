@@ -21,11 +21,6 @@ services:
       # Not secret: useless without BOLNA_API_KEY, which stays in Render's dashboard.
       - key: BOLNA_AGENT_ID
         value: "7438fadd-ad12-411c-9e31-fb9ad976ecbd"
-      # The same teacher at a slower and a faster voice (the speed button picks one per call).
-      - key: BOLNA_AGENT_ID_SLOW
-        value: "640fa0f4-510e-4f56-91aa-e5bc2da409d4"
-      - key: BOLNA_AGENT_ID_FAST
-        value: "6ab6f015-fc04-491e-beba-df2d6da1206a"
       - key: PUBLIC_URL
         value: "https://shikshak-o0l8.onrender.com"
       # Required in production (see docs/DEPLOYMENT.md): the same value the agents were set up with.
@@ -34,9 +29,9 @@ services:
       # Operator endpoints (phone revision). Leave empty to keep them off.
       - key: ADMIN_TOKEN
         sync: false
-      # Languages the agents have. Add ta,te only after npm run bolna:setup has pushed them.
+      # Languages the agent has (bolna:setup pushed Tamil and Telugu on 31 Oct 2026).
       - key: BOLNA_AGENT_LANGUAGES
-        value: "hi,en"
+        value: "hi,en,ta,te"
       # The free plan has no persistent disk: data is lost on each deploy. See docs/DEPLOYMENT.md.
       - key: DATA_DIR
         value: "data"

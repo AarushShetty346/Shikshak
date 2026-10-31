@@ -14,6 +14,6 @@ The essentials:
   live voice agents. `TOOLS_TOKEN` in `.env` must match Render's.
 - **Never commit `.env` or print keys.** Never commit `docs/research/` or `docs/submission/`.
 - **Don't spend money or place calls** (voice minutes, phone calls, paid model runs) without the
-  person's explicit go-ahead. The Bolna wallet is small (about ₹291 on 24 Oct).
+  person's explicit go-ahead. The Bolna wallet is small ($5.48 on 31 Oct).
 - **No fabricated results, and label anything unverified.** Practice marks are always "not official".
 - **Commit as the person you're working for**, never as someone else on the team.

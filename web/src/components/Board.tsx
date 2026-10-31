@@ -18,6 +18,7 @@ import { DiagramView, diagramHeight } from "./DiagramView";
 import { MathText } from "./MathText";
 import { TypePanel } from "./TypePanel";
 import { EditableGraph } from "./EditableGraph";
+import { lastBurstStart } from "../lib/ink";
 import { ArrowCounterClockwise, ArrowDown, BookOpenText, Camera, Check, CheckCircle, Eraser, HandGrabbing, Lightbulb, MagicWand, PauseCircle, PencilSimple, SealCheck, TextT, Trash, ArrowUp, X } from "@phosphor-icons/react";
 
 const PAD_L = 38; // room for the student's line numbers
@@ -93,6 +94,8 @@ interface Props {
   paused: boolean;
   submission: Submission;
   resumeTick: number;
+  /** The tutor rubs out the student's ink because they asked: the last thing drawn, or all of it. */
+  inkWipe?: { n: number; scope: "last" | "all" } | null;
   send: (msg: ClientMessage) => void;
   /** Student pressed Done (with the id of the work just sent): tell the tutor to look. */
   onDone: (captureId: string) => void;
@@ -441,6 +444,11 @@ export function Board(props: Props) {
   useEffect(() => {
     if (props.resumeTick) setHeld(new Set());
   }, [props.resumeTick]);
+  const wipe = props.inkWipe;
+  useEffect(() => {
+    if (!wipe) return;
+    setStrokes((all) => (wipe.scope === "all" ? [] : all.slice(0, lastBurstStart(all))));
+  }, [wipe]);
 
   // ---------- highlights: find the target block or line on screen ----------
   useLayoutEffect(() => {
