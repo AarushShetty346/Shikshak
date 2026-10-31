@@ -21,10 +21,6 @@ export const config = {
   /** Where durable state lives. ":memory:" keeps everything in memory (tests). */
   dataDir: () => process.env.DATA_DIR || "data",
 
-  /** The code a person types to switch to teacher mode. A front-door check, not security: a
-   * teacher still needs a learner's share code to see anything. */
-  teacherAccessCode: () => process.env.TEACHER_ACCESS_CODE || "123456",
-
   /** Shared secret Bolna sends on every tool call. Required in production. */
   toolsToken: () => process.env.TOOLS_TOKEN || "",
 

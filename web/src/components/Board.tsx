@@ -643,13 +643,29 @@ export function Board(props: Props) {
       }
       tiles.push({ src: c.toDataURL("image/png"), top, h });
     }
-    setPrintInk(tiles);
     const after = () => setPrintInk([]);
     window.addEventListener("afterprint", after, { once: true });
-    // Print once the ink images are on the page.
-    const raf = requestAnimationFrame(() => requestAnimationFrame(() => window.print()));
+    // Print only once the ink images are decoded and on the page: printing earlier leaves them
+    // blank in the PDF (the browser captures the page before the images have loaded).
+    let cancelled = false;
+    const decoded = (src: string) => {
+      const img = new Image();
+      img.src = src;
+      return img.decode().catch(() => {});
+    };
+    void Promise.all(tiles.map((t) => decoded(t.src))).then(() => {
+      if (cancelled) return;
+      setPrintInk(tiles);
+      requestAnimationFrame(() =>
+        requestAnimationFrame(async () => {
+          const shown = [...(pageRef.current?.querySelectorAll<HTMLImageElement>("img.print-ink") ?? [])];
+          await Promise.all(shown.map((img) => (img.complete ? Promise.resolve() : img.decode().catch(() => {}))));
+          if (!cancelled) window.print();
+        }),
+      );
+    });
     return () => {
-      cancelAnimationFrame(raf);
+      cancelled = true;
       window.removeEventListener("afterprint", after);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -948,7 +964,16 @@ export function Board(props: Props) {
   return (
     <div className="board" ref={wrapRef} data-tool={tool}>
       <div className="board-scroll" ref={scrollRef} onScroll={onScroll}>
-        <div className="board-page" ref={pageRef} style={{ height: px(pageHeightUnits), ["--s" as string]: scale }}>
+        <div
+          className="board-page"
+          ref={pageRef}
+          style={{
+            height: px(pageHeightUnits),
+            ["--s" as string]: scale,
+            // Printing: the page keeps its screen width and is shrunk to fit A4 (about 718px between margins).
+            ...(printInk.length ? { ["--print-w" as string]: `${view.w}px`, ["--print-zoom" as string]: Math.min(1, 718 / Math.max(1, view.w)) } : {}),
+          }}
+        >
           {blocks.map((b) => {
             const p = layout.pos[b.id] ?? { x: PAD_L, y: 0, w: W - PAD_L - PAD_R };
             const label = blockLabel(b);
@@ -992,7 +1017,7 @@ export function Board(props: Props) {
           })}
 
           {printInk.map((t) => (
-            <img key={t.top} className="print-ink" src={t.src} alt="" style={{ top: t.top, height: t.h }} />
+            <img key={t.top} className="print-ink" src={t.src} alt="" style={{ top: t.top, height: t.h, width: view.w }} />
           ))}
           {markedLine && <MarkCircle box={markedLine.box} index={markedLine.index} note={mark!.note} scale={scale} faded={drewSinceMark} />}
           {correctAt && status === "correct" && (

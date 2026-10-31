@@ -3,11 +3,9 @@
 // practise next. Everything here comes from recorded attempts; nothing is guessed.
 
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, CheckCircle, Trash, ArrowCounterClockwise, ShareNetwork } from "@phosphor-icons/react";
+import { ArrowLeft, CheckCircle, Trash, ArrowCounterClockwise } from "@phosphor-icons/react";
 import { deleteLearner, learnerMemory, rejectMisconception, resetMemory, STATUS_LABEL, type Learner, type Memory } from "../lib/learners";
 import { selectLearner } from "../lib/learners";
-import { ShareWithTeacher } from "./Teacher";
-import { PhoneRevision } from "./PhoneRevision";
 import { MathText } from "./MathText";
 
 const when = (t: number) => new Date(t).toLocaleDateString(undefined, { day: "numeric", month: "short" });
@@ -15,7 +13,6 @@ const when = (t: number) => new Date(t).toLocaleDateString(undefined, { day: "nu
 export function Progress({ learnerId, onBack }: { learnerId: string; onBack: () => void }) {
   const [data, setData] = useState<{ learner: Learner; memory: Memory } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [sharing, setSharing] = useState(false);
 
   const load = useCallback(() => {
     learnerMemory(learnerId)
@@ -145,16 +142,8 @@ export function Progress({ learnerId, onBack }: { learnerId: string; onBack: () 
       )}
 
       <section className="panel panel-quiet">
-        <h2>Phone revision</h2>
-        <PhoneRevision learnerId={learner.id} learnerName={learner.name} />
-      </section>
-
-      <section className="panel panel-quiet">
-        <h2>Privacy and sharing</h2>
+        <h2>Privacy</h2>
         <div className="actions actions-left">
-          <button className="btn-secondary btn-small" onClick={() => setSharing((s) => !s)}>
-            <ShareNetwork /> Share with a teacher
-          </button>
           <button
             className="btn-secondary btn-small"
             onClick={async () => {
@@ -177,7 +166,6 @@ export function Progress({ learnerId, onBack }: { learnerId: string; onBack: () 
             <Trash /> Delete learner
           </button>
         </div>
-        {sharing && <ShareWithTeacher learnerId={learner.id} learnerName={learner.name} />}
       </section>
     </main>
   );

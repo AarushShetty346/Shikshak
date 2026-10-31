@@ -154,43 +154,14 @@ test("BUG-18: a fake check is labelled as simulated on the student's screen", as
   await expect(card).toContainText("Simulated check");
 });
 
-test("the Student / Teacher switch wipes the board and changes mode, both ways", async ({ page }) => {
+test("a new session: the duster wipes the board, then the class opens", async ({ page }) => {
   await page.goto("/");
-  const toggle = page.getByRole("switch", { name: "Teacher mode" });
-  await expect(toggle).toHaveAttribute("aria-checked", "false");
-  await toggle.click();
-  // The access code comes first: a wrong one is refused, Cancel stays in student mode.
-  const code = page.getByLabel("Access code");
-  await expect(code).toBeVisible();
-  await code.fill("000000");
-  await page.getByRole("button", { name: "Unlock" }).click();
-  await expect(page.getByRole("alert")).toHaveText("That code isn't right.");
-  await page.getByRole("button", { name: "Cancel" }).click();
-  await expect(page).toHaveURL(/#?\/?$/);
-  await toggle.click();
-  await code.fill("123456");
-  await page.getByRole("button", { name: "Unlock" }).click();
+  await page.getByRole("button", { name: /New session/ }).first().click();
+  await page.getByPlaceholder("e.g. Quadratic equations").fill("Quadratic equations");
+  await page.getByRole("button", { name: "Create session" }).click();
   await expect(page.locator(".duster-wipe")).toBeAttached();
-  await expect(page).toHaveURL(/#\/teacher$/);
-  await expect(page.getByRole("heading", { name: "Teacher view" })).toBeVisible();
+  await expect(page.locator("canvas.board-ink")).toBeVisible({ timeout: 20_000 });
   await expect(page.locator(".duster-wipe")).toHaveCount(0, { timeout: 5000 });
-  await page.getByRole("switch", { name: "Teacher mode" }).click();
-  await expect(page).toHaveURL(/#\/$/, { timeout: 5000 });
-  await expect(page.getByRole("switch", { name: "Teacher mode" })).toHaveAttribute("aria-checked", "false");
-  await expect(page.locator(".duster-wipe")).toHaveCount(0, { timeout: 5000 });
-  // Unlocked for the rest of this tab: no second code.
-  await page.getByRole("switch", { name: "Teacher mode" }).click();
-  await expect(page).toHaveURL(/#\/teacher$/, { timeout: 5000 });
-  await expect(page.getByLabel("Access code")).toHaveCount(0);
-});
-
-test("opening #/teacher directly asks for the access code", async ({ page }) => {
-  await page.goto("/#/teacher");
-  await expect(page.getByLabel("Access code")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Teacher view" })).toHaveCount(0);
-  await page.getByLabel("Access code").fill("123456");
-  await page.keyboard.press("Enter");
-  await expect(page.getByRole("heading", { name: "Teacher view" })).toBeVisible();
 });
 
 test("Scan a question: under From paper, and says clearly when the reader isn't set up", async ({ page }) => {
@@ -442,7 +413,7 @@ test("study group: start one, a friend joins with the link, and opens my notes, 
   await ravi.page.goto(`/#/join/${code}`);
   await expect(ravi.page.getByRole("heading", { name: "Join Asha's study group?" })).toBeVisible();
   await expect(ravi.page.getByText(/see your name.*notes.*reports.*progress/)).toBeVisible();
-  await ravi.page.getByRole("button", { name: "Join", exact: true }).click();
+  await ravi.page.getByRole("button", { name: "Join as Ravi" }).click();
   await expect(ravi.page.getByRole("heading", { name: "Asha's study group" })).toBeVisible();
   await expect(ravi.page.locator(".group-member")).toHaveCount(2);
   await ravi.page.locator(".group-member", { hasText: "Asha" }).click();
@@ -464,6 +435,35 @@ test("study group: start one, a friend joins with the link, and opens my notes, 
   await ravi.ctx.close();
 });
 
+test("study group: a friend on a new device makes their account right on the join screen", async ({ browser }) => {
+  const ctx = await browser.newContext();
+  await ctx.addInitScript(() => {
+    sessionStorage.setItem("shikshak.splashSeen", "1");
+    localStorage.setItem("shikshak.tour.home.v1", "1");
+    localStorage.setItem("shikshak.tour.class.v1", "1");
+  });
+  const host = await ctx.newPage();
+  // Starting a group with no profile asks for the account first, then starts it.
+  await host.goto("/#/group");
+  await host.getByRole("button", { name: /Start a group/ }).click();
+  await host.getByLabel("Name or nickname").fill("Asha");
+  await host.getByRole("button", { name: "Create account and start" }).click();
+  await expect(host.getByRole("heading", { name: "Asha's study group" })).toBeVisible();
+  await host.getByRole("button", { name: "Invite" }).click();
+  const code = (await host.locator(".group-code").innerText()).trim();
+
+  const other = await browser.newContext();
+  const friend = await other.newPage();
+  await friend.goto(`/#/join/${code}`);
+  await expect(friend.getByRole("heading", { name: "Join Asha's study group?" })).toBeVisible();
+  await friend.getByLabel("Name or nickname").fill("Ravi");
+  await friend.getByRole("button", { name: "Create account and join" }).click();
+  await expect(friend.getByRole("heading", { name: "Asha's study group" })).toBeVisible();
+  await expect(friend.locator(".group-member")).toHaveCount(2);
+  await ctx.close();
+  await other.close();
+});
+
 test("guided tour: the first visit walks through the controls, once, and can be replayed", async ({ page }) => {
   const clips: string[] = [];
   page.on("request", (r) => r.url().includes("/tour/") && clips.push(r.url()));
@@ -471,7 +471,7 @@ test("guided tour: the first visit walks through the controls, once, and can be 
   const bubble = page.locator(".tour-bubble");
   await expect(bubble).toContainText("Namaste", { timeout: 5000 });
   await page.getByRole("button", { name: "Next" }).click();
-  await expect(bubble).toContainText("Student or Teacher");
+  await expect(bubble).toContainText("Start a class");
   // Each step asks for its recorded clip; a missing clip is just silence. The voice can be muted.
   await expect.poll(() => clips.some((u) => /\/tour\/tour-[0-9a-f]{8}\.mp3$/.test(u))).toBe(true);
   const mute = page.getByRole("button", { name: "Mute the teacher's voice" });

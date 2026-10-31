@@ -49,7 +49,7 @@ it, so the first load can take about a minute.
 | **Graphs** | The tutor draws graphs, number lines, triangles and tables; graphs can have sliders (a, b, c) the student drags to see the curve and its roots change |
 | **Notes** | Upload a book or notes (PDF or photos) and she teaches from your pages; download the whole class as PDF notes |
 | **Memory** | Progress per skill, recurring mistakes and next exercise, only from recorded attempts; end-of-class report |
-| **Together** | Study groups: invite by link, QR or code; each studies with their own tutor and can open the others' notes, reports and progress. Teachers see students who share a code with them (teacher mode asks for an access code, `123456` by default, set with `TEACHER_ACCESS_CODE`) |
+| **Together** | Study groups: invite by link, QR or code; each studies with their own tutor and can open the others' notes, reports and progress. |
 | **Focus** | Focus mode (30 min to 2 h): leave the class and the tutor calls you back; hide the controls for just the board |
 | **Languages** | Hinglish, Hindi, English; Tamil and Telugu on the board (voice needs the agent set up for them) |
 
@@ -117,9 +117,8 @@ Browser                                Server (Node, one process)               
   one, "don't know" is fine) that says where to start.
 - **Practice marks.** After Done on a checked problem, CBSE-style practice marks (½ per key step, 1 for the answer,
   an error penalised once). Labelled as not official. See [docs/MARKING.md](docs/MARKING.md).
-- **Reports and sharing.** An end-of-class report card (shareable image), a progress page, and teacher access
-  through a one-time code that the family can revoke.
-- **Phone revision (off by default).** Short keypad revision calls for basic phones, with guardian consent, an
+- **Reports.** An end-of-class report card (shareable image) and a progress page.
+- **Phone revision (server only, off by default, no screen in the app).** Short keypad revision calls for basic phones, with guardian consent, an
   operator allowlist, call windows and opt-out. Tested only against a mock; no real calls have been placed.
 - **Languages.** Hindi, Hinglish and English. Tamil and Telugu work on the board; their voice needs the agents set up
   with those languages (`BOLNA_AGENT_LANGUAGES`), and no fluent speaker has reviewed the experience yet.
