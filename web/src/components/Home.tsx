@@ -252,7 +252,7 @@ export function Home({
             <Plus weight="bold" /> New session
           </button>
           <button className="btn-secondary group-entry" onClick={() => (location.hash = "#/group")} title="Study with friends">
-            <UsersThree weight="bold" /> Study group
+            <UsersThree weight="bold" /> <span className="group-entry-label">Study group</span>
           </button>
           {learner ? (
             <div className="profile-menu" ref={profileRef}>

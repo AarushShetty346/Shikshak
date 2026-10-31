@@ -29,8 +29,9 @@ export const ALL_TOURS = () => [...HOME_TOUR, ...CLASS_TOUR, ...FOCUS_LINES];
 /** The home screen, the first time. */
 export const HOME_TOUR: TourStep[] = [
   { title: "Namaste! I am Shikshak, your tutor", text: "Let me show you around. It takes one minute. You can press Next, or use the arrow keys." },
-  { target: ".mode-toggle", title: "Student or Teacher", text: "Learning? Stay on Student. Teachers switch here to see the progress students share with them." },
+  { target: ".mode-toggle", title: "Student or Teacher", text: "Learning? Stay on Student. Teachers switch here, with their access code, to see the progress students share with them." },
   { target: ".home-head-actions .btn-primary", title: "Start a class", text: "Press New session to start a class. Make one class for each chapter, like a notebook for every topic." },
+  { target: ".group-entry", title: "Study with friends", text: "Start a study group and invite your friends. You each learn with your own tutor, and you can open each other's notes and progress." },
   { target: ".profile-button", title: "This is you", text: "Tap your picture to see your progress, switch to another learner, or add a brother or sister." },
   { target: ".session-list, .home-empty", title: "Your classes", text: "Your classes live here. Open one any time and the board is exactly as you left it." },
   { title: "That's it!", text: "Press New session, pick a topic, and I'll show you the board next." },
@@ -39,18 +40,18 @@ export const HOME_TOUR: TourStep[] = [
 /** The classroom, the first time: what each control does, and how a class goes. */
 export const CLASS_TOUR: TourStep[] = [
   { title: "This is our blackboard", text: "I teach on this board, and you write on it too. Let me show you the buttons." },
-  { target: ".btn-start", title: "Start the class", text: "Press Start and I'll begin talking. Then just talk back to me, like a real class." },
-  { target: ".btn-start", title: "How to talk to me", text: "Hold the Talk button, or hold Space or Caps Lock, while you speak. Let go when you're done. Need to stop me? Press Stop." },
-  { target: '[aria-label="Pen"]', title: "Your pen", text: "Write your working with your finger, mouse or stylus. One step on each line." },
-  { target: '[aria-label="Eraser"]', title: "Rub it out", text: "Made a mistake? Use the eraser, or undo your last line." },
+  { target: ".btn-start", title: "Start the class", text: "Press Play and I'll begin talking. Then just talk back to me, like a real class." },
+  { target: ".btn-mic, .btn-talk", title: "How to talk to me", text: "Once we start, hold the mic button, or hold Space or Caps Lock, while you speak. Let go when you're done. Need to stop me? Press Stop." },
+  { target: ".pen-fab", title: "Your pen", text: "Tap the pen for your tools: pen, eraser, scroll and undo. Write your working with your finger, mouse or stylus, one step on each line." },
+  { target: ".dock-input input", title: "Rather type?", text: "No stylus? Type a step here and press Enter. Tap T for maths symbols like therefore and implies." },
   { target: "button.btn-done", title: "Press Done", text: "When you finish, press Done. I'll read your steps and circle the first one that went wrong." },
-  { target: ".dock-attach", title: "Working in your notebook?", text: "No stylus? Solve it on paper and send me a photo. It goes on the board and I check it right there." },
-  { target: ".dock-attach", title: "Your book", text: "Upload your textbook or notes, and I'll teach from your own pages." },
+  { target: ".dock-attach", title: "Working in your notebook?", text: "Tap plus to send me a photo of your working or a question, or to upload your book. I check photos right on the board." },
   { target: ".btn-speed", title: "My speed", text: "Am I too fast or too slow? Change how fast I talk." },
-  { target: '[aria-label="Session menu"]', title: "The menu", text: "Your class report, a practice question and more are in here." },
+  { target: '[aria-label="Download notes as PDF"]', title: "Your notes", text: "Download the whole class as PDF notes, any time." },
+  { target: '[aria-label="Session menu"]', title: "The menu", text: "Focus mode, your class report, a practice question and more are in here." },
   {
     title: "How we'll learn",
-    text: "First I explain on the board. Then it's your turn to try. Press Done, and I check it and circle any slip. Stuck? Ask me for a hint. Ready? Press Start!",
+    text: "First I explain on the board. Then it's your turn to try. Press Done, and I check it and circle any slip. Stuck? Ask me for a hint. Ready? Press Play!",
   },
 ];
 

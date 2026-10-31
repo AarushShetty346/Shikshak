@@ -5421,3 +5421,42 @@ button.group-card {
   max-width: none !important;
   width: auto !important;
 }
+/* Short screens (a phone on its side): the typing box scrolls instead of covering the top bar. */
+.type-panel {
+  max-height: calc(100dvh - 100px);
+  overflow-y: auto;
+}
+@media (max-height: 480px) {
+  .type-panel textarea {
+    min-height: 64px;
+  }
+  .type-symbols button {
+    height: 30px;
+    min-width: 32px;
+    font-size: 16px;
+  }
+}
+/* Small phones: the home header's Study group button is just its icon (the name stays for screen readers). */
+.home-head-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+@media (max-width: 420px) {
+  .group-entry {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+  .group-entry-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
+/* The moment chip floats over the board: solid, so the writing under it doesn't show through. */
+.moment-chip {
+  background: #1d3329 !important;
+  box-shadow: 0 4px 12px rgb(8 20 15 / 0.45);
+}

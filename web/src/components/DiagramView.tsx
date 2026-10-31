@@ -151,7 +151,7 @@ function Body({ d, w, h, shown, values }: { d: Diagram; w: number; h: number; sh
       });
       // ...and shows where the first curve crosses the x-axis, so moving a slider shows what changes.
       const roots = d.params?.length ? crossings(fns[0], d.xmin, d.xmax) : [];
-      const shownExpr = (e: string) => (names.length ? tidy(e.replace(new RegExp(`(?<![a-z])(${names.join("|")})(?![a-z])`, "gi"), (n) => String(Math.round(env[n.toLowerCase()] * 100) / 100))) : e);
+      const shownExpr = (e: string) => (names.length ? tidy(e.replace(new RegExp(`(^|[^a-z])(${names.join("|")})(?![a-z])`, "gi"), (_m, pre: string, n: string) => pre + String(Math.round(env[n.toLowerCase()] * 100) / 100))) : e);
       const xs = Array.from({ length: 121 }, (_, i) => d.xmin + ((d.xmax - d.xmin) * i) / 120);
       // Range from the sensible part of each curve (ignore the huge values next to an asymptote).
       const ys = fns.flatMap((f) => xs.map(f)).filter((v) => Number.isFinite(v) && Math.abs(v) <= 20);

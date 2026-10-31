@@ -338,7 +338,13 @@ test("session layout: start, the typing field and the mic at the bottom; the pen
   await expect(dock.getByRole("button", { name: /^(Start|Resume)$/ })).toBeVisible();
   await expect(dock.getByRole("textbox", { name: "Type a step" })).toBeVisible();
   await expect(dock.getByRole("button", { name: "Start talking" })).toBeVisible();
-  await expect(page.getByRole("toolbar", { name: "Board tools" })).toBeVisible();
+  // The tray starts open on a big screen and closed on a phone (so it doesn't cover the board).
+  const tools = page.getByRole("toolbar", { name: "Board tools" });
+  if (test.info().project.name === "phone") {
+    await expect(tools).toBeHidden();
+    await page.getByRole("button", { name: "Show the drawing tools" }).click();
+  }
+  await expect(tools).toBeVisible();
   await page.getByRole("button", { name: "Hide the drawing tools" }).click();
   await expect(page.getByRole("toolbar", { name: "Board tools" })).toBeHidden();
   await page.getByRole("button", { name: "Show the drawing tools" }).click();

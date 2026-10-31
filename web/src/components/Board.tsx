@@ -24,7 +24,8 @@ const PAD_L = 38; // room for the student's line numbers
 const PAD_R = 22;
 const GAP = 34;
 const PAGE_GAP = 160;
-const TOP = 70; // clear of the brand mark and voice indicator floating at the top
+/** Room at the top of the page, in screen pixels, for the menu, the class pill and the tutor. */
+const TOP_PX = 92;
 const INK = "#9fd3ff";
 const PEN_WIDTH = 3.2;
 const ERASER_RADIUS = 18;
@@ -177,9 +178,9 @@ export function Board(props: Props) {
   const [view, setView] = useState({ w: 0, h: 0 });
   const [tool, setTool] = useState<"pen" | "eraser" | "hand">("pen");
   const [typing, setTyping] = useState(false);
-  const [line, setLine] = useState("");
   // The drawing tools sit in a tray on the right; the pen button hides it to give the board the room.
-  const [trayOpen, setTrayOpen] = useState(true);
+  // On a phone (or a short screen) it starts closed, so it doesn't cover the board.
+  const [trayOpen, setTrayOpen] = useState(() => window.innerWidth >= 700 && window.innerHeight >= 560);
   const [newBelow, setNewBelow] = useState(false);
   // The open question has scrolled out of view above: show it pinned at the top.
   const [questionAbove, setQuestionAbove] = useState(false);
@@ -246,6 +247,8 @@ export function Board(props: Props) {
     if (below > (floors.current[b.id] ?? 0)) floors.current[b.id] = below;
   }
 
+  // The first block starts below the bar at the top of the screen, whatever the board's scale.
+  const TOP = Math.max(70, Math.ceil(TOP_PX / scale));
   const layout = useMemo(() => {
     const pos: Record<string, { x: number; y: number; w: number }> = {};
     const byLabel: Record<string, { x: number; y: number; w: number; h: number }> = {};
@@ -281,7 +284,7 @@ export function Board(props: Props) {
     }
     return { pos, bottom: Math.max(mainBottom, sideBottom) };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [blocks, heights, W, strokes, revealed]);
+  }, [blocks, heights, W, strokes, revealed, TOP]);
 
   const contentBottom = Math.max(layout.bottom, inkBottom(strokes));
   const pageHeightUnits = contentBottom + (view.h / scale) * 0.85 + 60;
@@ -1081,24 +1084,7 @@ export function Board(props: Props) {
 
       <div className="class-dock">
         {props.dockLeft}
-        <form
-          className="dock-input"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!line.trim()) return;
-            addTyped([line.trim().slice(0, 120)]);
-            setLine("");
-          }}
-        >
-          {props.dockAttach}
-          <input value={line} onChange={(e) => setLine(e.target.value)} placeholder="Type your working…" aria-label="Type a step" maxLength={120} enterKeyHint="send" />
-          <button type="button" className={typing ? "on" : ""} onClick={() => setTyping((t) => !t)} aria-label="Type" aria-expanded={typing} title="Type several steps, with maths symbols">
-            <TextT />
-          </button>
-          <button type="submit" className="dock-send" disabled={!line.trim()} aria-label="Add this step to the board" title="Add this step to the board">
-            <ArrowUp weight="bold" />
-          </button>
-        </form>
+        <DockInput attach={props.dockAttach} typing={typing} onToggleTyping={() => setTyping((t) => !t)} onAdd={(text) => addTyped([text])} />
         {props.dockRight}
       </div>
     </div>
@@ -1497,4 +1483,32 @@ function slideTo(input: HTMLInputElement, clientX: number) {
   if (input.value === next) return;
   Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(input, next);
   input.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+/** The typing field in the bottom bar. Its own state, so typing doesn't re-render the board. */
+function DockInput({ attach, typing, onToggleTyping, onAdd }: { attach: ReactNode; typing: boolean; onToggleTyping: () => void; onAdd: (text: string) => void }) {
+  const [line, setLine] = useState("");
+  return (
+    <form
+      className="dock-input"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!line.trim()) return;
+        onAdd(line.trim().slice(0, 120));
+        setLine("");
+      }}
+    >
+      {attach}
+      <input value={line} onChange={(e) => setLine(e.target.value)} placeholder="Type a step…" aria-label="Type a step" maxLength={120} enterKeyHint="send" />
+      <button type="button" className={typing ? "on" : ""} onClick={onToggleTyping} aria-label="Type" aria-expanded={typing} title="Type several steps, with maths symbols">
+        <TextT />
+      </button>
+      {/* The send arrow appears once there's something to send, so the field keeps its room. */}
+      {line.trim() && (
+        <button type="submit" className="dock-send" aria-label="Add this step to the board" title="Add this step to the board">
+          <ArrowUp weight="bold" />
+        </button>
+      )}
+    </form>
+  );
 }
