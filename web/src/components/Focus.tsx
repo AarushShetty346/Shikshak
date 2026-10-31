@@ -29,7 +29,7 @@ export function FocusSetup({ onStart, onClose }: { onStart: (minutes: number) =>
           <Timer weight="bold" />
         </span>
         <h2 id="focus-title">Focus mode</h2>
-        <p>For this long, stay on the board. If you switch to another tab or app, I'll notice and call you back, like in class.</p>
+        <p>Pick a time and stay on the board. If you leave, I'll call you back.</p>
         <div className="focus-choices" role="radiogroup" aria-label="How long">
           {FOCUS_CHOICES.map((m) => (
             <button key={m} role="radio" aria-checked={minutes === m} className={minutes === m ? "on" : ""} onClick={() => setMinutes(m)}>

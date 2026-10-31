@@ -37,7 +37,7 @@ export function TypePanel({ onAdd, onClose }: { onAdd: (lines: string[]) => void
   return (
     <div className="type-panel" role="dialog" aria-label="Type your working" onKeyDown={(e) => e.key === "Escape" && onClose()}>
       <div className="type-panel-head">
-        <span>Type your working, one step on each line</span>
+        <span>Type your steps, one per line</span>
         <button className="type-panel-close" onClick={onClose} aria-label="Close">
           <X weight="bold" />
         </button>

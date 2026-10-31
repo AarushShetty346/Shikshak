@@ -5013,3 +5013,450 @@ body:has(.home-board) {
 .focus-callback {
   z-index: 80;
 }
+
+/* ---------- study groups ---------- */
+.group-page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding-top: 18px;
+  padding-bottom: 40px;
+}
+.group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.group-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink);
+}
+.group-title {
+  margin: 0;
+  font-size: clamp(34px, 5vw, 56px);
+}
+.group-hero {
+  width: min(560px, 100%);
+  margin: 0 auto;
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  text-align: center;
+}
+.group-hero h1 {
+  margin: 8px 0 0;
+  font-size: clamp(44px, 8vw, 72px);
+  line-height: 1.05;
+}
+.group-sub {
+  margin: 0;
+  font-size: clamp(19px, 2.6vw, 24px);
+  font-weight: 700;
+  color: var(--ink);
+}
+.group-blurb {
+  margin: 0;
+  max-width: 440px;
+  color: var(--ink-soft);
+  font-size: 16px;
+  line-height: 1.5;
+}
+.group-cta {
+  margin-top: 8px;
+  padding: 14px 28px !important;
+  font-size: 17px !important;
+}
+.group-art {
+  display: grid;
+  grid-template-columns: repeat(3, clamp(70px, 14vw, 104px));
+  gap: 6px;
+}
+.group-dot {
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: rgb(246 215 122 / 0.16);
+  display: grid;
+  place-items: center;
+}
+.group-dot-main {
+  background: #f6d77a;
+  color: #1b2a23;
+  font-size: clamp(30px, 6vw, 44px);
+}
+.group-dot-face {
+  background: rgb(159 211 255 / 0.2);
+}
+.group-dot-face .avatar {
+  width: 80% !important;
+  height: 80% !important;
+}
+.group-code-form {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+.group-code-form input {
+  width: 160px;
+  padding: 8px 12px;
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.2);
+  color: var(--ink);
+  font-size: 16px;
+  letter-spacing: 0.15em;
+  text-align: center;
+}
+.group-fine {
+  margin: 8px 0 0;
+  max-width: 420px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  opacity: 0.85;
+  line-height: 1.45;
+}
+.group-list {
+  width: min(560px, 100%);
+  margin: 10px auto 0;
+  display: grid;
+  gap: 8px;
+}
+.group-list h2 {
+  margin: 0;
+  font-size: 24px;
+}
+.group-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.group-row-name {
+  flex: 1;
+  font-weight: 700;
+}
+.group-row-count {
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+.group-stack {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px 3px 3px;
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+}
+.group-stack .avatar {
+  width: 30px !important;
+  height: 30px !important;
+  margin-left: -8px;
+  border: 2px solid var(--bg, #1d3329);
+}
+.group-stack .avatar:first-child {
+  margin-left: 0;
+}
+.group-more {
+  margin-left: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.group-pills {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.group-pill {
+  padding: 8px 18px;
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  font-weight: 700;
+  cursor: pointer;
+}
+.group-pill:hover {
+  border-color: var(--chalk-yellow);
+}
+.group-section {
+  margin: 6px 0 8px;
+  font-size: 18px;
+  color: var(--ink);
+}
+.group-members,
+.group-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+}
+.group-member {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto auto;
+  column-gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.group-member .avatar {
+  grid-row: 1 / 4;
+}
+.group-member-name {
+  font-weight: 700;
+  font-size: 18px;
+}
+.group-member-sub {
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+.group-member-go {
+  color: var(--chalk-yellow);
+  font-size: 13px;
+  font-weight: 700;
+}
+.group-you {
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgb(246 215 122 / 0.2);
+  color: var(--chalk-yellow);
+  font-size: 12px;
+}
+.group-note {
+  margin: 0;
+  color: var(--ink-soft);
+}
+.group-tabs {
+  align-self: flex-start;
+}
+.group-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.group-card {
+  width: 100%;
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--ink);
+  text-align: left;
+  font: inherit;
+}
+button.group-card {
+  cursor: pointer;
+}
+.group-card span {
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+.group-mistake strong {
+  color: #ffb4a8;
+}
+.group-notes {
+  display: grid;
+  gap: 18px;
+  width: min(680px, 100%);
+  padding: 18px;
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  background: var(--board, #1d3329);
+}
+.group-note-block {
+  position: relative !important;
+  top: auto !important;
+  left: auto !important;
+  width: 100% !important;
+}
+
+/* Bottom sheets (invite, join). */
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgb(10 18 14 / 0.55);
+}
+.sheet-static {
+  background: transparent;
+}
+.sheet {
+  position: relative;
+  width: min(520px, 100%);
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  padding: 14px 22px max(24px, env(safe-area-inset-bottom));
+  border-radius: 22px 22px 0 0;
+  background: #24372d;
+  color: #f4f1e6;
+  text-align: center;
+  box-shadow: 0 -12px 40px rgb(0 0 0 / 0.45);
+  zoom: var(--ui-zoom, 1);
+}
+.sheet-grip {
+  width: 44px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgb(244 241 230 / 0.35);
+}
+.sheet-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 999px;
+  background: rgb(244 241 230 / 0.1);
+  color: inherit;
+  cursor: pointer;
+}
+.sheet h2 {
+  margin: 0;
+  font-size: 22px;
+}
+.sheet h3 {
+  margin: 0 0 4px;
+  font-size: 17px;
+}
+.sheet p {
+  margin: 0;
+  color: rgb(244 241 230 / 0.78);
+  font-size: 14px;
+}
+.sheet hr {
+  width: 100%;
+  border: 0;
+  border-top: 1px solid rgb(244 241 230 / 0.15);
+}
+.sheet-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 26px !important;
+  background: #f6d77a !important;
+  color: #1b2a23 !important;
+}
+.sheet-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  text-align: left;
+}
+.sheet-green {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #7ee0a3 !important;
+  font-weight: 700;
+}
+.group-qr {
+  flex: none;
+  width: 116px;
+  height: 116px;
+  border-radius: 8px;
+}
+.group-code {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 1.5px dashed rgb(246 215 122 / 0.6);
+  border-radius: 12px;
+  background: transparent;
+  color: #f6d77a;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  cursor: pointer;
+}
+.sheet .link-button {
+  color: #f4f1e6;
+}
+.group-entry {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+/* Read-only notes: everything already written, no chalk animation. */
+.group-notes *,
+.group-notes *::before,
+.group-notes *::after {
+  animation: none !important;
+  transition: none !important;
+}
+.group-notes .chalk-write,
+.group-notes .rline,
+.group-notes .dpiece {
+  clip-path: none !important;
+  opacity: 1 !important;
+  max-width: none !important;
+  width: auto !important;
+}
+/* Short screens (a phone on its side): the typing box scrolls instead of covering the top bar. */
+.type-panel {
+  max-height: calc(100dvh - 100px);
+  overflow-y: auto;
+}
+@media (max-height: 480px) {
+  .type-panel textarea {
+    min-height: 64px;
+  }
+  .type-symbols button {
+    height: 30px;
+    min-width: 32px;
+    font-size: 16px;
+  }
+}
+/* Small phones: the home header's Study group button is just its icon (the name stays for screen readers). */
+.home-head-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+@media (max-width: 420px) {
+  .group-entry {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+  .group-entry-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
+/* The moment chip floats over the board: solid, so the writing under it doesn't show through. */
+.moment-chip {
+  background: #1d3329 !important;
+  box-shadow: 0 4px 12px rgb(8 20 15 / 0.45);
+}

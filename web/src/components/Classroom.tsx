@@ -27,7 +27,7 @@ import { FocusMode, FocusSetup } from "./Focus";
 import { VoiceOrb, type VoiceState } from "./VoiceOrb";
 import { ArrowLeft, Camera, ChartBar, DownloadSimple, Eye, EyeSlash, Timer, Notebook, Plus, FileText, Scan, Signpost, HandPalm, List, Microphone, MicrophoneSlash, Pause, PencilSimpleLine, Play, Question, SignOut, UploadSimple } from "@phosphor-icons/react";
 
-function toBlock(e: BlockEvent & { erased?: boolean }, instant: boolean): TutorBlock {
+export function toBlock(e: BlockEvent & { erased?: boolean }, instant: boolean): TutorBlock {
   switch (e.type) {
     case "write":
       return { kind: "write", id: e.id, label: e.label, style: e.style, lines: e.lines, place: e.place, replaces: e.replaces, instant };
