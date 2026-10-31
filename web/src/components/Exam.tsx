@@ -312,22 +312,51 @@ const stopAll = () => {
   media.camera = media.screen = null;
 };
 
+/**
+ * The front camera. iPad and iPhone Safari can reject the "facingMode" hint or ask slowly, so it
+ * retries without it, and gives a reason the student can act on instead of failing silently.
+ */
+async function openCamera(): Promise<MediaStream> {
+  if (!navigator.mediaDevices?.getUserMedia) throw new Error("This browser can't use the camera here. Open the site in Safari or Chrome (not inside another app).");
+  try {
+    return await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+  } catch (e) {
+    const name = (e as DOMException).name;
+    if (name === "NotAllowedError" || name === "SecurityError")
+      throw new Error("The camera is blocked. Allow it for this site (on iPad: Settings › Safari › Camera › Allow, or the \"aA\" menu › Website Settings), then try again.");
+    if (name === "NotReadableError") throw new Error("Another app is using the camera. Close it, then try again.");
+    return await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+  }
+}
+
+/** Safari may not start a camera preview by itself: start it explicitly. */
+function showStream(el: HTMLVideoElement | null, stream: MediaStream | null) {
+  if (!el || !stream) return;
+  if (el.srcObject !== stream) el.srcObject = stream;
+  void el.play().catch(() => {});
+}
+
 function Invigilator({ exam, onReady, onCancel }: { exam: Exam; onReady: (e: Exam) => void; onCancel: () => void }) {
   const [camera, setCamera] = useState(Boolean(media.camera));
   const [screen, setScreen] = useState(Boolean(media.screen));
   const [error, setError] = useState<string | null>(null);
   const preview = useRef<HTMLVideoElement>(null);
+  const [asking, setAsking] = useState(false);
   useEffect(() => {
-    if (preview.current && media.camera) preview.current.srcObject = media.camera;
+    showStream(preview.current, media.camera);
   }, [camera]);
 
   const turnOnCamera = async () => {
     setError(null);
+    setAsking(true);
     try {
-      media.camera = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+      media.camera = await openCamera();
       setCamera(true);
-    } catch {
-      setError("The camera is needed for an exam. Allow it in the browser (the camera icon in the address bar), then try again.");
+    } catch (e) {
+      const m = (e as Error).message;
+      setError(m && !/^(Permission|NotAllowed|The request)/.test(m) ? m : "The camera is needed for an exam. Allow it in the browser, then try again.");
+    } finally {
+      setAsking(false);
     }
   };
   const shareScreen = async () => {
@@ -375,7 +404,7 @@ function Invigilator({ exam, onReady, onCancel }: { exam: Exam; onReady: (e: Exa
             <strong>Camera on</strong>
             <span>So the invigilator can see you, as in an exam hall.</span>
           </div>
-          {camera ? <video ref={preview} className="exam-cam-preview" autoPlay muted playsInline /> : <button className="btn-secondary btn-small" onClick={() => void turnOnCamera()}>Turn on camera</button>}
+          {camera ? <video ref={preview} className="exam-cam-preview" autoPlay muted playsInline /> : <button className="btn-secondary btn-small" onClick={() => void turnOnCamera()} disabled={asking}>{asking ? "Allow the camera…" : "Turn on camera"}</button>}
         </li>
         <li data-ok={screen}>
           <Monitor weight="bold" />
@@ -446,7 +475,7 @@ function Sitting({ exam, onEnd }: { exam: Exam; onEnd: () => void }) {
     const screenTrack = media.screen?.getVideoTracks()[0];
     if (screenTrack) screenTrack.onended = () => callOutFor("share", "screen-share-ended");
     if (cameraTrack) cameraTrack.onended = () => callOutFor("camera", "camera-off");
-    if (cam.current && media.camera) cam.current.srcObject = media.camera;
+    showStream(cam.current, media.camera);
   }, [callOutFor]);
 
   useEffect(() => {
@@ -518,11 +547,11 @@ function Sitting({ exam, onEnd }: { exam: Exam; onEnd: () => void }) {
   const cameraAgain = async () => {
     setFixError(null);
     try {
-      media.camera = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+      media.camera = await openCamera();
       watchTracks();
       await backToPaper();
-    } catch {
-      setFixError("Allow the camera in the browser, then try again.");
+    } catch (e) {
+      setFixError((e as Error).message || "Allow the camera in the browser, then try again.");
     }
   };
   const line = callOut ? (callOut.count >= 3 && ["left", "window", "fullscreen"].includes(callOut.kind) ? INVIGILATOR_LINES.again : INVIGILATOR_LINES[callOut.kind]) : null;
@@ -617,7 +646,7 @@ function Answers({ exam, onMarked, onBack }: { exam: Exam; onMarked: (e: Exam) =
           {busy ? <span className="spin" /> : <CheckCircle weight="bold" />} {busy ? "Marking…" : `Mark my ${files.length || ""} page${files.length === 1 ? "" : "s"}`}
         </button>
       </div>
-      <input ref={input} type="file" accept="image/*" multiple hidden data-exam="answers" onChange={(e) => void add(e.target.files)} />
+      <input ref={input} type="file" accept="image/*" multiple className="file-picker" tabIndex={-1} aria-hidden="true" data-exam="answers" onChange={(e) => void add(e.target.files)} />
       {files.length > 0 && (
         <ol className="exam-thumbs">
           {files.map((f, i) => (

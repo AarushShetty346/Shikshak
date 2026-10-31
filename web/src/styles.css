@@ -6000,3 +6000,15 @@ button.group-card {
   text-transform: uppercase;
   font-size: 13px;
 }
+
+/* File pickers opened from menus. Kept in the page (not display: none) because iPad Safari can
+   ignore a programmatic click on a hidden file input. */
+.file-picker {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}

@@ -129,6 +129,22 @@ describe("board tools", () => {
     t.ws.close();
   });
 
+  it("Done and 'ho gaya' together: the second look at the same work says it was already told", async () => {
+    const id = await session();
+    const t = await tab(id, { png: PNG("twice"), lineCount: 2 });
+    askJson.mockResolvedValue(MISTAKE);
+    const first = await post("look_at_board", { session_code: id });
+    expect(first.already_told).toBeUndefined();
+    const second = await post("look_at_board", { session_code: id });
+    expect(second).toMatchObject({ status: "mistake", already_told: true });
+    const asked = await post("look_at_board", { session_code: id, student_said: "why is step 2 wrong?" });
+    expect(asked.already_told).toBeUndefined(); // a real question gets a real answer
+    t.draw({ png: PNG("changed"), lineCount: 3 });
+    const changed = await post("look_at_board", { session_code: id });
+    expect(changed.already_told).toBeUndefined();
+    t.ws.close();
+  });
+
   it("an empty board says so without calling the model", async () => {
     const id = await session();
     const t = await tab(id, { png: "", lineCount: 0 });

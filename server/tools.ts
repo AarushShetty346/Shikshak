@@ -109,7 +109,16 @@ async function lookAtBoard(req: Request, res: Response) {
     if (published) afterReview(s, capture, result);
     if (result.status === "empty") signal(s, { type: "unclear", note: "Nothing new written yet" });
     console.log(`[look] ${s.label} ${result.kind}/${result.status} line=${result.line}${published ? "" : " (stale, not shown)"}`);
-    res.json(published ? result : { ...result, note: "A newer question or newer work arrived while reading; this result wasn't shown on the board." });
+    if (!published) return void res.json({ ...result, note: "A newer question or newer work arrived while reading; this result wasn't shown on the board." });
+    // Done and "ho gaya" together ask twice about the same work: she answers once.
+    const key = `${capture.hash}|${capture.questionId}|${capture.photo?.label ?? ""}`;
+    const told = s.lastLook?.key === key && Date.now() - s.lastLook.at < 30_000 && !studentSaid;
+    s.lastLook = { key, at: Date.now() };
+    res.json(
+      told
+        ? { ...result, already_told: true, note: "You told the student about this exact work a few seconds ago. Don't repeat it: at most one short line, then wait for them to change it or ask." }
+        : result,
+    );
   } catch (err) {
     const e = err as Error;
     console.error("[look] failed", e.message);
