@@ -62,7 +62,7 @@ export function buildTools(publicUrl: string, toolsToken?: string): ToolDef[] {
       name: "write",
       description:
         "Write on the shared blackboard. Use it the way a teacher uses chalk: a heading when starting a topic, a short definition, an equation, or a worked solution built step by step. Lines appear one by one while you speak, so explain them in the same order. Keep it to what matters; never write whole paragraphs.",
-      pre_call_message: { hi: "अच्छा।", en: "Okay." },
+      pre_call_message: { hi: "एक मिनट, बोर्ड पर लिखती हूँ।", en: "Give me a moment, I'll write it down." },
       properties: {
         kind: {
           type: "string",
@@ -107,14 +107,14 @@ export function buildTools(publicUrl: string, toolsToken?: string): ToolDef[] {
       name: "erase",
       description:
         "Rub out a block that is no longer needed or was wrong (its space can be reused with write's replace), or 'all' to start a fresh page for a new topic when the board is crowded.",
-      pre_call_message: { hi: "अच्छा।", en: "Okay." },
+      pre_call_message: { hi: "बस एक पल।", en: "Just a moment." },
       properties: { target: { type: "string", description: "A block label like 'B3', or 'all'." } },
       required: ["target"],
     }),
     tool(base, token, {
       name: "give_problem",
       description: "Put a practice problem on the board with space below it for the student to solve. Use when it is the student's turn to solve something you made up.",
-      pre_call_message: { hi: "अच्छा, एक सवाल देती हूँ।", en: "Okay, here's one for you." },
+      pre_call_message: { hi: "लो, अब आपकी बारी।", en: "Your turn now." },
       properties: {
         problem: { type: "string", description: "The problem as plain text, e.g. 'Find the 10th term of 2, 5, 8, ...'." },
         answer: { type: "string", description: "The correct final answer, for checking. Never read it aloud." },
@@ -125,7 +125,7 @@ export function buildTools(publicUrl: string, toolsToken?: string): ToolDef[] {
       name: "look_at_board",
       description:
         "Look at what the student wrote or drew on the board: their working, a doubt, a diagram. Returns what is written and, for working, the first wrong step (the board circles it). Call it when you receive 'dtmf_number: 1' (the student pressed Done), or when they say they are done, 'check karo', 'ho gaya', 'dekho', 'maine likha hai', ask if they are right, or ask about something they drew.",
-      pre_call_message: { hi: "एक सेकंड, देखती हूँ।", en: "One second, let me look." },
+      pre_call_message: { hi: "एक सेकंड, आपका काम देख रही हूँ।", en: "One second, I'm looking at your work." },
       properties: {
         student_said: {
           type: "string",
@@ -138,7 +138,7 @@ export function buildTools(publicUrl: string, toolsToken?: string): ToolDef[] {
       name: "continue_lesson",
       description:
         "Call this right after you have answered a student's doubt or question that interrupted your explanation. It un-pauses the board and tells you exactly where the lesson was, so you can pick up from there.",
-      pre_call_message: { hi: "अच्छा।", en: "Alright." },
+      pre_call_message: { hi: "चलो, जहाँ थे वहीं से आगे बढ़ते हैं।", en: "Let's pick up where we were." },
       properties: {},
       required: [],
     }),
@@ -146,7 +146,7 @@ export function buildTools(publicUrl: string, toolsToken?: string): ToolDef[] {
       name: "show_section",
       description:
         "Write the next part of today's prepared study plan on the board (made from the student's own notes if they uploaded any). Pass 'next' to move on, or a section number to go back or jump. Returns a short line to say and a question to ask. Only when the lesson plan lists sections.",
-      pre_call_message: { hi: "अच्छा, बोर्ड पर देखो।", en: "Okay, look at the board." },
+      pre_call_message: { hi: "दो मिनट दीजिए, अगला हिस्सा लिखती हूँ।", en: "Give me two minutes, I'll write the next part." },
       properties: { section: { type: "string", description: "'next', or a section number from the lesson plan, e.g. '3'." } },
       required: ["section"],
     }),
@@ -176,7 +176,7 @@ export function buildTools(publicUrl: string, toolsToken?: string): ToolDef[] {
       name: "give_practice",
       description:
         "Put the next prepared practice problem from the study plan on the board. Its answer stays hidden; look_at_board checks it. Only when the lesson plan says practice problems are ready.",
-      pre_call_message: { hi: "अच्छा, एक सवाल देती हूँ।", en: "Okay, here is one for you." },
+      pre_call_message: { hi: "सोचने दो, कौन सा सवाल दूँ।", en: "Let me think of a good one for you." },
       properties: { number: { type: "string", description: "'next', or a practice number, e.g. '2'." } },
       required: ["number"],
     }),
@@ -184,7 +184,7 @@ export function buildTools(publicUrl: string, toolsToken?: string): ToolDef[] {
       name: "next_problem",
       description:
         "Put a CHECKED problem from the library on the board (answer and solution verified, hints ready). Prefer this over making up problems. kind: practice (normal), transfer (a fresh one to see if they can do it alone), diagnostic (the quick check; usually via the diagnostic tool).",
-      pre_call_message: { hi: "अच्छा, एक सवाल देती हूँ।", en: "Here's one for you." },
+      pre_call_message: { hi: "हम्म, एक अच्छा सा सवाल ढूँढती हूँ।", en: "Hmm, let me find a good question." },
       properties: {
         kind: { type: "string", description: "practice | transfer | diagnostic" },
         skill: { type: "string", description: "Optional skill id, e.g. ap.nth_term, from plan_next or the memory note." },
@@ -196,7 +196,7 @@ export function buildTools(publicUrl: string, toolsToken?: string): ToolDef[] {
       name: "solve",
       description:
         "Get a worked solution for a problem (yours or the student's) BEFORE you teach or judge it. Returns the answer for your eyes only, steps, three hints, and exactly how much was verified ('library'/'exact' = checked; 'substitution' = only the final answer checked; 'unverified' = nothing checked: never call that checked). Never read out the answer.",
-      pre_call_message: { hi: "एक सेकंड।", en: "One second." },
+      pre_call_message: { hi: "सोच रही हूँ, बस एक सेकंड।", en: "Thinking, just a second." },
       properties: {
         problem: { type: "string", description: "The problem text (plain-text maths). Leave empty to solve the question on the board." },
         problem_id: { type: "string", description: "Optional library problem id." },
@@ -223,7 +223,7 @@ export function buildTools(publicUrl: string, toolsToken?: string): ToolDef[] {
       name: "check_answer",
       description:
         "Check an answer the student SAID aloud against the current question, exactly (fractions, signs, both roots). Returns correct / incorrect / partial / approximate / unreadable, and a known misconception if their answer matches one. For written work use look_at_board.",
-      pre_call_message: { hi: "देखती हूँ।", en: "Let me check." },
+      pre_call_message: { hi: "रुको, चेक करती हूँ।", en: "Hold on, let me check." },
       properties: { answer: { type: "string", description: "The student's answer as they said it, e.g. 'x = 3 or 4', '29'." } },
       required: ["answer"],
     }),
@@ -231,7 +231,7 @@ export function buildTools(publicUrl: string, toolsToken?: string): ToolDef[] {
       name: "plan_next",
       description:
         "Ask what to do next when unsure: uses the question, their attempts, hints used, the quick check and their record. Returns one action (nudge, next_hint, explain_step, equivalent_example, transfer_question, follow_up_check, diagnostic_question, continue_lesson) and which tool to call.",
-      pre_call_message: { hi: "अच्छा।", en: "Okay." },
+      pre_call_message: { hi: "सोचने दो, आगे क्या करें।", en: "Let me think about what's next." },
       properties: {},
       required: [],
     }),
@@ -246,7 +246,7 @@ export function buildTools(publicUrl: string, toolsToken?: string): ToolDef[] {
     tool(base, token, {
       name: "skip_question",
       description: "The student wants to skip the current question (or doesn't know it in the quick check). Records it as skipped/unanswered, not wrong.",
-      pre_call_message: { hi: "ठीक है।", en: "That's fine." },
+      pre_call_message: { hi: "कोई बात नहीं, आगे बढ़ते हैं।", en: "No problem, let's move on." },
       properties: {},
       required: [],
     }),

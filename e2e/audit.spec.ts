@@ -588,6 +588,108 @@ test("study group: after joining, My classes takes you to your own classes", asy
   await other.close();
 });
 
+// Exams: a 1x1 PNG stands in for a photo of an answer sheet.
+const SHEET = { name: "page1.png", mimeType: "image/png", buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64") };
+
+test("mock exam: a board-style paper to read and download, then marked like a board exam, then a class on it", async ({ page }) => {
+  await page.addInitScript(() => {
+    (window as unknown as { printed: number }).printed = 0;
+    window.print = () => void ((window as unknown as { printed: number }).printed += 1);
+  });
+  await page.goto("/");
+  await ensureAccount(page);
+  await page.getByRole("button", { name: /Exam/ }).first().click();
+  await expect(page.getByRole("heading", { name: "Exams" })).toBeVisible();
+  await page.getByRole("button", { name: "Quadratic equations" }).click();
+  await page.getByRole("radio", { name: "5", exact: true }).click();
+  await page.getByRole("radio", { name: "30 min", exact: true }).click();
+  await page.getByRole("radio", { name: /Mock exam/ }).click();
+  await page.getByRole("button", { name: /Make my paper/ }).click();
+  const paper = page.getByRole("article", { name: "Question paper" });
+  await expect(paper).toBeVisible({ timeout: 15_000 });
+  await expect(paper).toContainText("Time allowed: 30 min");
+  await expect(paper).toContainText("Maximum Marks: 15");
+  for (const sec of ["SECTION A", "SECTION B", "SECTION C", "SECTION D", "SECTION E"]) await expect(paper).toContainText(sec);
+  await page.getByRole("button", { name: /Download PDF/ }).click();
+  await expect.poll(() => page.evaluate(() => (window as unknown as { printed: number }).printed)).toBe(1);
+  // Answer sheets, marked.
+  await page.getByRole("button", { name: /Upload my answers/ }).click();
+  await page.locator('input[data-exam="answers"]').setInputFiles([SHEET, { ...SHEET, name: "page2.png" }]);
+  await expect(page.getByRole("img", { name: "Page 2" })).toBeVisible();
+  await page.getByRole("button", { name: /Mark my 2 pages/ }).click();
+  await expect(page.getByRole("heading", { name: "Your marks" })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("Practice marks from Shikshak, not official marks.")).toBeVisible();
+  await expect(page.getByText("Neatness")).toBeVisible();
+  await expect(page.locator(".exam-qmarks > li")).toHaveCount(5);
+  await expect(page.getByRole("heading", { name: "Invigilator's report" })).toHaveCount(0);
+  // Learn from it with the tutor: a class opens with the weakest question on the board.
+  await page.getByRole("button", { name: /Learn from this with the tutor/ }).click();
+  await expect(page.locator("canvas.board-ink")).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator(".tblock-problem")).toBeVisible({ timeout: 10_000 });
+});
+
+test("exam with an invigilator: questions hidden until start, camera and whole screen needed, what it notices is in the report", async ({ page }) => {
+  // Test browsers have no camera or screen to share: stand-ins that behave like the real thing.
+  await page.addInitScript(() => {
+    const fake = (surface?: string) => {
+      const c = document.createElement("canvas");
+      c.width = 64;
+      c.height = 48;
+      c.getContext("2d")!.fillRect(0, 0, 64, 48);
+      const stream = c.captureStream(5);
+      const track = stream.getVideoTracks()[0];
+      const settings = track.getSettings.bind(track);
+      track.getSettings = () => ({ ...settings(), ...(surface ? { displaySurface: surface } : {}) });
+      (window as unknown as { tracks: MediaStreamTrack[] }).tracks ??= [];
+      (window as unknown as { tracks: MediaStreamTrack[] }).tracks.push(track);
+      return stream;
+    };
+    Object.defineProperty(navigator, "mediaDevices", {
+      configurable: true,
+      value: { getUserMedia: async () => fake(), getDisplayMedia: async () => fake("monitor") },
+    });
+  });
+  await page.goto("/");
+  await ensureAccount(page);
+  await page.goto("/#/exam");
+  await page.getByPlaceholder("e.g. Quadratic equations").fill("Triangles");
+  await page.getByRole("radio", { name: "5", exact: true }).click();
+  await page.getByRole("radio", { name: /^Exam/ }).click();
+  await page.getByRole("button", { name: /Make my paper/ }).click();
+  await expect(page.getByText("The questions appear when you start the exam.")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("button", { name: /Download PDF/ })).toHaveCount(0);
+  await page.getByRole("button", { name: /Start exam/ }).click();
+  const start = page.getByRole("button", { name: "Start the exam" });
+  await expect(start).toBeDisabled();
+  await page.getByRole("button", { name: "Turn on camera" }).click();
+  await page.getByRole("button", { name: "Share screen" }).click();
+  await expect(start).toBeEnabled();
+  await start.click();
+  await expect(page.getByRole("timer", { name: "Time left" })).toBeVisible();
+  await expect(page.getByRole("article", { name: "Question paper" })).toContainText("SECTION A");
+  await expect(page.getByText("The questions appear when you start the exam.")).toHaveCount(0);
+  // Leaving the tab, and stopping the screen share, are noticed.
+  await page.evaluate(() => {
+    Object.defineProperty(document, "hidden", { configurable: true, get: () => true });
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  await expect(page.getByRole("alert")).toContainText("left the exam page");
+  await page.evaluate(() => {
+    const share = (window as unknown as { tracks: MediaStreamTrack[] }).tracks[1];
+    share.stop();
+    share.dispatchEvent(new Event("ended"));
+    share.onended?.(new Event("ended"));
+  });
+  page.once("dialog", (d) => d.accept());
+  await page.getByRole("button", { name: "I've finished" }).click();
+  await page.locator('input[data-exam="answers"]').setInputFiles(SHEET);
+  await page.getByRole("button", { name: /Mark my/ }).click();
+  await expect(page.getByRole("heading", { name: "Your marks" })).toBeVisible({ timeout: 15_000 });
+  const report = page.locator(".exam-panel", { has: page.getByRole("heading", { name: "Invigilator's report" }) });
+  await expect(report).toContainText("Left the exam tab or app");
+  await expect(report).toContainText("Stopped sharing the screen");
+});
+
 test("guided tour: the first visit walks through the controls, once, and can be replayed", async ({ page }) => {
   const clips: string[] = [];
   page.on("request", (r) => r.url().includes("/tour/") && clips.push(r.url()));

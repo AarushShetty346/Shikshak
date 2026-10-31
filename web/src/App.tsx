@@ -7,6 +7,7 @@ import { ChalkFilter } from "./components/Chalk";
 import { DusterWipe } from "./components/Duster";
 import { Splash, splashDue } from "./components/Splash";
 import { JoinGroup, StudyGroups } from "./components/StudyGroup";
+import { ExamHome, ExamView } from "./components/Exam";
 import { getSession, sessionFromHash } from "./lib/session";
 import { listLearners } from "./lib/learners";
 
@@ -16,7 +17,9 @@ type Route =
   | { page: "progress"; learnerId: string }
   | { page: "pilot" }
   | { page: "groups"; groupId: string | null }
-  | { page: "join"; code: string };
+  | { page: "join"; code: string }
+  | { page: "exams" }
+  | { page: "exam"; id: string };
 
 function readRoute(): Route {
   const id = sessionFromHash();
@@ -28,6 +31,9 @@ function readRoute(): Route {
   const join = /^#\/join\/([A-Za-z0-9]{6})$/.exec(location.hash);
   if (join) return { page: "join", code: join[1].toUpperCase() };
   if (location.hash === "#/pilot") return { page: "pilot" };
+  if (location.hash === "#/exam") return { page: "exams" };
+  const ex = /^#\/exam\/(ex_[A-Za-z0-9_-]{8,20})$/.exec(location.hash);
+  if (ex) return { page: "exam", id: ex[1] };
   return { page: "home" };
 }
 
@@ -92,6 +98,10 @@ export function App() {
       return <StudyGroups groupId={route.groupId} onBack={() => go("#/")} onOpenGroup={(id) => go(id ? `#/group/${id}` : "#/group")} />;
     case "join":
       return <JoinGroup code={route.code} onJoined={(id) => go(`#/group/${id}`)} onNotNow={() => go("#/")} />;
+    case "exams":
+      return <ExamHome onOpen={(id) => go(`#/exam/${id}`)} />;
+    case "exam":
+      return <ExamView key={route.id} id={route.id} onBack={() => go("#/exam")} />;
     case "pilot":
       return <Pilot onBack={() => go("#/")} />;
     default:
