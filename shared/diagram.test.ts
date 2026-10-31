@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compileExpr, DIAGRAM_EXAMPLES, diagramPieces, parseDiagram } from "./diagram";
+import { compileExpr, compileGraphExpr, DIAGRAM_EXAMPLES, diagramPieces, parseDiagram } from "./diagram";
 
 describe("diagram language", () => {
   it("parses every documented example", () => {
@@ -68,5 +68,24 @@ describe("graphs with breaks", () => {
     expect(s.at(-1)![1]).toBeCloseTo(4);
     expect(s[0][0]).toBeCloseTo(-2, 1);
     expect(s.at(-1)![0]).toBeCloseTo(2, 1);
+  });
+});
+
+describe("graphs with sliders", () => {
+  it("reads the sliders and draws with their values", () => {
+    const d = parseDiagram("graph: y = a x^2 + b x + c | params: a = 1 (-3..3), b = -1, c = -6 (-6..6) | x: -5..5");
+    expect(d).toMatchObject({ type: "graph", params: [{ name: "a", value: 1, min: -3, max: 3 }, { name: "b", value: -1, min: -5, max: 5 }, { name: "c", value: -6, min: -6, max: 6 }] });
+    const f = compileGraphExpr("a x^2 + b x + c", ["a", "b", "c"]);
+    expect(f(3, { a: 1, b: -1, c: -6 })).toBe(0);
+    expect(f(2, { a: 2, b: 0, c: 1 })).toBe(9);
+    // Function names still win over one-letter sliders.
+    expect(compileGraphExpr("abs(x) + a", ["a", "b"])(-2, { a: 1 })).toBe(3);
+  });
+
+  it("refuses bad sliders, and letters that aren't sliders", () => {
+    expect(() => parseDiagram("graph: y = a x | params: a = one")).toThrow(/slider/);
+    expect(() => parseDiagram("graph: y = a x | params: a = 1, a = 2")).toThrow(/twice/);
+    expect(() => parseDiagram("graph: y = k x")).toThrow(/can't draw/);
+    expect(parseDiagram("graph: y = x^2")).not.toHaveProperty("params");
   });
 });

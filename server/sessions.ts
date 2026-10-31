@@ -368,7 +368,9 @@ export function hydrate(s: Session, snap: BoardSnapshot): boolean {
               ? `${b.docName} page ${b.page ?? "-"}`
               : b.type === "hint"
                 ? `${b.level}: ${b.text}`
-                : b.caption;
+                : b.type === "fix"
+                  ? `fixed ${b.photoLabel}: ${b.questions.map((q) => q.question).join(" / ")}`
+                  : b.caption;
     s.blocks.push({ label: b.label, kind: b.type === "write" ? b.style : b.type, summary: summary.slice(0, 120), lines: Math.max(1, lines.length), erased: Boolean(b.erased) });
   }
   s.labelCounter = s.blocks.reduce((m, b) => Math.max(m, Number(b.label.slice(1)) || 0), 0);

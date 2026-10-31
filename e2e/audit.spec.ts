@@ -5,6 +5,8 @@ import { expect, test, type Page } from "@playwright/test";
 
 // These tests aren't about the first-time tour (its own test is in audit.spec.ts): mark it as seen.
 test.beforeEach(async ({ page }, info) => {
+  // The start screen has its own test.
+  if (!info.title.includes("start screen")) await page.addInitScript(() => sessionStorage.setItem("shikshak.splashSeen", "1"));
   if (info.title.includes("guided tour")) return;
   await page.addInitScript(() => {
     localStorage.setItem("shikshak.tour.home.v1", "1");
@@ -97,7 +99,7 @@ test("BUG-06: after three hints the question is still on screen", async ({ page 
 test("BUG-07: the first screen says what Shikshak is", async ({ page }) => {
   await page.goto("/");
   const pitch = page.locator(".home-empty");
-  await expect(pitch).toContainText(/voice maths tutor/i);
+  await expect(pitch).toContainText(/I am Shikshak, your tutor/);
   await expect(pitch).toContainText(/handwritten/i);
   await expect(page.getByText(/Physics/)).toHaveCount(0);
 });
@@ -220,6 +222,183 @@ test("Paper mode: a photo of my working is pinned on the board, checked, and mar
   const [p, c] = [(await photo.boundingBox())!, (await circle.boundingBox())!];
   expect(c.y).toBeGreaterThan(p.y);
   expect(c.y).toBeLessThan(p.y + p.height);
+});
+
+test("Fix it on a photo: the slips are marked on the photo and the answer is written exam-style", async ({ page }) => {
+  await openClass(page);
+  await page.locator('input[data-paper="work"]').setInputFiles("e2e/paper-working.jpg");
+  const photo = page.locator(".photo-page");
+  await expect(photo.locator("img")).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator(".submission")).toHaveAttribute("data-state", "done", { timeout: 20_000 });
+  // The button sits under the ink layer; a tap on it presses it rather than drawing.
+  const fix = photo.getByRole("button", { name: "Fix it" });
+  await fix.scrollIntoViewIfNeeded();
+  const at = (await fix.boundingBox())!;
+  await page.mouse.click(at.x + at.width / 2, at.y + at.height / 2);
+  const block = page.locator(".fix-block");
+  await expect(block).toBeVisible({ timeout: 15_000 });
+  await expect(block).toContainText("(simulated)");
+  await expect(block.locator(".fix-band")).toHaveCount(1);
+  await expect(block.locator(".fix-photo img")).toBeVisible();
+  // Exam layout: steps with ⇒ and ∵, ending in a boxed "∴" answer.
+  await expect(block.locator(".exam-line").filter({ hasText: "⇒" }).first()).toBeVisible();
+  await expect(block.locator(".exam-line").filter({ hasText: "∵" })).toHaveCount(1);
+  await expect(block.locator(".exam-final")).toHaveText("∴ x = 2 or x = 3");
+  await expect(block).toContainText("Not checked by the maths engine");
+});
+
+test("ink drawn over a photo is sent with the photo, so the reader sees what I marked", async ({ page }) => {
+  await openClass(page);
+  await page.locator('input[data-paper="work"]').setInputFiles("e2e/paper-working.jpg");
+  const img = page.locator(".photo-page img");
+  await expect(img).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator(".submission")).toHaveAttribute("data-state", "done", { timeout: 20_000 });
+  const sent: { photoLabel?: string; png?: string; lineCount?: number }[] = [];
+  page.on("websocket", (ws) => ws.on("framesent", (f) => typeof f.payload === "string" && f.payload.includes('"capture"') && sent.push(JSON.parse(f.payload))));
+  await page.reload();
+  await expect(img).toBeVisible({ timeout: 15_000 });
+  await img.scrollIntoViewIfNeeded();
+  const box = (await img.boundingBox())!;
+  await scribble(page, box.x + box.width * 0.55, box.y + box.height * 0.4, 120);
+  await page.locator("button.btn-done").click();
+  await expect.poll(() => sent.length, { timeout: 10_000 }).toBeGreaterThan(0);
+  expect(sent[0].photoLabel).toMatch(/^B\d+$/);
+  expect(sent[0].lineCount).toBe(0);
+  expect(sent[0].png).toMatch(/^data:image\/jpeg;base64,/);
+  await expect(page.locator(".submission")).toContainText("Simulated check", { timeout: 20_000 });
+});
+
+test("Type tool: typed steps go on the board as my lines and are checked like handwriting", async ({ page }) => {
+  const id = await openClass(page);
+  await tool(page, "next_problem", { session_code: id, problem_id: "quad.fact.01" });
+  await page.getByRole("button", { name: "Type", exact: true }).click();
+  const box = page.getByRole("textbox", { name: "Your working" });
+  await box.fill("x² − 5x + 6 = 0\n(x − 2)(x − 3) = 0\n");
+  await page.getByRole("button", { name: "Insert ∴" }).click();
+  await box.press("End");
+  await box.pressSequentially(" x = 2 or x = 3");
+  await expect(page.getByText("3 lines")).toBeVisible();
+  await page.getByRole("button", { name: "Put on the board" }).click();
+  await expect(box).toHaveCount(0);
+  // They're the student's own lines now: Done sends them, numbered, like handwriting.
+  const sent: { lineCount?: number }[] = [];
+  page.on("websocket", (ws) => ws.on("framesent", (f) => typeof f.payload === "string" && f.payload.includes('"capture"') && sent.push(JSON.parse(f.payload))));
+  await page.reload();
+  await expect(page.locator("canvas.board-ink")).toBeVisible();
+  const done = page.locator("button.btn-done");
+  await expect(done).toBeEnabled();
+  await done.click();
+  await expect.poll(() => sent[0]?.lineCount, { timeout: 10_000 }).toBe(3);
+  await expect(page.locator(".submission")).toContainText("Simulated check", { timeout: 20_000 });
+});
+
+test("a graph with sliders: moving a slider redraws the curve and where it crosses the x-axis", async ({ page }) => {
+  const id = await openClass(page);
+  const r = await tool(page, "draw", { session_code: id, diagram: "graph: y = a x^2 + b x + c | params: a = 1 (-3..3), b = -1 (-6..6), c = -6 (-6..6) | x: -5..5", caption: "Move a, b and c" });
+  expect(r.ok).toBe(true);
+  const graph = page.locator(".editable-graph");
+  await expect(graph).toBeVisible({ timeout: 10_000 });
+  await expect(graph.locator(".graph-root")).toHaveCount(2);
+  await expect(graph.locator(".graph-root text")).toHaveText(["−2", "3"]);
+  // Drag c to the far right (under the ink layer, so it goes through the board).
+  const c = graph.getByRole("slider", { name: "Change c" });
+  await c.scrollIntoViewIfNeeded();
+  const box = (await c.boundingBox())!;
+  await page.mouse.move(box.x + box.width * 0.1, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width - 1, box.y + box.height / 2, { steps: 6 });
+  await page.mouse.up();
+  await expect(c).toHaveValue("6");
+  // y = x² − x + 6 never touches the x-axis.
+  await expect(graph.locator(".graph-root")).toHaveCount(0);
+  await expect(graph.locator("text").filter({ hasText: /^y = / })).toHaveText(/^y = x² [−-] x \+ 6$/);
+  await graph.getByRole("button", { name: "Reset" }).evaluate((b: HTMLButtonElement) => b.click());
+  await expect(c).toHaveValue("-6");
+});
+
+test("download notes: the whole class prints as a PDF, board only, with my ink", async ({ page }) => {
+  await page.addInitScript(() => {
+    (window as unknown as { printed: number }).printed = 0;
+    window.print = () => void ((window as unknown as { printed: number }).printed += 1);
+  });
+  await openClass(page);
+  const at = (await page.locator("canvas.board-ink").boundingBox())!;
+  await scribble(page, at.x + 80, at.y + 200, 160);
+  await page.getByRole("button", { name: "Download notes as PDF" }).click();
+  await expect.poll(() => page.evaluate(() => (window as unknown as { printed: number }).printed)).toBe(1);
+  await expect(page.locator(".print-ink")).not.toHaveCount(0);
+  await page.emulateMedia({ media: "print" });
+  await expect(page.locator(".class-dock")).toBeHidden();
+  await expect(page.locator(".print-ink").first()).toBeVisible();
+});
+
+test("session layout: start, the typing field and the mic at the bottom; the pen button hides the tools", async ({ page }) => {
+  await openClass(page);
+  const dock = page.locator(".class-dock");
+  await expect(dock.getByRole("button", { name: /^(Start|Resume)$/ })).toBeVisible();
+  await expect(dock.getByRole("textbox", { name: "Type a step" })).toBeVisible();
+  await expect(dock.getByRole("button", { name: "Start talking" })).toBeVisible();
+  await expect(page.getByRole("toolbar", { name: "Board tools" })).toBeVisible();
+  await page.getByRole("button", { name: "Hide the drawing tools" }).click();
+  await expect(page.getByRole("toolbar", { name: "Board tools" })).toBeHidden();
+  await page.getByRole("button", { name: "Show the drawing tools" }).click();
+  // One step typed in the bar goes on the board as my line.
+  await dock.getByRole("textbox", { name: "Type a step" }).fill("x = 2");
+  await page.keyboard.press("Enter");
+  await expect(page.locator("button.btn-done")).toBeEnabled();
+  // The + holds paper and books.
+  await dock.getByRole("button", { name: "Add from paper or a book" }).click();
+  await expect(page.getByRole("menuitem", { name: /Upload my book or notes/ })).toBeVisible();
+});
+
+test("start screen: Shikshak in the middle, Start Shiksha, then a new device makes its account", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Shikshak" })).toBeVisible();
+  await page.getByRole("button", { name: /Start Shiksha/ }).click();
+  await expect(page.getByRole("heading", { name: "Create your account" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Cancel" })).toHaveCount(0);
+  await page.getByLabel("Name or nickname").fill("Meera");
+  await page.getByRole("button", { name: "Create account" }).click();
+  await expect(page.getByRole("heading", { name: "Meera's classes" })).toBeVisible();
+  // Once per visit: a reload goes straight on.
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Meera's classes" })).toBeVisible();
+});
+
+test("hide the controls: just the board, and one button brings them back", async ({ page }) => {
+  await openClass(page);
+  await page.getByRole("button", { name: "Hide the controls" }).click();
+  await expect(page.locator(".class-dock")).toBeHidden();
+  await expect(page.locator(".class-pill")).toBeHidden();
+  await expect(page.getByRole("toolbar", { name: "Board tools" })).toBeHidden();
+  await page.getByRole("button", { name: "Show the controls" }).click();
+  await expect(page.locator(".class-dock")).toBeVisible();
+});
+
+test("focus mode: pick a time from 30 minutes, and leaving the class gets a call back", async ({ page }) => {
+  await openClass(page);
+  await page.getByRole("button", { name: "Session menu" }).click();
+  await page.getByRole("menuitem", { name: "Focus mode" }).click();
+  await expect(page.getByRole("radio", { name: "30 min" })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByRole("radio")).toHaveCount(5);
+  await page.getByRole("radio", { name: "45 min" }).click();
+  await page.getByRole("button", { name: "Start focus" }).click();
+  await expect(page.getByRole("timer")).toContainText(/4[45]:\d\d/);
+  // Switching to another tab and back.
+  const flip = (hidden: boolean) =>
+    page.evaluate((h) => {
+      Object.defineProperty(document, "hidden", { configurable: true, get: () => h });
+      document.dispatchEvent(new Event("visibilitychange"));
+    }, hidden);
+  await flip(true);
+  await flip(false);
+  await expect(page.getByRole("alertdialog")).toContainText(/board|class|work/i);
+  await expect(page.getByRole("timer")).toContainText("left 1×");
+  await page.getByRole("button", { name: "I'm back" }).click();
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
+  page.once("dialog", (d) => d.accept());
+  await page.getByRole("button", { name: "Stop focus mode" }).click();
+  await expect(page.getByRole("timer")).toHaveCount(0);
 });
 
 test("guided tour: the first visit walks through the controls, once, and can be replayed", async ({ page }) => {

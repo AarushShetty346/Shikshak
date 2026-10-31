@@ -50,6 +50,16 @@ export function makeSnapshot(strokes: Stroke[], lines: WrittenLine[]): string | 
   ctx.lineJoin = "round";
   for (const s of strokes) {
     if (s.points.length === 0) continue;
+    if (s.text) {
+      // A typed line: clear printed text, where it sits on the board.
+      const size = (s.size ?? 26) * scale;
+      ctx.font = `${Math.round(size)}px sans-serif`;
+      ctx.textAlign = "left";
+      ctx.textBaseline = "alphabetic";
+      ctx.fillStyle = "#000000";
+      ctx.fillText(s.text, tx(s.points[0][0]), ty(s.points[0][1]) + size * 0.85);
+      continue;
+    }
     ctx.beginPath();
     ctx.moveTo(tx(s.points[0][0]), ty(s.points[0][1]));
     if (s.points.length === 1) ctx.lineTo(tx(s.points[0][0]) + 0.1, ty(s.points[0][1]));
@@ -67,4 +77,53 @@ export function makeSnapshot(strokes: Stroke[], lines: WrittenLine[]): string | 
   }
 
   return canvas.toDataURL("image/png");
+}
+
+const PHOTO_MAX = 1600;
+const PHOTO_INK = "#1d4ed8"; // bright blue, so the reader can tell the student's board ink from the paper
+
+/**
+ * The student wrote on the board over a photo of their paper: the photo with that ink drawn on top
+ * (in blue), as a JPEG the size of the photo. Lines found on it map straight back onto the photo.
+ * imgBox is where the photo sits on the board, in board units.
+ */
+export function makePhotoSnapshot(img: HTMLImageElement, imgBox: { x: number; y: number; w: number; h: number }, strokes: Stroke[]): string | null {
+  if (!img.complete || !img.naturalWidth || imgBox.w <= 0 || imgBox.h <= 0) return null;
+  const k = Math.min(1, PHOTO_MAX / Math.max(img.naturalWidth, img.naturalHeight));
+  const width = Math.round(img.naturalWidth * k);
+  const height = Math.round(img.naturalHeight * k);
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d")!;
+  ctx.drawImage(img, 0, 0, width, height);
+  const sx = width / imgBox.w;
+  const sy = height / imgBox.h;
+  const tx = (x: number) => (x - imgBox.x) * sx;
+  const ty = (y: number) => (y - imgBox.y) * sy;
+  ctx.strokeStyle = PHOTO_INK;
+  ctx.fillStyle = PHOTO_INK;
+  ctx.lineWidth = Math.max(3, 3.2 * sx);
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  for (const s of strokes) {
+    if (s.points.length === 0) continue;
+    if (s.text) {
+      const size = (s.size ?? 26) * sy;
+      ctx.font = `${Math.round(size)}px sans-serif`;
+      ctx.textBaseline = "alphabetic";
+      ctx.fillText(s.text, tx(s.points[0][0]), ty(s.points[0][1]) + size * 0.85);
+      continue;
+    }
+    ctx.beginPath();
+    ctx.moveTo(tx(s.points[0][0]), ty(s.points[0][1]));
+    if (s.points.length === 1) ctx.lineTo(tx(s.points[0][0]) + 0.1, ty(s.points[0][1]));
+    for (const [x, y] of s.points.slice(1)) ctx.lineTo(tx(x), ty(y));
+    ctx.stroke();
+  }
+  try {
+    return canvas.toDataURL("image/jpeg", 0.88);
+  } catch {
+    return null; // a tainted canvas can't be read; send the ink alone instead
+  }
 }

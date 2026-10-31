@@ -24,14 +24,17 @@ const CaptureSchema = z
     png: z
       .string()
       .max(3_000_000)
-      .regex(/^data:image\/png;base64,[A-Za-z0-9+/]+=*$/)
+      .regex(/^data:image\/(png|jpeg);base64,[A-Za-z0-9+/]+=*$/)
       .nullable(),
     lineCount: z.number().int().min(0).max(MAX_LINES),
     lines: z.array(BoxSchema).max(MAX_LINES),
+    /** The student wrote over a photo on the board: the image is that photo with their ink on top. */
+    photoLabel: z.string().regex(/^[A-Z]\d{1,4}$/).nullish(),
   })
   .strict()
   .refine((c) => c.lines.length === c.lineCount, { message: "lines must match lineCount" })
-  .refine((c) => (c.lineCount === 0) === (c.png === null), { message: "png must be present exactly when there are lines" });
+  .refine((c) => (c.lineCount === 0 && !c.photoLabel) === (c.png === null), { message: "png must be present exactly when there is work" })
+  .refine((c) => !c.photoLabel || c.lineCount === 0, { message: "a photo capture has no board lines" });
 
 const InterruptSchema = z.object({ kind: z.literal("interrupt"), reason: z.enum(["doubt", "speech"]) }).strict();
 const SyncSchema = z.object({ kind: z.literal("sync") }).strict();
@@ -55,6 +58,10 @@ const DiagramSchema = z.union([
       points: z.array(z.object({ x: finite, y: finite, label: text(20) }).strict()).max(6),
       xmin: finite,
       xmax: finite,
+      params: z
+        .array(z.object({ name: z.string().regex(/^[a-wyz]$/), value: finite, min: finite, max: finite }).strict())
+        .max(4)
+        .optional(),
     })
     .strict(),
   z
@@ -114,6 +121,29 @@ const BlockSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("page"), id, ...erased }).strict(),
   z
     .object({ type: z.literal("source"), id, label, docId: id, docName: text(120), page: z.number().int().min(1).max(5000).nullable(), caption: text(120), photo: z.boolean().optional(), ...erased })
+    .strict(),
+  z
+    .object({
+      type: z.literal("fix"),
+      id,
+      label,
+      photoLabel: label,
+      docId: id,
+      questions: z
+        .array(
+          z
+            .object({
+              question: text(600),
+              status: z.enum(["correct", "mistake", "incomplete", "unreadable"]),
+              marks: z.array(z.object({ top: z.number().min(0).max(1), bottom: z.number().min(0).max(1), fix: text(200) }).strict()).max(12),
+              solution: z.array(text(200)).max(30),
+            })
+            .strict(),
+        )
+        .max(6),
+      simulated: z.boolean().optional(),
+      ...erased,
+    })
     .strict(),
   z
     .object({

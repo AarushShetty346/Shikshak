@@ -117,3 +117,82 @@ describe("paper mode: a photo of the working", () => {
     }
   });
 });
+
+describe("ink drawn over a photo on the board", () => {
+  it("is checked as that photo, and circled on it", async () => {
+    askJson.mockResolvedValue(READ_SLIP);
+    const id = await kit.newSession(srv.base, token, { topic: "Quadratic equations" });
+    const tab = await kit.openTab(srv.base, token, id);
+    await tool("next_problem", { session_code: id, problem_id: "quad.fact.01" });
+    const label = (await api().post(`/sessions/${id}/paper`, { file: PHOTO, captureId: "cap-paper-3" })).json.label as string;
+    await vi.waitFor(() => expect(tab.events().some((e) => e.type === "mark")).toBe(true));
+    askJson.mockClear();
+    const questionId = (tab.events().find((e) => e.type === "problem") as { questionId: string }).questionId;
+    // The browser sends the photo with the student's ink on top, naming the photo.
+    tab.send({ kind: "capture", id: "cap-ink-1", reason: "done", requestId: null, questionId, png: `data:image/jpeg;base64,${PHOTO.data}`, lineCount: 0, lines: [], photoLabel: label });
+    await vi.waitFor(() => expect(tab.events().filter((e) => e.type === "mark").some((e) => (e as { captureId: string }).captureId === "cap-ink-1")).toBe(true));
+    const req = askJson.mock.calls[0][0] as { system: string };
+    expect(req.system).toMatch(/Bright blue strokes/);
+    const mark = tab.events().filter((e) => e.type === "mark").at(-1);
+    expect(mark).toMatchObject({ on: { label } });
+    tab.ws.close();
+  });
+
+  it("can't name a block that isn't a photo", async () => {
+    const id = await kit.newSession(srv.base, token);
+    const tab = await kit.openTab(srv.base, token, id);
+    tab.send({ kind: "capture", id: "cap-ink-2", reason: "done", requestId: null, questionId: null, png: `data:image/jpeg;base64,${PHOTO.data}`, lineCount: 0, lines: [], photoLabel: "B99" });
+    await new Promise((r) => setTimeout(r, 200));
+    expect(askJson).not.toHaveBeenCalled();
+    tab.ws.close();
+  });
+});
+
+describe("Fix it on a photo", () => {
+  const FIXED = {
+    questions: [
+      {
+        question: "Solve x^2 - 7x + 12 = 0",
+        status: "mistake",
+        marks: [{ top: 0.3, bottom: 0.42, fix: "x(x − 3) − 4(x − 3) = 0" }],
+        solution: ["x² − 7x + 12 = 0", "⇒ x² − 3x − 4x + 12 = 0", "⇒ (x − 3)(x − 4) = 0", "∴ x = 3 or x = 4"],
+      },
+    ],
+    note: "Look at line 2.",
+  };
+
+  it("puts the photo back with the slips marked and an exam-style answer, and asks for exactly that", async () => {
+    askJson.mockResolvedValueOnce(READ_SLIP).mockResolvedValueOnce(FIXED);
+    const id = await kit.newSession(srv.base, token, { topic: "Quadratic equations" });
+    const tab = await kit.openTab(srv.base, token, id);
+    const label = (await api().post(`/sessions/${id}/paper`, { file: PHOTO })).json.label as string;
+    await vi.waitFor(() => expect(askJson).toHaveBeenCalledTimes(1));
+    const r = await api().post(`/sessions/${id}/fix`, { label, docId: PHOTO.id, image: `data:image/jpeg;base64,${PHOTO.data}` });
+    expect(r.status).toBe(200);
+    const fix = tab.events().find((e) => e.type === "fix");
+    expect(fix).toMatchObject({ photoLabel: label, docId: PHOTO.id, questions: [{ status: "mistake", marks: [{ top: 0.3, bottom: 0.42 }] }] });
+    const req = askJson.mock.calls[1][0] as { system: string };
+    expect(req.system).toMatch(/Work only with the question\(s\) in THIS photo/);
+    expect(req.system).toMatch(/"∴"/);
+    expect(req.system).toMatch(/"∵"/);
+    expect(req.system).toMatch(/"⇒"/);
+    tab.ws.close();
+  });
+
+  it("refuses anything that isn't a photo on the board, and says so when there's no reader", async () => {
+    const id = await kit.newSession(srv.base, token);
+    expect((await api().post(`/sessions/${id}/fix`, { label: "B1", docId: PHOTO.id })).status).toBe(404);
+    modelOn = false;
+    const prev = process.env.FAKE_CHECKER;
+    delete process.env.FAKE_CHECKER;
+    try {
+      askJson.mockResolvedValue(READ_SLIP);
+      modelOn = true;
+      const label = (await api().post(`/sessions/${id}/paper`, { file: PHOTO })).json.label as string;
+      modelOn = false;
+      expect((await api().post(`/sessions/${id}/fix`, { label, docId: PHOTO.id })).status).toBe(503);
+    } finally {
+      if (prev !== undefined) process.env.FAKE_CHECKER = prev;
+    }
+  });
+});

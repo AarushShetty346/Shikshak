@@ -9,6 +9,7 @@ import { noteInterrupt } from "./board";
 import { config } from "./config";
 import { submitPaperWork } from "./paper";
 import { scanQuestion } from "./scan";
+import { fixPhoto } from "./fix";
 import { allow, BusyError, chargeModelCall, QuotaError, withModelSlot } from "./limits";
 import {
   getLearner as getLearnerSafe,
@@ -40,6 +41,7 @@ import {
   createSession,
   deleteSession,
   docMeta,
+  findBlock,
   getSession,
   hashPng,
   hydrate,
@@ -335,6 +337,23 @@ export function createApp(opts: { devTools?: boolean; phoneProvider?: PhoneProvi
       if (sendLimitError(res, err) !== false) return;
       console.error("[scan] failed", e.message);
       res.status(502).json({ error: "Couldn't read that photo just now. Try again." });
+    }
+  });
+
+  // "Fix it" on a photo on the board: the slips marked on the photo, and an exam-style answer.
+  api.post("/sessions/:id/fix", big, async (req, res) => {
+    const s = ownSession(req, res);
+    if (!s) return;
+    try {
+      const r = await fixPhoto(s, req.body?.label, req.body?.docId, req.body?.image);
+      if (!r.ok) return void res.status(r.status).json({ error: r.error });
+      touch(s);
+      res.json(r);
+    } catch (err) {
+      const e = err as Error;
+      if (sendLimitError(res, err) !== false) return;
+      console.error("[fix] failed", e.message);
+      res.status(502).json({ error: "Couldn't fix that photo just now. Try again." });
     }
   });
 
@@ -815,7 +834,10 @@ export function createApp(opts: { devTools?: boolean; phoneProvider?: PhoneProvi
               lines: msg.lines,
               at: Date.now(),
               hash: hashPng(msg.png),
+              // Ink drawn over a photo on the board: checked as that photo (its lines are found by the reader).
+              ...(msg.photoLabel && findBlock(s, msg.photoLabel)?.kind === "photo" ? { photo: { label: findBlock(s, msg.photoLabel)!.label } } : {}),
             };
+            if (msg.photoLabel && !capture.photo) return fail("no such photo");
             storeCapture(s, capture);
             if (capture.reason === "done") {
               reviewSubmission(s, capture, (result) => afterReview(s, capture, result)).catch((err) => console.error("[ws] review crashed", (err as Error).message));

@@ -24,11 +24,11 @@ export function clipName(s: TourStep): string {
   return `tour-${h.toString(16).padStart(8, "0")}.mp3`;
 }
 
-export const ALL_TOURS = () => [...HOME_TOUR, ...CLASS_TOUR];
+export const ALL_TOURS = () => [...HOME_TOUR, ...CLASS_TOUR, ...FOCUS_LINES];
 
 /** The home screen, the first time. */
 export const HOME_TOUR: TourStep[] = [
-  { title: "Namaste! I'm your maths teacher", text: "Let me show you around. It takes one minute. You can press Next, or use the arrow keys." },
+  { title: "Namaste! I am Shikshak, your tutor", text: "Let me show you around. It takes one minute. You can press Next, or use the arrow keys." },
   { target: ".mode-toggle", title: "Student or Teacher", text: "Learning? Stay on Student. Teachers switch here to see the progress students share with them." },
   { target: ".home-head-actions .btn-primary", title: "Start a class", text: "Press New session to start a class. Make one class for each chapter, like a notebook for every topic." },
   { target: ".profile-button", title: "This is you", text: "Tap your picture to see your progress, switch to another learner, or add a brother or sister." },
@@ -44,12 +44,20 @@ export const CLASS_TOUR: TourStep[] = [
   { target: '[aria-label="Pen"]', title: "Your pen", text: "Write your working with your finger, mouse or stylus. One step on each line." },
   { target: '[aria-label="Eraser"]', title: "Rub it out", text: "Made a mistake? Use the eraser, or undo your last line." },
   { target: "button.btn-done", title: "Press Done", text: "When you finish, press Done. I'll read your steps and circle the first one that went wrong." },
-  { target: '[aria-label="From paper"]', title: "Working in your notebook?", text: "No stylus? Solve it on paper and send me a photo. It goes on the board and I check it right there." },
-  { target: '[aria-label="Upload material"]', title: "Your book", text: "Upload your textbook or notes, and I'll teach from your own pages." },
+  { target: ".dock-attach", title: "Working in your notebook?", text: "No stylus? Solve it on paper and send me a photo. It goes on the board and I check it right there." },
+  { target: ".dock-attach", title: "Your book", text: "Upload your textbook or notes, and I'll teach from your own pages." },
   { target: ".btn-speed", title: "My speed", text: "Am I too fast or too slow? Change how fast I talk." },
   { target: '[aria-label="Session menu"]', title: "The menu", text: "Your class report, a practice question and more are in here." },
   {
     title: "How we'll learn",
     text: "First I explain on the board. Then it's your turn to try. Press Done, and I check it and circle any slip. Stuck? Ask me for a hint. Ready? Press Start!",
   },
+];
+
+/** What the teacher says in focus mode when the student leaves the class, and when it's over. */
+export const FOCUS_LINES: TourStep[] = [
+  { title: "Eyes on the board", text: "Hello! Where did you go? Come back to the board, please." },
+  { title: "Back to class", text: "Focus time is still on. Come back, we were doing so well." },
+  { title: "Pay attention", text: "I saw you switch away. Let's get back to work together." },
+  { title: "Well done!", text: "Your focus time is over. Take a short break, you've earned it." },
 ];

@@ -23,8 +23,9 @@ import { talkKey, talkKeyHint } from "../lib/pushToTalk";
 import { QuestionBar, QuickCheck } from "./ClassTools";
 import { CLASS_TOUR, Tour, tourDue } from "./Tour";
 import { ReportCard } from "./ReportCard";
+import { FocusMode, FocusSetup } from "./Focus";
 import { VoiceOrb, type VoiceState } from "./VoiceOrb";
-import { ArrowLeft, Camera, ChartBar, FileText, Scan, Signpost, HandPalm, List, Microphone, MicrophoneSlash, Pause, PencilSimpleLine, Play, Question, SignOut, UploadSimple } from "@phosphor-icons/react";
+import { ArrowLeft, Camera, ChartBar, DownloadSimple, Eye, EyeSlash, Timer, Notebook, Plus, FileText, Scan, Signpost, HandPalm, List, Microphone, MicrophoneSlash, Pause, PencilSimpleLine, Play, Question, SignOut, UploadSimple } from "@phosphor-icons/react";
 
 function toBlock(e: BlockEvent & { erased?: boolean }, instant: boolean): TutorBlock {
   switch (e.type) {
@@ -44,6 +45,8 @@ function toBlock(e: BlockEvent & { erased?: boolean }, instant: boolean): TutorB
       return { kind: "source", id: e.id, label: e.label, docId: e.docId, docName: e.docName, page: e.page, caption: e.caption, photo: e.photo, instant };
     case "hint":
       return { kind: "hint", id: e.id, label: e.label, level: e.level, rung: e.rung, of: e.of, text: e.text, instant };
+    case "fix":
+      return { kind: "fix", id: e.id, label: e.label, photoLabel: e.photoLabel, docId: e.docId, questions: e.questions, simulated: e.simulated, instant };
   }
 }
 
@@ -157,7 +160,7 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
     (seq: number, e: BoardEvent): "ok" | "dup" | "gap" => {
       const next = applySeq(snapRef.current, seq, e);
       if (next === "dup" || next === "gap") return next;
-      if ("id" in e && (e.type === "write" || e.type === "draw" || e.type === "steps" || e.type === "problem" || e.type === "plan" || e.type === "page" || e.type === "source" || e.type === "hint")) liveIds.current.add(e.id);
+      if ("id" in e && (e.type === "write" || e.type === "draw" || e.type === "steps" || e.type === "problem" || e.type === "plan" || e.type === "page" || e.type === "source" || e.type === "hint" || e.type === "fix")) liveIds.current.add(e.id);
       if (e.type === "problem" || (e.type === "write" && e.style === "your_turn")) setStatus("idle");
       if (e.type === "mark") setStatus("idle");
       if (e.type === "correct") setStatus("correct");
@@ -369,7 +372,7 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
   useEffect(() => {
     if (!paperOpen) return;
     const close = (e: Event) => {
-      if (e instanceof KeyboardEvent ? e.key === "Escape" : !(e.target as Element | null)?.closest(".paper-menu, .paper-pop")) setPaperOpen(false);
+      if (e instanceof KeyboardEvent ? e.key === "Escape" : !(e.target as Element | null)?.closest(".dock-attach, .paper-pop")) setPaperOpen(false);
     };
     window.addEventListener("pointerdown", close);
     window.addEventListener("keydown", close);
@@ -426,6 +429,22 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
     }
   };
 
+  // ---------- "Fix it" on a photo ----------
+  const [fixing, setFixing] = useState<string | null>(null);
+  const fixPhoto = async (label: string, docId: string, image: string | null) => {
+    if (!serverId || fixing) return;
+    setFixing(label);
+    try {
+      const r = await apiFetch<{ note: string; questions: { status: string }[] }>(`/sessions/${serverId}/fix`, { body: { label, docId, image } });
+      const wrong = r.questions.filter((q) => q.status === "mistake").length;
+      showToast(r.note || (wrong ? "I marked the slips on your photo and wrote out the answer below it." : "Your working looks right. The full answer is below it."));
+    } catch (e) {
+      showToast(`Couldn't fix it: ${(e as Error).message}`);
+    } finally {
+      setFixing(null);
+    }
+  };
+
   // ---------- who has the floor ----------
   const teacherSpeaking = active && voice.volume > 0.03;
   const [thinkingUntil, setThinkingUntil] = useState(0);
@@ -469,11 +488,40 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
   const blocks = useMemo(() => snapshot.blocks.map((b) => toBlock(b, !liveIds.current.has(b.id))), [snapshot.blocks]);
   const erased = useMemo(() => snapshot.blocks.filter((b) => b.erased && "label" in b && b.label).map((b) => (b as { label: string }).label), [snapshot.blocks]);
 
-  const classControls = (
+  // ---------- the bottom bar ----------
+  const dockLeft = live ? (
+    <button className="btn-pause dock-round" onClick={pause} aria-label={voice.state === "active" ? "Pause the class" : "Connecting"} title="Pause the class (the board stays as it is)">
+      {voice.state === "active" ? <Pause weight="fill" /> : <span className="spin" />}
+    </button>
+  ) : (
+    <button className="btn-start dock-round" onClick={startOrResume} disabled={!serverId} aria-label={started ? "Resume" : "Start"} title={started ? "Resume the class" : "Start the class"}>
+      <Play weight="fill" />
+    </button>
+  );
+  const dockAttach = (
+    <button
+      type="button"
+      className="dock-attach"
+      onClick={() => setPaperOpen((o) => !o)}
+      disabled={scanning || uploading || !serverId}
+      aria-label="Add from paper or a book"
+      aria-haspopup="menu"
+      aria-expanded={paperOpen}
+      title="A photo of your working or a question, or your book"
+    >
+      {scanning || uploading ? <span className="spin" /> : <Plus weight="bold" />}
+    </button>
+  );
+  const dockRight = (
     <>
-      {active && !handsFree && (
+      {active && teacherSpeaking && (
+        <button className="btn-stop" onClick={stopTeacher} title="Stop the teacher and ask">
+          <HandPalm /> Stop
+        </button>
+      )}
+      {active && !handsFree ? (
         <button
-          className="btn-talk"
+          className="btn-talk dock-round"
           data-on={voice.talking}
           onPointerDown={(e) => {
             e.currentTarget.setPointerCapture(e.pointerId);
@@ -483,56 +531,43 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
           onPointerCancel={talkUp}
           onLostPointerCapture={talkUp}
           onContextMenu={(e) => e.preventDefault()}
+          aria-label={voice.talking ? "Listening" : "Hold to talk"}
           title={`Hold to talk (or ${talkKeyHint()})`}
         >
-          <Microphone weight={voice.talking ? "fill" : "bold"} /> {voice.talking ? "Listening…" : "Hold to talk"}
-        </button>
-      )}
-      {active && teacherSpeaking && (
-        <button className="btn-stop" onClick={stopTeacher} title="Stop the teacher and ask">
-          <HandPalm /> Stop
-        </button>
-      )}
-      <div className="paper-menu">
-        <button
-          onClick={() => setPaperOpen((o) => !o)}
-          disabled={scanning || !serverId}
-          aria-label="From paper"
-          aria-haspopup="menu"
-          aria-expanded={paperOpen}
-          title="Working on paper? Send a photo"
-        >
-          {scanning ? <span className="spin" /> : <Camera />}
-        </button>
-      </div>
-      <button onClick={() => fileInput.current?.click()} disabled={uploading || !serverId} aria-label="Upload material" title="Upload a PDF or photos of your book or notes">
-        {uploading ? <span className="spin" /> : <UploadSimple />}
-      </button>
-      <button className="btn-speed" onClick={cycleSpeed} title="Teacher's speaking speed">
-        {SPEED_LABEL[speed]}
-      </button>
-      {live ? (
-        <button className="btn-pause" onClick={pause} title="Pause the class (the board stays as it is)">
-          {voice.state === "active" ? (
-            <>
-              <Pause weight="fill" /> Pause
-            </>
-          ) : (
-            <>
-              <span className="spin" /> Connecting…
-            </>
-          )}
+          <Microphone weight={voice.talking ? "fill" : "bold"} />
         </button>
       ) : (
-        <button className="btn-start" onClick={startOrResume} disabled={!serverId} title={started ? "Resume the class" : "Start the class"}>
-          <Play weight="fill" /> {started ? "Resume" : "Start"}
+        <button
+          className="btn-mic dock-round"
+          data-live={active}
+          onClick={active ? undefined : startOrResume}
+          disabled={!serverId || (live && !active)}
+          aria-label={active ? "Listening all the time" : "Start talking"}
+          title={active ? "Hands-free: I'm always listening" : "Start the class and talk"}
+        >
+          {active ? <Microphone weight="fill" /> : <MicrophoneSlash weight="bold" />}
         </button>
       )}
     </>
   );
 
+  // ---------- hide the controls; focus mode ----------
+  const [hideUi, setHideUi] = useState(false);
+  const [focusSetup, setFocusSetup] = useState(false);
+  const [focusEndsAt, setFocusEndsAt] = useState<number | null>(null);
+
+  // ---------- notes as a PDF ----------
+  const [printTick, setPrintTick] = useState(0);
+  const downloadNotes = () => {
+    const title = document.title;
+    const day = new Date().toISOString().slice(0, 10);
+    document.title = `Shikshak notes - ${meta.name} - ${day}`; // the PDF's file name
+    window.addEventListener("afterprint", () => (document.title = title), { once: true });
+    setPrintTick((n) => n + 1);
+  };
+
   return (
-    <div className="classroom">
+    <div className="classroom" data-hide-ui={hideUi}>
       <Board
         sessionCode={sessionId}
         blocks={blocks}
@@ -552,7 +587,12 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
         submission={submission}
         send={send}
         onDone={onDone}
-        toolbarExtra={classControls}
+        dockLeft={dockLeft}
+        dockAttach={dockAttach}
+        dockRight={dockRight}
+        printTick={printTick}
+        onFix={fixPhoto}
+        fixing={fixing}
       />
 
       <div className="session-menu">
@@ -604,6 +644,16 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
             </button>
             <button
               role="menuitem"
+              disabled={Boolean(focusEndsAt)}
+              onClick={() => {
+                setMenuOpen(false);
+                setFocusSetup(true);
+              }}
+            >
+              <Timer /> Focus mode
+            </button>
+            <button
+              role="menuitem"
               onClick={() => {
                 setMenuOpen(false);
                 setTouring(true);
@@ -642,6 +692,36 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
           </div>
         )}
       </div>
+      <div className="class-pill" role="toolbar" aria-label="Class">
+        <button onClick={() => setShowReport("view")} disabled={!serverId} aria-label="Class report" title="Class report">
+          <Notebook weight="bold" />
+        </button>
+        <button className="btn-speed" onClick={cycleSpeed} title="Teacher's speaking speed" aria-label={`Speaking speed ${SPEED_LABEL[speed]}`}>
+          {SPEED_LABEL[speed]}
+        </button>
+        <span className="class-pill-sep" aria-hidden="true" />
+        <button onClick={downloadNotes} aria-label="Download notes as PDF" title="Download this whole class as PDF notes">
+          <DownloadSimple weight="bold" />
+        </button>
+        <button onClick={() => setHideUi(true)} aria-label="Hide the controls" title="Hide the controls (just the board)">
+          <EyeSlash weight="bold" />
+        </button>
+      </div>
+      {hideUi && (
+        <button className="show-ui" onClick={() => setHideUi(false)} aria-label="Show the controls" title="Show the controls">
+          <Eye weight="bold" />
+        </button>
+      )}
+      {focusSetup && (
+        <FocusSetup
+          onClose={() => setFocusSetup(false)}
+          onStart={(minutes) => {
+            setFocusSetup(false);
+            setFocusEndsAt(Date.now() + minutes * 60_000);
+          }}
+        />
+      )}
+      {focusEndsAt && <FocusMode endsAt={focusEndsAt} onEnd={() => setFocusEndsAt(null)} />}
       <VoiceOrb state={orb} level={orb === "teacher" ? Math.min(1, voice.volume * 3) : orb === "student" ? mic : 0} />
 
       <input ref={fileInput} type="file" accept="application/pdf,image/*" multiple hidden onChange={(e) => void upload(e.target.files)} />
@@ -649,7 +729,7 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
       <input ref={workInput} type="file" accept="image/*" capture="environment" hidden data-paper="work" onChange={(e) => void sendWork(e.target.files)} />
     {paperOpen && (
       <div className="menu paper-pop" role="menu">
-        <p className="paper-pop-title">Working on paper?</p>
+        <p className="paper-pop-title">Add to the class</p>
         <button
           role="menuitem"
           onClick={() => {
@@ -667,6 +747,15 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
           }}
         >
           <Scan /> <span><strong>Add a question</strong><small>A photo of a question from your book or notebook.</small></span>
+        </button>
+        <button
+          role="menuitem"
+          onClick={() => {
+            setPaperOpen(false);
+            fileInput.current?.click();
+          }}
+        >
+          <UploadSimple /> <span><strong>Upload my book or notes</strong><small>A PDF or photos. I teach from your own pages.</small></span>
         </button>
       </div>
     )}
