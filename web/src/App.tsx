@@ -38,7 +38,7 @@ function readRoute(): Route {
 export function App() {
   const [route, setRoute] = useState<Route>(readRoute);
   // The start screen first (each visit); from there, a new device makes its account.
-  const [splash, setSplash] = useState(splashDue);
+  const [splash, setSplash] = useState(() => splashDue() && readRoute().page === "home");
   const [fromSplash, setFromSplash] = useState(false);
 
   useEffect(() => {
