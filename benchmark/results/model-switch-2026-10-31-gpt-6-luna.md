@@ -7,6 +7,7 @@ A team decision, not a benchmark result. No model comparison was run: `npm run b
   ($0.060 per minute for the whole call).
 - What we don't know yet: whether luna picks the right tools, avoids giving answers away, or answers as fast.
   Check this in a short test class before the demo.
-- Reasoning effort and verbosity are set to low, as the dashboard shows for this model, so replies stay quick
-  and fit the 400-token limit.
+- Reasoning effort and verbosity: first set to low, then changed to medium the same evening at the team's
+  request, with the reply limit raised from 400 to 1200 tokens because thinking counts against it. Medium
+  makes her pause longer before speaking; not yet timed.
 - Roll back with `npm run bolna:model -- --rollback`, then `npm run bolna:setup`.
