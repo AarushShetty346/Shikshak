@@ -39,7 +39,6 @@ export function App() {
   const [route, setRoute] = useState<Route>(readRoute);
   // The start screen first (each visit); from there, a new device makes its account.
   const [splash, setSplash] = useState(() => splashDue() && readRoute().page === "home");
-  const [fromSplash, setFromSplash] = useState(false);
 
   useEffect(() => {
     const onHash = () => setRoute(readRoute());
@@ -64,7 +63,6 @@ export function App() {
         <Splash
           onStart={() => {
             setSplash(false);
-            setFromSplash(true);
           }}
         />
       </>
@@ -91,7 +89,7 @@ export function App() {
     case "pilot":
       return <Pilot onBack={() => go("#/")} />;
     default:
-      return <Home onOpen={open} onProgress={(lid) => go(`#/learner/${lid}`)} createAccount={fromSplash} />;
+      return <Home onOpen={open} onProgress={(lid) => go(`#/learner/${lid}`)} />;
   }
   }
 }

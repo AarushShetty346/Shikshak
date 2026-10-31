@@ -7,7 +7,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Archive, ArrowCounterClockwise, ArrowsLeftRight, BookOpenText, ChartLineUp, DotsThree, PencilSimpleLine, Plus, Signpost, Trash, UserPlus, UsersThree } from "@phosphor-icons/react";
 import { emptySnapshot } from "../../../shared/boardState";
 import { LANGUAGE_NAMES, LANGUAGE_STATUS, type Language } from "../../../shared/types";
-import { apiFetch } from "../lib/api";
 import { createLearner, listLearners, selectedLearner, selectLearner, type Learner } from "../lib/learners";
 import { deleteSession, listSessions, loadData, newCode, saveData, saveSession, updateSession, type SessionMeta } from "../lib/session";
 import { HOME_TOUR, Tour, tourDue } from "./Tour";
@@ -31,13 +30,10 @@ function initial(s: SessionMeta): string {
 export function Home({
   onOpen,
   onProgress,
-  createAccount = false,
 }: {
   /** fresh: a session just made here (the board is wiped clean before it opens). */
   onOpen: (id: string, fresh?: boolean) => void;
   onProgress: (learnerId: string) => void;
-  /** Coming from the start screen on a new device: making your account comes first. */
-  createAccount?: boolean;
 }) {
   const [creating, setCreating] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
@@ -52,10 +48,13 @@ export function Home({
   const profileRef = useRef<HTMLDivElement>(null);
   const [, refresh] = useState(0);
 
+  // Only a list that really came from the server may be used to clear away other classes.
+  const [learnersLoaded, setLearnersLoaded] = useState(false);
   const loadLearners = useCallback(() => {
     listLearners()
       .then((list) => {
         setLearners(list);
+        setLearnersLoaded(true);
         setLearnerError(null);
         // Keep the selection valid: the remembered learner, else the only one, else none.
         setCurrent((cur) => {
@@ -72,27 +71,19 @@ export function Home({
   useEffect(loadLearners, [loadLearners]);
 
   const all = listSessions(true);
-  const mine = (s: SessionMeta) => !learners?.length || (current ? s.learnerId === current : !s.learnerId);
+  // Classes belong to an account: only the current account's are shown.
+  const mine = (s: SessionMeta) => Boolean(current) && s.learnerId === current;
   const sessions = all.filter((s) => (showArchived || !s.archived) && mine(s));
   const archivedCount = all.filter((s) => s.archived && mine(s)).length;
   const learner = learners?.find((l) => l.id === current) ?? null;
-  // Classes made before a profile was picked belong to nobody. With one profile on the device
-  // they're simply added to that profile's classes (with several, they stay where they are).
-  const unlinkedKey = all
-    .filter((s) => !s.learnerId && !s.archived)
-    .map((s) => s.id)
-    .join(",");
+  // Classes that belong to no account on this device (made before an account existed, or whose
+  // account is gone) aren't kept: they're deleted here and on the server. Only after the account
+  // list has really loaded, so a network error can never clear anything.
+  const strayKey = learnersLoaded && learners ? all.filter((s) => !s.learnerId || !learners.some((l) => l.id === s.learnerId)).map((s) => s.id).join(",") : "";
   useEffect(() => {
-    if (!learner || learners?.length !== 1 || !unlinkedKey) return;
-    const orphans = all.filter((s) => !s.learnerId && !s.archived);
-    void Promise.all(
-      orphans.map(async (s) => {
-        if (s.serverId) await apiFetch(`/sessions/${s.serverId}`, { method: "PATCH", body: { learnerId: learner.id } }).catch(() => {});
-        updateSession(s.id, { learnerId: learner.id, updatedAt: s.updatedAt });
-      }),
-    ).then(() => refresh((n) => n + 1));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [learner?.id, learners?.length, unlinkedKey]);
+    if (!strayKey) return;
+    void Promise.all(strayKey.split(",").map((id) => deleteSession(id).catch(() => {}))).then(() => refresh((n) => n + 1));
+  }, [strayKey]);
 
   // Close a row menu on outside click or Escape.
   const menuRef = useRef<HTMLDivElement>(null);
@@ -126,7 +117,8 @@ export function Home({
   // The first time the home screen shows (not the profile picker), a short guided tour.
   const pickerShown = learners !== null && (adding || (learners.length > 0 && (picking || !current)));
   // Only when coming from the start screen: otherwise the picker just adds a learner.
-  const newAccount = createAccount && learners !== null && learners.length === 0;
+  // No account on this device: making one comes first, always.
+  const newAccount = learners !== null && learnersLoaded && learners.length === 0;
   useEffect(() => {
     if (newAccount) setAdding(true);
   }, [newAccount]);
@@ -242,7 +234,7 @@ export function Home({
           </ul>
           {addForm}
           {learnerError && <p className="form-error">{learnerError}</p>}
-          {adding && learners.length === 0 && !createAccount && (
+          {adding && learners.length > 0 && (
             <button className="link-button" onClick={() => setAdding(false)}>
               Back
             </button>
