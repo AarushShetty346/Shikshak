@@ -7,7 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Archive, ArrowCounterClockwise, ArrowsLeftRight, BookOpenText, ChartLineUp, DotsThree, PencilSimpleLine, Plus, Signpost, Trash, UserPlus, UsersThree } from "@phosphor-icons/react";
 import { emptySnapshot } from "../../../shared/boardState";
 import { LANGUAGE_NAMES, LANGUAGE_STATUS, type Language } from "../../../shared/types";
-import { createLearner, listLearners, selectedLearner, selectLearner, type Learner } from "../lib/learners";
+import { cachedLearners, createLearner, listLearners, rememberLearner, selectedLearner, selectLearner, type Learner } from "../lib/learners";
 import { deleteSession, listSessions, loadData, newCode, saveData, saveSession, updateSession, type SessionMeta } from "../lib/session";
 import { HOME_TOUR, Tour, tourDue } from "./Tour";
 import { Setup } from "./Setup";
@@ -38,7 +38,7 @@ export function Home({
   const [creating, setCreating] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
   const [menuFor, setMenuFor] = useState<string | null>(null);
-  const [learners, setLearners] = useState<Learner[] | null>(null);
+  const [learners, setLearners] = useState<Learner[] | null>(cachedLearners);
   const [learnerError, setLearnerError] = useState<string | null>(null);
   const [current, setCurrent] = useState<string | null>(selectedLearner());
   const [adding, setAdding] = useState(false);
@@ -49,7 +49,7 @@ export function Home({
   const [, refresh] = useState(0);
 
   // Only a list that really came from the server may be used to clear away other classes.
-  const [learnersLoaded, setLearnersLoaded] = useState(false);
+  const [learnersLoaded, setLearnersLoaded] = useState(() => cachedLearners() !== null);
   const loadLearners = useCallback(() => {
     listLearners()
       .then((list) => {
@@ -115,7 +115,8 @@ export function Home({
   }, [profileOpen]);
 
   // The first time the home screen shows (not the profile picker), a short guided tour.
-  const pickerShown = learners !== null && (adding || (learners.length > 0 && (picking || !current)));
+  // No account yet: the account form is the screen straight away (not a frame of "Your classes" first).
+  const pickerShown = learners !== null && (adding || (learnersLoaded && learners.length === 0) || (learners.length > 0 && (picking || !current)));
   // Only when coming from the start screen: otherwise the picker just adds a learner.
   // No account on this device: making one comes first, always.
   const newAccount = learners !== null && learnersLoaded && learners.length === 0;
@@ -178,13 +179,16 @@ export function Home({
     refresh((n) => n + 1);
   };
 
-  const addForm = adding && (
+  const addForm = (adding || newAccount) && (
     <AddLearner
       submitLabel={newAccount ? "Create account" : "Add"}
       required={newAccount}
       onDone={(l) => {
         setAdding(false);
         if (l) {
+          // Show the new account's classes at once; the full list follows.
+          rememberLearner(l);
+          setLearners((prev) => [...(prev ?? []).filter((x) => x.id !== l.id), l]);
           choose(l.id);
           loadLearners();
         }

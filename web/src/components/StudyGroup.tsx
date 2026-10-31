@@ -39,6 +39,8 @@ export function StudyGroups({ groupId, onBack, onOpenGroup }: { groupId: string 
   useEffect(() => void reload(), [groupId]);
 
   const group = groupId ? groups?.find((g) => g.id === groupId) : null;
+  // Opening a group: nothing until it has loaded (not a moment of the "Study together" page).
+  if (groupId && groups === null) return <main className="home home-board group-page" aria-busy="true" />;
   if (groupId && groups && !group) return <Shell onBack={() => onOpenGroup(null)} title="Study group"><p className="group-note">You're not in this group any more.</p></Shell>;
   if (group) return <GroupPage group={group} learnerId={learnerId} onBack={() => onOpenGroup(null)} onChanged={reload} onGone={() => onOpenGroup(null)} />;
 

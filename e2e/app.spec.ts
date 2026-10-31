@@ -4,7 +4,7 @@ import { expect, test, type Page } from "@playwright/test";
 // These tests aren't about the first-time tour (its own test is in audit.spec.ts): mark it as seen.
 test.beforeEach(async ({ page }, info) => {
   // The start screen has its own test.
-  if (!info.title.includes("start screen")) await page.addInitScript(() => sessionStorage.setItem("shikshak.splashSeen", "1"));
+  if (!info.title.includes("start screen")) await page.addInitScript(() => sessionStorage.setItem("shikshak.test.skipSplash", "1"));
   if (info.title.includes("guided tour")) return;
   await page.addInitScript(() => {
     localStorage.setItem("shikshak.tour.home.v1", "1");

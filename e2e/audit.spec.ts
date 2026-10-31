@@ -6,7 +6,7 @@ import { expect, test, type Page } from "@playwright/test";
 // These tests aren't about the first-time tour (its own test is in audit.spec.ts): mark it as seen.
 test.beforeEach(async ({ page }, info) => {
   // The start screen has its own test.
-  if (!info.title.includes("start screen")) await page.addInitScript(() => sessionStorage.setItem("shikshak.splashSeen", "1"));
+  if (!info.title.includes("start screen")) await page.addInitScript(() => sessionStorage.setItem("shikshak.test.skipSplash", "1"));
   if (info.title.includes("guided tour")) return;
   await page.addInitScript(() => {
     localStorage.setItem("shikshak.tour.home.v1", "1");
@@ -344,6 +344,8 @@ test("session layout: start, the typing field and the mic at the bottom; the pen
 });
 
 test("start screen: Shikshak in the middle, Start Shiksha, then a new device makes its account", async ({ page }) => {
+  // A tab from an older version still carries its old "seen" mark: the start screen shows anyway.
+  await page.addInitScript(() => sessionStorage.setItem("shikshak.splashSeen", "1"));
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Shikshak" })).toBeVisible();
   await expect(page.getByText("Shikshak, your own tutor")).toBeVisible();
@@ -400,7 +402,7 @@ test("study group: start one, a friend joins with the link, and opens my notes, 
   const device = async (name: string) => {
     const ctx = await browser.newContext();
     await ctx.addInitScript(() => {
-      sessionStorage.setItem("shikshak.splashSeen", "1");
+      sessionStorage.setItem("shikshak.test.skipSplash", "1");
       localStorage.setItem("shikshak.tour.home.v1", "1");
       localStorage.setItem("shikshak.tour.class.v1", "1");
     });
@@ -455,7 +457,7 @@ test("study group: start one, a friend joins with the link, and opens my notes, 
 test("study group: a friend on a new device makes their account right on the join screen", async ({ browser }) => {
   const ctx = await browser.newContext();
   await ctx.addInitScript(() => {
-    sessionStorage.setItem("shikshak.splashSeen", "1");
+    sessionStorage.setItem("shikshak.test.skipSplash", "1");
     localStorage.setItem("shikshak.tour.home.v1", "1");
     localStorage.setItem("shikshak.tour.class.v1", "1");
   });
@@ -503,6 +505,37 @@ test("classes belong to an account: a class with no account is cleared, the acco
   await expect(page.locator("canvas.board-ink")).toBeVisible({ timeout: 20_000 });
   await page.goto("/");
   await expect(page.getByText("Arithmetic progressions").first()).toBeVisible();
+});
+
+test("no wrong screen flashes: account first on a new device, and a group page never shows the start page", async ({ page }) => {
+  // Every heading the page ever shows, in order (even for one frame), with a slow server.
+  await page.addInitScript(() => {
+    const w = window as unknown as { __seen: string[] };
+    w.__seen = [];
+    const look = () => {
+      for (const h of document.querySelectorAll("h1, h2")) {
+        const t = (h.textContent || "").trim();
+        if (t && w.__seen.at(-1) !== t) w.__seen.push(t);
+      }
+    };
+    new MutationObserver(look).observe(document, { subtree: true, childList: true, characterData: true });
+  });
+  await page.route("**/api/**", async (r) => {
+    await new Promise((x) => setTimeout(x, 500));
+    await r.continue();
+  });
+  const seen = () => page.evaluate(() => (window as unknown as { __seen: string[] }).__seen);
+  await page.goto("/");
+  await page.getByLabel("Name or nickname").fill("Harsh");
+  await page.getByRole("button", { name: "Create account" }).click();
+  await expect(page.getByRole("heading", { name: "Harsh's classes" })).toBeVisible();
+  expect(await seen()).not.toContain("Your classes");
+  await page.goto("/#/group");
+  await page.getByRole("button", { name: /Start a group/ }).click();
+  await expect(page.getByRole("heading", { name: "Harsh's study group" })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Harsh's study group" })).toBeVisible();
+  expect(await seen()).not.toContain("Study together");
 });
 
 test("guided tour: the first visit walks through the controls, once, and can be replayed", async ({ page }) => {

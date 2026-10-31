@@ -86,7 +86,17 @@ export function selectLearner(id: string | null) {
   }
 }
 
-export const listLearners = () => apiFetch<{ learners: Learner[] }>("/learners").then((r) => r.learners);
+// The last list the server sent, and the request in flight: the start screen fetches the list while
+// it's showing, so the home screen can draw the right account at once instead of a blank or wrong one.
+let known: Learner[] | null = null;
+let inflight: Promise<Learner[]> | null = null;
+export const cachedLearners = () => known;
+export const listLearners = () =>
+  (inflight ??= apiFetch<{ learners: Learner[] }>("/learners")
+    .then((r) => (known = r.learners))
+    .finally(() => (inflight = null)));
+/** Remember a learner just made (until the next list arrives). */
+export const rememberLearner = (l: Learner) => (known = [...(known ?? []).filter((x) => x.id !== l.id), l]);
 export const createLearner = (input: { name: string; grade: string; language: Language }) =>
   apiFetch<{ learner: Learner }>("/learners", { body: { ...input, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone } }).then((r) => r.learner);
 export const updateLearner = (id: string, patch: Partial<Pick<Learner, "name" | "grade" | "language" | "timezone">>) =>

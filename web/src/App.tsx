@@ -8,6 +8,7 @@ import { DusterWipe } from "./components/Duster";
 import { Splash, splashDue } from "./components/Splash";
 import { JoinGroup, StudyGroups } from "./components/StudyGroup";
 import { getSession, sessionFromHash } from "./lib/session";
+import { listLearners } from "./lib/learners";
 
 type Route =
   | { page: "home" }
@@ -39,6 +40,11 @@ export function App() {
   const [route, setRoute] = useState<Route>(readRoute);
   // The start screen first (each visit); from there, a new device makes its account.
   const [splash, setSplash] = useState(() => splashDue() && readRoute().page === "home");
+
+  // Fetch the accounts while the start screen shows, so home opens on the right one at once.
+  useEffect(() => {
+    void listLearners().catch(() => {});
+  }, []);
 
   useEffect(() => {
     const onHash = () => setRoute(readRoute());
