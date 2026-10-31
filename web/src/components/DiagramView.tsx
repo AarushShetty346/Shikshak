@@ -1,7 +1,7 @@
 // Draws a tutor diagram in chalk, revealing `shown` pieces in order (the board advances it
 // while the tutor talks). Everything is in board units; the SVG scales with the board.
 
-import { compileExpr, graphSegments, type Diagram } from "../../../shared/diagram";
+import { compileGraphExpr, graphSegments, type Diagram } from "../../../shared/diagram";
 import { prettify as prettifyText } from "../../../shared/mathText";
 
 const SUP: Record<string, string> = { "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹", n: "ⁿ", "-": "⁻" };
@@ -37,7 +37,7 @@ export function diagramHeight(d: Diagram, columnWidth: number): number {
   }
 }
 
-export function DiagramView({ diagram, width: columnWidth, shown }: { diagram: Diagram; width: number; shown: number }) {
+export function DiagramView({ diagram, width: columnWidth, shown, values }: { diagram: Diagram; width: number; shown: number; values?: Record<string, number> }) {
   const width = diagramWidth(diagram, columnWidth);
   const height = diagramHeight(diagram, columnWidth);
   return (
@@ -47,7 +47,7 @@ export function DiagramView({ diagram, width: columnWidth, shown }: { diagram: D
       style={{ width: `${(width / columnWidth) * 100}%`, aspectRatio: `${width} / ${height}` }}
       aria-hidden="true"
     >
-      <Body d={diagram} w={width} h={height} shown={shown} />
+      <Body d={diagram} w={width} h={height} shown={shown} values={values} />
     </svg>
   );
 }
@@ -68,7 +68,7 @@ const Text = ({ children, ...p }: React.SVGProps<SVGTextElement>) => (
   </text>
 );
 
-function Body({ d, w, h, shown }: { d: Diagram; w: number; h: number; shown: number }) {
+function Body({ d, w, h, shown, values }: { d: Diagram; w: number; h: number; shown: number; values?: Record<string, number> }) {
   switch (d.type) {
     case "ap": {
       const n = d.terms.length;
@@ -142,7 +142,16 @@ function Body({ d, w, h, shown }: { d: Diagram; w: number; h: number; shown: num
     }
     case "graph": {
       const pad = 30;
-      const fns = d.exprs.map((e) => compileExpr(e));
+      // A graph with sliders: the equation reads the slider values (the tutor's values until moved).
+      const env: Record<string, number> = Object.fromEntries((d.params ?? []).map((q) => [q.name, values?.[q.name] ?? q.value]));
+      const names = Object.keys(env);
+      const fns = d.exprs.map((e) => {
+        const g = compileGraphExpr(e, names);
+        return (x: number) => g(x, env);
+      });
+      // ...and shows where the first curve crosses the x-axis, so moving a slider shows what changes.
+      const roots = d.params?.length ? crossings(fns[0], d.xmin, d.xmax) : [];
+      const shownExpr = (e: string) => (names.length ? tidy(e.replace(new RegExp(`(?<![a-z])(${names.join("|")})(?![a-z])`, "gi"), (n) => String(Math.round(env[n.toLowerCase()] * 100) / 100))) : e);
       const xs = Array.from({ length: 121 }, (_, i) => d.xmin + ((d.xmax - d.xmin) * i) / 120);
       // Range from the sensible part of each curve (ignore the huge values next to an asymptote).
       const ys = fns.flatMap((f) => xs.map(f)).filter((v) => Number.isFinite(v) && Math.abs(v) <= 20);
@@ -179,12 +188,20 @@ function Body({ d, w, h, shown }: { d: Diagram; w: number; h: number; shown: num
                 ))}
                 {last && (
                   <Text x={Math.min(sx(last[0]), sx(d.xmax) - 70)} y={sy(last[1]) - 18} fill={colors[i % 3]} fontSize={20}>
-                    {`y = ${prettify(d.exprs[i])}`}
+                    {`y = ${prettify(shownExpr(d.exprs[i]))}`}
                   </Text>
                 )}
               </Piece>
             );
           })}
+          {roots.map((r, i) => (
+            <g key={`r${i}`} className="graph-root">
+              <circle cx={sx(r)} cy={sy(0)} r={7} fill="#7ee0a3" />
+              <Text x={sx(r)} y={sy(0) + (i % 2 ? -18 : 30)} fontSize={18} fill="#7ee0a3">
+                {fmt(r)}
+              </Text>
+            </g>
+          ))}
           {d.points.map((p, i) => (
             <Piece key={`p${i}`} on={shown > 1 + fns.length + i}>
               <circle cx={sx(p.x)} cy={sy(p.y)} r={7} fill={CHALK} />
@@ -265,4 +282,47 @@ function Body({ d, w, h, shown }: { d: Diagram; w: number; h: number; shown: num
       );
     }
   }
+}
+
+const fmt = (n: number) => String(Math.round(n * 100) / 100).replace("-", "−");
+
+/** Where f crosses zero between xmin and xmax (sign changes, refined by bisection). At most 4. */
+function crossings(f: (x: number) => number, xmin: number, xmax: number): number[] {
+  const out: number[] = [];
+  const n = 400;
+  let px = xmin;
+  let py = f(px);
+  for (let i = 1; i <= n && out.length < 4; i++) {
+    const x = xmin + ((xmax - xmin) * i) / n;
+    const y = f(x);
+    if (Number.isFinite(py) && Number.isFinite(y)) {
+      if (py === 0) out.push(px);
+      else if (py * y < 0 && Math.abs(y - py) < 50) {
+        let [a, b] = [px, x];
+        for (let k = 0; k < 40; k++) {
+          const m = (a + b) / 2;
+          if (f(a) * f(m) <= 0) b = m;
+          else a = m;
+        }
+        out.push((a + b) / 2);
+      }
+    }
+    px = x;
+    py = y;
+  }
+  return out;
+}
+
+/** "1 x^2 + -1 x + -6" -> "x^2 - x - 6": how a student would write the equation with the slider values in. */
+function tidy(e: string): string {
+  return e
+    .replace(/\s+/g, " ")
+    .replace(/\+\s*-\s*/g, "- ")
+    .replace(/-\s*-\s*/g, "+ ")
+    .replace(/(^|[^\d.])1\s*(?=x)/g, "$1")
+    .replace(/(^|[^\d.])-1\s*(?=x)/g, "$1-")
+    .replace(/(\d)\s+x/g, "$1x")
+    .replace(/[+-]\s*0\s*x(\^\d)?\s*/g, "")
+    .replace(/\s*[+-]\s*0(?![\d.x])/g, "")
+    .trim();
 }

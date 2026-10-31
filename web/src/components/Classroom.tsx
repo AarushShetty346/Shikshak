@@ -24,7 +24,7 @@ import { QuestionBar, QuickCheck } from "./ClassTools";
 import { CLASS_TOUR, Tour, tourDue } from "./Tour";
 import { ReportCard } from "./ReportCard";
 import { VoiceOrb, type VoiceState } from "./VoiceOrb";
-import { ArrowLeft, Camera, ChartBar, FileText, Scan, Signpost, HandPalm, List, Microphone, MicrophoneSlash, Pause, PencilSimpleLine, Play, Question, SignOut, UploadSimple } from "@phosphor-icons/react";
+import { ArrowLeft, Camera, ChartBar, DownloadSimple, Notebook, Plus, FileText, Scan, Signpost, HandPalm, List, Microphone, MicrophoneSlash, Pause, PencilSimpleLine, Play, Question, SignOut, UploadSimple } from "@phosphor-icons/react";
 
 function toBlock(e: BlockEvent & { erased?: boolean }, instant: boolean): TutorBlock {
   switch (e.type) {
@@ -371,7 +371,7 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
   useEffect(() => {
     if (!paperOpen) return;
     const close = (e: Event) => {
-      if (e instanceof KeyboardEvent ? e.key === "Escape" : !(e.target as Element | null)?.closest(".paper-menu, .paper-pop")) setPaperOpen(false);
+      if (e instanceof KeyboardEvent ? e.key === "Escape" : !(e.target as Element | null)?.closest(".dock-attach, .paper-pop")) setPaperOpen(false);
     };
     window.addEventListener("pointerdown", close);
     window.addEventListener("keydown", close);
@@ -487,11 +487,40 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
   const blocks = useMemo(() => snapshot.blocks.map((b) => toBlock(b, !liveIds.current.has(b.id))), [snapshot.blocks]);
   const erased = useMemo(() => snapshot.blocks.filter((b) => b.erased && "label" in b && b.label).map((b) => (b as { label: string }).label), [snapshot.blocks]);
 
-  const classControls = (
+  // ---------- the bottom bar ----------
+  const dockLeft = live ? (
+    <button className="btn-pause dock-round" onClick={pause} aria-label={voice.state === "active" ? "Pause the class" : "Connecting"} title="Pause the class (the board stays as it is)">
+      {voice.state === "active" ? <Pause weight="fill" /> : <span className="spin" />}
+    </button>
+  ) : (
+    <button className="btn-start dock-round" onClick={startOrResume} disabled={!serverId} aria-label={started ? "Resume" : "Start"} title={started ? "Resume the class" : "Start the class"}>
+      <Play weight="fill" />
+    </button>
+  );
+  const dockAttach = (
+    <button
+      type="button"
+      className="dock-attach"
+      onClick={() => setPaperOpen((o) => !o)}
+      disabled={scanning || uploading || !serverId}
+      aria-label="Add from paper or a book"
+      aria-haspopup="menu"
+      aria-expanded={paperOpen}
+      title="A photo of your working or a question, or your book"
+    >
+      {scanning || uploading ? <span className="spin" /> : <Plus weight="bold" />}
+    </button>
+  );
+  const dockRight = (
     <>
-      {active && !handsFree && (
+      {active && teacherSpeaking && (
+        <button className="btn-stop" onClick={stopTeacher} title="Stop the teacher and ask">
+          <HandPalm /> Stop
+        </button>
+      )}
+      {active && !handsFree ? (
         <button
-          className="btn-talk"
+          className="btn-talk dock-round"
           data-on={voice.talking}
           onPointerDown={(e) => {
             e.currentTarget.setPointerCapture(e.pointerId);
@@ -501,53 +530,35 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
           onPointerCancel={talkUp}
           onLostPointerCapture={talkUp}
           onContextMenu={(e) => e.preventDefault()}
+          aria-label={voice.talking ? "Listening" : "Hold to talk"}
           title={`Hold to talk (or ${talkKeyHint()})`}
         >
-          <Microphone weight={voice.talking ? "fill" : "bold"} /> {voice.talking ? "Listening…" : "Hold to talk"}
-        </button>
-      )}
-      {active && teacherSpeaking && (
-        <button className="btn-stop" onClick={stopTeacher} title="Stop the teacher and ask">
-          <HandPalm /> Stop
-        </button>
-      )}
-      <div className="paper-menu">
-        <button
-          onClick={() => setPaperOpen((o) => !o)}
-          disabled={scanning || !serverId}
-          aria-label="From paper"
-          aria-haspopup="menu"
-          aria-expanded={paperOpen}
-          title="Working on paper? Send a photo"
-        >
-          {scanning ? <span className="spin" /> : <Camera />}
-        </button>
-      </div>
-      <button onClick={() => fileInput.current?.click()} disabled={uploading || !serverId} aria-label="Upload material" title="Upload a PDF or photos of your book or notes">
-        {uploading ? <span className="spin" /> : <UploadSimple />}
-      </button>
-      <button className="btn-speed" onClick={cycleSpeed} title="Teacher's speaking speed">
-        {SPEED_LABEL[speed]}
-      </button>
-      {live ? (
-        <button className="btn-pause" onClick={pause} title="Pause the class (the board stays as it is)">
-          {voice.state === "active" ? (
-            <>
-              <Pause weight="fill" /> Pause
-            </>
-          ) : (
-            <>
-              <span className="spin" /> Connecting…
-            </>
-          )}
+          <Microphone weight={voice.talking ? "fill" : "bold"} />
         </button>
       ) : (
-        <button className="btn-start" onClick={startOrResume} disabled={!serverId} title={started ? "Resume the class" : "Start the class"}>
-          <Play weight="fill" /> {started ? "Resume" : "Start"}
+        <button
+          className="btn-mic dock-round"
+          data-live={active}
+          onClick={active ? undefined : startOrResume}
+          disabled={!serverId || (live && !active)}
+          aria-label={active ? "Listening all the time" : "Start talking"}
+          title={active ? "Hands-free: I'm always listening" : "Start the class and talk"}
+        >
+          {active ? <Microphone weight="fill" /> : <MicrophoneSlash weight="bold" />}
         </button>
       )}
     </>
   );
+
+  // ---------- notes as a PDF ----------
+  const [printTick, setPrintTick] = useState(0);
+  const downloadNotes = () => {
+    const title = document.title;
+    const day = new Date().toISOString().slice(0, 10);
+    document.title = `Shikshak notes - ${meta.name} - ${day}`; // the PDF's file name
+    window.addEventListener("afterprint", () => (document.title = title), { once: true });
+    setPrintTick((n) => n + 1);
+  };
 
   return (
     <div className="classroom">
@@ -570,7 +581,10 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
         submission={submission}
         send={send}
         onDone={onDone}
-        toolbarExtra={classControls}
+        dockLeft={dockLeft}
+        dockAttach={dockAttach}
+        dockRight={dockRight}
+        printTick={printTick}
         onFix={fixPhoto}
         fixing={fixing}
       />
@@ -662,6 +676,18 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
           </div>
         )}
       </div>
+      <div className="class-pill" role="toolbar" aria-label="Class">
+        <button onClick={() => setShowReport("view")} disabled={!serverId} aria-label="Class report" title="Class report">
+          <Notebook weight="bold" />
+        </button>
+        <button className="btn-speed" onClick={cycleSpeed} title="Teacher's speaking speed" aria-label={`Speaking speed ${SPEED_LABEL[speed]}`}>
+          {SPEED_LABEL[speed]}
+        </button>
+        <span className="class-pill-sep" aria-hidden="true" />
+        <button onClick={downloadNotes} aria-label="Download notes as PDF" title="Download this whole class as PDF notes">
+          <DownloadSimple weight="bold" />
+        </button>
+      </div>
       <VoiceOrb state={orb} level={orb === "teacher" ? Math.min(1, voice.volume * 3) : orb === "student" ? mic : 0} />
 
       <input ref={fileInput} type="file" accept="application/pdf,image/*" multiple hidden onChange={(e) => void upload(e.target.files)} />
@@ -669,7 +695,7 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
       <input ref={workInput} type="file" accept="image/*" capture="environment" hidden data-paper="work" onChange={(e) => void sendWork(e.target.files)} />
     {paperOpen && (
       <div className="menu paper-pop" role="menu">
-        <p className="paper-pop-title">Working on paper?</p>
+        <p className="paper-pop-title">Add to the class</p>
         <button
           role="menuitem"
           onClick={() => {
@@ -687,6 +713,15 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
           }}
         >
           <Scan /> <span><strong>Add a question</strong><small>A photo of a question from your book or notebook.</small></span>
+        </button>
+        <button
+          role="menuitem"
+          onClick={() => {
+            setPaperOpen(false);
+            fileInput.current?.click();
+          }}
+        >
+          <UploadSimple /> <span><strong>Upload my book or notes</strong><small>A PDF or photos. I teach from your own pages.</small></span>
         </button>
       </div>
     )}

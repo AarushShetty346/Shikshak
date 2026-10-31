@@ -44,8 +44,8 @@ export const CLASS_TOUR: TourStep[] = [
   { target: '[aria-label="Pen"]', title: "Your pen", text: "Write your working with your finger, mouse or stylus. One step on each line." },
   { target: '[aria-label="Eraser"]', title: "Rub it out", text: "Made a mistake? Use the eraser, or undo your last line." },
   { target: "button.btn-done", title: "Press Done", text: "When you finish, press Done. I'll read your steps and circle the first one that went wrong." },
-  { target: '[aria-label="From paper"]', title: "Working in your notebook?", text: "No stylus? Solve it on paper and send me a photo. It goes on the board and I check it right there." },
-  { target: '[aria-label="Upload material"]', title: "Your book", text: "Upload your textbook or notes, and I'll teach from your own pages." },
+  { target: ".dock-attach", title: "Working in your notebook?", text: "No stylus? Solve it on paper and send me a photo. It goes on the board and I check it right there." },
+  { target: ".dock-attach", title: "Your book", text: "Upload your textbook or notes, and I'll teach from your own pages." },
   { target: ".btn-speed", title: "My speed", text: "Am I too fast or too slow? Change how fast I talk." },
   { target: '[aria-label="Session menu"]', title: "The menu", text: "Your class report, a practice question and more are in here." },
   {

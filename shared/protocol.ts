@@ -58,6 +58,10 @@ const DiagramSchema = z.union([
       points: z.array(z.object({ x: finite, y: finite, label: text(20) }).strict()).max(6),
       xmin: finite,
       xmax: finite,
+      params: z
+        .array(z.object({ name: z.string().regex(/^[a-wyz]$/), value: finite, min: finite, max: finite }).strict())
+        .max(4)
+        .optional(),
     })
     .strict(),
   z

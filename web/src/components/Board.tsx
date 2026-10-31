@@ -17,7 +17,8 @@ import { renderPdfPage } from "../lib/files";
 import { DiagramView, diagramHeight } from "./DiagramView";
 import { MathText } from "./MathText";
 import { TypePanel } from "./TypePanel";
-import { ArrowCounterClockwise, ArrowDown, BookOpenText, Camera, Check, CheckCircle, Eraser, HandGrabbing, Lightbulb, MagicWand, PauseCircle, PencilSimple, SealCheck, TextT, Trash } from "@phosphor-icons/react";
+import { EditableGraph } from "./EditableGraph";
+import { ArrowCounterClockwise, ArrowDown, BookOpenText, Camera, Check, CheckCircle, Eraser, HandGrabbing, Lightbulb, MagicWand, PauseCircle, PencilSimple, SealCheck, TextT, Trash, ArrowUp, X } from "@phosphor-icons/react";
 
 const PAD_L = 38; // room for the student's line numbers
 const PAD_R = 22;
@@ -83,8 +84,12 @@ interface Props {
   send: (msg: ClientMessage) => void;
   /** Student pressed Done (with the id of the work just sent): tell the tutor to look. */
   onDone: (captureId: string) => void;
-  /** Extra toolbar buttons (start/end class, ask doubt). */
-  toolbarExtra?: ReactNode;
+  /** The bottom bar: start/pause on the left, the + (paper, book) in the typing field, the mic on the right. */
+  dockLeft?: ReactNode;
+  dockAttach?: ReactNode;
+  dockRight?: ReactNode;
+  /** Increments to print the whole board (Save as PDF): the student's ink is drawn for every page first. */
+  printTick?: number;
   /** "Fix it" on a photo: its label and stored file, and the photo with the student's ink on top. */
   onFix?: (label: string, docId: string, image: string | null) => void;
   /** The photo being fixed now, if any. */
@@ -156,7 +161,7 @@ function piecesOf(b: TutorBlock): number {
 const blockLabel = (b: TutorBlock) => ("label" in b ? b.label : undefined);
 
 export function Board(props: Props) {
-  const { sessionCode, blocks, highlights, erased, currentSection, mark, correct, questionId, status, captureRequest, send, onDone, toolbarExtra } = props;
+  const { sessionCode, blocks, highlights, erased, currentSection, mark, correct, questionId, status, captureRequest, send, onDone } = props;
   const wrapRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const pageRef = useRef<HTMLDivElement>(null);
@@ -172,6 +177,9 @@ export function Board(props: Props) {
   const [view, setView] = useState({ w: 0, h: 0 });
   const [tool, setTool] = useState<"pen" | "eraser" | "hand">("pen");
   const [typing, setTyping] = useState(false);
+  const [line, setLine] = useState("");
+  // The drawing tools sit in a tray on the right; the pen button hides it to give the board the room.
+  const [trayOpen, setTrayOpen] = useState(true);
   const [newBelow, setNewBelow] = useState(false);
   // The open question has scrolled out of view above: show it pinned at the top.
   const [questionAbove, setQuestionAbove] = useState(false);
@@ -189,6 +197,7 @@ export function Board(props: Props) {
   const lastPenAt = useRef(0);
   const lastDrawAt = useRef(0);
   const blockEls = useRef(new Map<string, HTMLElement>());
+  const dragging = useRef<HTMLInputElement | null>(null);
 
   // ---------- size and scale ----------
   useLayoutEffect(() => {
@@ -220,7 +229,7 @@ export function Board(props: Props) {
     }
   }
   const estimate = (b: TutorBlock, width: number) =>
-    b.kind === "draw" ? diagramHeight(b.diagram, width) + 40 : b.kind === "page" ? 40 : b.kind === "source" ? (b.photo ? width * 0.75 : width * 0.9) : b.kind === "fix" ? width * 0.75 + 90 + b.questions.reduce((n, q) => n + 60 + q.solution.length * 36, 0) : 60 + piecesOf(b) * 46;
+    b.kind === "draw" ? diagramHeight(b.diagram, width) + 40 + (b.diagram.type === "graph" ? (b.diagram.params?.length ?? 0) * 52 : 0) : b.kind === "page" ? 40 : b.kind === "source" ? (b.photo ? width * 0.75 : width * 0.9) : b.kind === "fix" ? width * 0.75 + 90 + b.questions.reduce((n, q) => n + 60 + q.solution.length * 36, 0) : 60 + piecesOf(b) * 46;
 
   // A block that is still being written stays below any ink the student has added since it arrived,
   // so the tutor never writes over the student's work (the student can't see a block's space
@@ -599,6 +608,50 @@ export function Board(props: Props) {
     scrollRef.current?.scrollTo({ top: Math.max(0, (contentBottom - view.h / scale / 2) * scale) });
   }, [view.h, blocks.length, contentBottom, scale]);
 
+  // ---------- notes as a PDF (print, "Save as PDF") ----------
+  // The ink canvas only covers the screen, so for printing the student's ink is drawn for the whole
+  // board as images laid over the page, then the browser prints the page (see @media print).
+  const [printInk, setPrintInk] = useState<{ src: string; top: number; h: number }[]>([]);
+  useEffect(() => {
+    if (!props.printTick) return;
+    const width = view.w;
+    const bottom = (Math.max(inkBottom(strokesRef.current), layout.bottom) + 40) * scale;
+    const TILE = 2400;
+    const dpr = 1.5;
+    const tiles: { src: string; top: number; h: number }[] = [];
+    for (let top = 0; top < bottom && width > 0; top += TILE) {
+      const h = Math.min(TILE, bottom - top);
+      const c = document.createElement("canvas");
+      c.width = Math.round(width * dpr);
+      c.height = Math.round(h * dpr);
+      const ctx = c.getContext("2d");
+      if (!ctx) break;
+      ctx.setTransform(dpr * scale, 0, 0, dpr * scale, 0, -dpr * top);
+      ctx.strokeStyle = INK;
+      ctx.fillStyle = INK;
+      ctx.lineWidth = PEN_WIDTH;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      for (const st of strokesRef.current) {
+        const b = strokeBox(st);
+        if ((b.y + b.h) * scale < top || b.y * scale > top + h) continue;
+        if (st.text) drawTyped(ctx, st);
+        else drawStroke(ctx, st.points);
+      }
+      tiles.push({ src: c.toDataURL("image/png"), top, h });
+    }
+    setPrintInk(tiles);
+    const after = () => setPrintInk([]);
+    window.addEventListener("afterprint", after, { once: true });
+    // Print once the ink images are on the page.
+    const raf = requestAnimationFrame(() => requestAnimationFrame(() => window.print()));
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("afterprint", after);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.printTick]);
+
   // ---------- typed working (the Type tool) ----------
   // Typed lines go under the question (below anything already written there), one per line, as the
   // student's own strokes: Done reads them, the eraser and undo work on them, and they're saved.
@@ -744,6 +797,22 @@ export function Board(props: Props) {
       if (!action.disabled) action.click();
       return;
     }
+    // A slider on a board block (an editable graph): drag it instead of drawing.
+    const slider = [...(pageRef.current?.querySelectorAll<HTMLInputElement>("input[data-board-drag]") ?? [])].find((el) => {
+      const r = el.getBoundingClientRect();
+      return e.clientX >= r.left - 6 && e.clientX <= r.right + 6 && e.clientY >= r.top - 12 && e.clientY <= r.bottom + 12;
+    });
+    if (slider) {
+      dragging.current = slider;
+      activePointer.current = e.pointerId;
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch {
+        // dragging still works without capture
+      }
+      slideTo(slider, e.clientX);
+      return;
+    }
     if (e.pointerType === "touch") {
       touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (touches.current.size >= 2) {
@@ -781,6 +850,7 @@ export function Board(props: Props) {
 
   const onPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const scroller = scrollRef.current!;
+    if (dragging.current && e.pointerId === activePointer.current) return slideTo(dragging.current, e.clientX);
     if (e.pointerType === "touch" && touches.current.has(e.pointerId)) touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (panning.current && (touches.current.size >= 2 || (tool === "hand" && e.pointerId === activePointer.current))) {
       const y = touches.current.size >= 2 ? avgY(touches.current) : e.clientY;
@@ -809,6 +879,11 @@ export function Board(props: Props) {
 
   const onPointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
     touches.current.delete(e.pointerId);
+    if (dragging.current && e.pointerId === activePointer.current) {
+      dragging.current = null;
+      activePointer.current = null;
+      return;
+    }
     if (panning.current) {
       if (tool === "hand") {
         if (e.pointerId === activePointer.current) {
@@ -913,6 +988,9 @@ export function Board(props: Props) {
             );
           })}
 
+          {printInk.map((t) => (
+            <img key={t.top} className="print-ink" src={t.src} alt="" style={{ top: t.top, height: t.h }} />
+          ))}
           {markedLine && <MarkCircle box={markedLine.box} index={markedLine.index} note={mark!.note} scale={scale} faded={drewSinceMark} />}
           {correctAt && status === "correct" && (
             <div className="stamp" style={{ top: px(correctAt.y + correctAt.h + 10), left: px(Math.min(correctAt.x + correctAt.w, W - 200)) }}>
@@ -971,7 +1049,7 @@ export function Board(props: Props) {
       {sub.state !== "idle" && <SubmissionCard sub={sub} onRetry={done} canRetry={response.length > 0} />}
 
       {typing && <TypePanel onAdd={addTyped} onClose={() => setTyping(false)} />}
-      <div className="board-tools" role="toolbar" aria-label="Board tools">
+      <div className="board-tray" data-open={trayOpen} role="toolbar" aria-label="Board tools">
         <button className={tool === "pen" ? "on" : ""} onClick={() => setTool("pen")} aria-label="Pen" title="Pen">
           <PencilSimple />
         </button>
@@ -980,9 +1058,6 @@ export function Board(props: Props) {
         </button>
         <button className={tool === "hand" ? "on" : ""} onClick={() => setTool("hand")} aria-label="Scroll" title="Scroll (or use two fingers)">
           <HandGrabbing />
-        </button>
-        <button className={typing ? "on" : ""} onClick={() => setTyping((t) => !t)} aria-label="Type" aria-expanded={typing} title="Type your working instead of writing">
-          <TextT />
         </button>
         <button onClick={() => setStrokes((s) => s.slice(0, -1))} disabled={!strokes.length} aria-label="Undo" title="Undo">
           <ArrowCounterClockwise />
@@ -995,12 +1070,36 @@ export function Board(props: Props) {
         >
           <Trash />
         </button>
-        <button className="btn-done" data-ready={canDone} data-state={sub.state} onClick={done} disabled={!canDone} title="Send what I wrote to the teacher">
-          {sub.state === "submitting" || sub.state === "reviewing" ? <span className="spin" /> : <CheckCircle weight="fill" />}
-          {doneLabel}
-        </button>
-        {toolbarExtra && <span className="tools-sep" aria-hidden="true" />}
-        {toolbarExtra}
+      </div>
+      <button className="pen-fab" data-open={trayOpen} onClick={() => setTrayOpen((o) => !o)} aria-label={trayOpen ? "Hide the drawing tools" : "Show the drawing tools"} aria-expanded={trayOpen}>
+        {trayOpen ? <X weight="bold" /> : <PencilSimple weight="bold" />}
+      </button>
+      <button className="btn-done" data-ready={canDone} data-state={sub.state} onClick={done} disabled={!canDone} title="Send what I wrote to the teacher">
+        {sub.state === "submitting" || sub.state === "reviewing" ? <span className="spin" /> : <CheckCircle weight="fill" />}
+        {doneLabel}
+      </button>
+
+      <div className="class-dock">
+        {props.dockLeft}
+        <form
+          className="dock-input"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!line.trim()) return;
+            addTyped([line.trim().slice(0, 120)]);
+            setLine("");
+          }}
+        >
+          {props.dockAttach}
+          <input value={line} onChange={(e) => setLine(e.target.value)} placeholder="Type your working…" aria-label="Type a step" maxLength={120} enterKeyHint="send" />
+          <button type="button" className={typing ? "on" : ""} onClick={() => setTyping((t) => !t)} aria-label="Type" aria-expanded={typing} title="Type several steps, with maths symbols">
+            <TextT />
+          </button>
+          <button type="submit" className="dock-send" disabled={!line.trim()} aria-label="Add this step to the board" title="Add this step to the board">
+            <ArrowUp weight="bold" />
+          </button>
+        </form>
+        {props.dockRight}
       </div>
     </div>
   );
@@ -1087,7 +1186,11 @@ function BlockBody({
       return (
         <>
           {block.caption && <p className="diagram-caption">{block.caption}</p>}
-          <DiagramView diagram={block.diagram} width={width} shown={shown} />
+          {block.diagram.type === "graph" && block.diagram.params?.length ? (
+            <EditableGraph diagram={block.diagram} width={width} shown={shown} />
+          ) : (
+            <DiagramView diagram={block.diagram} width={width} shown={shown} />
+          )}
         </>
       );
     case "write":
@@ -1380,4 +1483,18 @@ function FixView({ block, sessionCode }: { block: Extract<TutorBlock, { kind: "f
       <p className="fix-foot">Written by your tutor from your photo. Not checked by the maths engine, so read each step.</p>
     </div>
   );
+}
+
+/** Moves a range input to the pointer's x, the way a real drag would (React sees an input event). */
+function slideTo(input: HTMLInputElement, clientX: number) {
+  const r = input.getBoundingClientRect();
+  const min = Number(input.min);
+  const max = Number(input.max);
+  const step = Number(input.step) || 1;
+  const t = Math.min(1, Math.max(0, (clientX - r.left) / Math.max(1, r.width)));
+  const v = Math.round((min + t * (max - min)) / step) * step;
+  const next = String(Math.min(max, Math.max(min, Number(v.toFixed(4)))));
+  if (input.value === next) return;
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(input, next);
+  input.dispatchEvent(new Event("input", { bubbles: true }));
 }

@@ -4477,3 +4477,400 @@ body:has(.home-board) {
   font-size: 13px;
   color: rgb(241 239 230 / 0.75);
 }
+
+/* ---------- editable graphs ---------- */
+.graph-sliders {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 6px 22px;
+  width: min(100%, 560px);
+  margin-top: 8px;
+}
+.graph-slider {
+  display: grid;
+  grid-template-columns: 22px 1fr 44px;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-hand);
+  color: #f4f1e8;
+}
+.graph-slider-name {
+  font-size: 22px;
+  font-style: italic;
+  color: #f6d77a;
+}
+.graph-slider-value {
+  font-size: 20px;
+  text-align: right;
+  color: #9fd3ff;
+}
+.graph-slider input[type="range"] {
+  width: 100%;
+  accent-color: #9fd3ff;
+  height: 28px;
+}
+.graph-reset {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border: 1.5px solid rgb(244 241 232 / 0.4);
+  border-radius: 999px;
+  background: transparent;
+  color: #f4f1e8;
+  font-family: var(--font-hand);
+  font-size: 17px;
+}
+
+/* ---------- session layout: the board gets the screen ----------
+   Top: menu and topic (left), a small pill (report, speed, PDF), the tutor (right).
+   Bottom: start/pause, the typing field with + for paper and books, and the mic.
+   Drawing tools: a slim tray on the right that the pen button opens and closes. */
+.class-dock {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  z-index: 3;
+  width: min(760px, calc(100% - 24px));
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  zoom: var(--ui-zoom, 1);
+}
+.dock-round {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: #f7f9f7;
+  color: #1b2a23;
+  font-size: 26px;
+  box-shadow: 0 8px 24px rgb(8 20 15 / 0.45);
+  cursor: pointer;
+}
+.dock-round:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.dock-round.btn-start {
+  background: #f6d77a;
+}
+.dock-round.btn-talk,
+.dock-round.btn-mic {
+  background: #e5484d;
+  color: #fff;
+}
+.dock-round.btn-talk[data-on="true"],
+.dock-round.btn-mic[data-live="true"] {
+  background: #2f9e62;
+  box-shadow: 0 0 0 6px rgb(47 158 98 / 0.35), 0 8px 24px rgb(8 20 15 / 0.45);
+}
+.class-dock .btn-stop {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: #fff1c2;
+  color: #2c2414;
+  font-weight: 700;
+  box-shadow: 0 8px 24px rgb(8 20 15 / 0.45);
+}
+.dock-input {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 56px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #f7f9f7;
+  box-shadow: 0 8px 24px rgb(8 20 15 / 0.45);
+}
+.dock-input input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  color: #1b2a23;
+  font-family: var(--font-hand);
+  font-size: 19px;
+  outline: none;
+}
+.dock-input input::placeholder {
+  color: #8a958f;
+}
+.dock-input button {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #3d4a44;
+  font-size: 22px;
+  cursor: pointer;
+}
+.dock-input button.on {
+  background: #e7efe9;
+}
+.dock-input .dock-send {
+  background: #23392f;
+  color: #fff;
+}
+.dock-input .dock-send:disabled {
+  background: #d8dfdb;
+  color: #8a958f;
+}
+.dock-input:focus-within {
+  box-shadow: 0 0 0 3px #f6d77a, 0 8px 24px rgb(8 20 15 / 0.45);
+}
+
+.board-tray {
+  position: absolute;
+  right: 16px;
+  bottom: calc(max(12px, env(safe-area-inset-bottom)) + 136px);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 5px;
+  border-radius: 18px;
+  background: #f7f9f7;
+  box-shadow: 0 10px 30px rgb(8 20 15 / 0.45);
+  zoom: var(--ui-zoom, 1);
+}
+.board-tray[data-open="false"] {
+  display: none;
+}
+.board-tray button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: #4a5751;
+  font-size: 21px;
+  cursor: pointer;
+}
+.board-tray button.on {
+  background: #23392f;
+  color: #f6d77a;
+}
+.board-tray button:disabled {
+  opacity: 0.35;
+}
+.pen-fab {
+  position: absolute;
+  right: 16px;
+  bottom: calc(max(12px, env(safe-area-inset-bottom)) + 72px);
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border: 0;
+  border-radius: 999px;
+  background: #f7f9f7;
+  color: #1b2a23;
+  font-size: 24px;
+  box-shadow: 0 8px 24px rgb(8 20 15 / 0.45);
+  cursor: pointer;
+  zoom: var(--ui-zoom, 1);
+}
+.board > .btn-done {
+  position: absolute;
+  right: 82px;
+  bottom: calc(max(12px, env(safe-area-inset-bottom)) + 78px);
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
+  background: #f7f9f7;
+  color: #6b766f;
+  font-weight: 700;
+  font-size: 16px;
+  box-shadow: 0 8px 24px rgb(8 20 15 / 0.45);
+  zoom: var(--ui-zoom, 1);
+}
+.board > .btn-done[data-ready="true"] {
+  background: #2f9e62;
+  color: #fff;
+}
+.board > .btn-done:disabled[data-state="idle"] {
+  opacity: 0.75;
+}
+
+.class-pill {
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 999px;
+  background: #f7f9f7;
+  box-shadow: 0 6px 18px rgb(8 20 15 / 0.4);
+  zoom: var(--ui-zoom, 1);
+}
+.class-pill button {
+  display: grid;
+  place-items: center;
+  min-width: 40px;
+  height: 38px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #1b2a23;
+  font-size: 19px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.class-pill button:hover:not(:disabled) {
+  background: #e7efe9;
+}
+.class-pill .btn-speed {
+  font-size: 15px;
+}
+.class-pill-sep {
+  width: 1px;
+  height: 22px;
+  background: #d3dbd6;
+}
+
+/* Things that floated over the old bottom-right toolbar now sit above the bottom bar. */
+.submission {
+  bottom: calc(max(12px, env(safe-area-inset-bottom)) + 132px);
+  right: 82px;
+}
+.question-bar {
+  bottom: calc(max(12px, env(safe-area-inset-bottom)) + 132px);
+  right: 82px;
+}
+.toast {
+  bottom: calc(max(12px, env(safe-area-inset-bottom)) + 84px);
+}
+.paper-pop {
+  right: auto;
+  left: max(12px, calc(50% - 370px));
+  bottom: calc(max(12px, env(safe-area-inset-bottom)) + 76px);
+}
+.type-panel {
+  right: auto;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(max(12px, env(safe-area-inset-bottom)) + 76px);
+}
+@media (max-width: 600px) {
+  .menu-name {
+    display: none;
+  }
+  .class-dock {
+    gap: 6px;
+  }
+  .dock-round {
+    width: 50px;
+    height: 50px;
+  }
+  .dock-input {
+    height: 50px;
+  }
+  .dock-input input {
+    font-size: 17px;
+  }
+  .submission,
+  .question-bar {
+    right: 78px;
+    left: 12px;
+  }
+}
+
+.print-ink {
+  display: none;
+}
+
+/* ---------- the class as PDF notes (print, "Save as PDF") ----------
+   Only the board is printed, as dark writing on white: the chalkboard's colours are inverted,
+   and photos and paper notes are inverted back so they look as they do on screen. */
+@media print {
+  @page {
+    margin: 10mm;
+  }
+  html,
+  body,
+  #root,
+  .classroom,
+  .board,
+  .board-scroll {
+    position: static !important;
+    overflow: visible !important;
+    height: auto !important;
+    background: #fff !important;
+  }
+  .board-page {
+    position: relative !important;
+    background: #000 !important; /* inverted: white paper */
+    filter: invert(1) hue-rotate(180deg);
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .print-ink {
+    display: block;
+    position: absolute;
+    left: 0;
+    width: 100%;
+  }
+  .photo-page,
+  .source-page,
+  .fix-photo,
+  .exam-answer {
+    filter: invert(1) hue-rotate(180deg);
+  }
+  .board-ink,
+  .class-dock,
+  .board-tray,
+  .pen-fab,
+  .board > .btn-done,
+  .class-pill,
+  .session-menu,
+  .orb,
+  .toast,
+  .submission,
+  .question-bar,
+  .board-pill,
+  .write-here,
+  .type-panel,
+  .paper-pop,
+  .tour,
+  .fix-button,
+  .graph-reset,
+  .dev-panel {
+    display: none !important;
+  }
+}

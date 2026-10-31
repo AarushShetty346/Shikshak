@@ -5,14 +5,23 @@
 export type Diagram =
   | { type: "ap"; terms: string[]; d: string | null }
   | { type: "numberline"; from: number; to: number; points: { x: number; label: string }[] }
-  | { type: "graph"; exprs: string[]; points: { x: number; y: number; label: string }[]; xmin: number; xmax: number }
+  | { type: "graph"; exprs: string[]; points: { x: number; y: number; label: string }[]; xmin: number; xmax: number; params?: GraphParam[] }
   | { type: "triangle"; labels: [string, string, string]; sides: { AB?: string; BC?: string; CA?: string }; angle: { at: string; label: string } | null; right: boolean }
   | { type: "table"; header: string[]; rows: string[][] };
+
+/** A number in a graph's equation the student can change with a slider (e.g. a in y = ax² + bx + c). */
+export interface GraphParam {
+  name: string;
+  value: number;
+  min: number;
+  max: number;
+}
 
 export const DIAGRAM_EXAMPLES = [
   "ap: 2, 5, 8, 11 | d = 3",
   "numberline: -5..5 | points: -2, 3 | labels: a, b",
   "graph: y = x^2 - 4 ; y = 2x | points: (2,0), (-2,0) | x: -4..4",
+  "graph: y = a x^2 + b x + c | params: a = 1 (-3..3), b = -1 (-6..6), c = -6 (-6..6) | x: -5..5",
   "triangle: right | vertices: A, B, C | AB = 3, BC = 4, AC = 5 | angle: theta at A",
   "table: n, a_n ; 1, 2 ; 2, 5 ; 3, 8",
 ];
@@ -63,6 +72,25 @@ function range(s: string, fallback: [number, number]): [number, number] {
   return a < b ? [a, b] : fallback;
 }
 
+/** "a = 1 (-3..3), b = -1, c = -6": up to 4 one-letter numbers the student can slide. */
+function parseParams(src: string | undefined): GraphParam[] {
+  const out: GraphParam[] = [];
+  for (const item of (src ?? "").replace(/[−–]/g, "-").split(",").map((x) => x.trim()).filter(Boolean)) {
+    const m = /^([a-wyz])\s*=\s*(-?[\d.]+)\s*(?:\(\s*(-?[\d.]+)\s*\.\.\s*(-?[\d.]+)\s*\))?$/i.exec(item);
+    if (!m) throw new Error(`can't read the slider "${item}"; write it like a = 1 (-3..3)`);
+    const name = m[1].toLowerCase();
+    const value = Number(m[2]);
+    const span = Math.max(5, Math.ceil(Math.abs(value)) + 3);
+    let min = m[3] !== undefined ? Number(m[3]) : -span;
+    let max = m[4] !== undefined ? Number(m[4]) : span;
+    if (!(min < max)) [min, max] = [-span, span];
+    if (out.some((q) => q.name === name)) throw new Error(`the slider ${name} is given twice`);
+    out.push({ name, value: Math.min(max, Math.max(min, value)), min, max });
+  }
+  if (out.length > 4) throw new Error("at most 4 sliders");
+  return out;
+}
+
 /** Parses the one-line diagram language. Throws with a short reason the tutor can act on. */
 export function parseDiagram(raw: string): Diagram {
   const spec = String(raw ?? "").trim();
@@ -88,12 +116,13 @@ export function parseDiagram(raw: string): Diagram {
         .filter(Boolean)
         .slice(0, 3);
       if (!exprs.length) throw new Error("graph needs an equation, e.g. graph: y = x^2 - 4");
-      for (const e of exprs) compileExpr(e); // throws if it can't be drawn
+      const params = parseParams(rest.get("params"));
+      for (const e of exprs) compileGraphExpr(e, params.map((q) => q.name)); // throws if it can't be drawn
       const [xmin, xmax] = range(rest.get("x") ?? "", [-5, 5]);
       const points = [...(rest.get("points") ?? "").matchAll(/\(\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*\)/g)]
         .slice(0, 6)
         .map((m) => ({ x: Number(m[1]), y: Number(m[2]), label: "" }));
-      return { type: "graph", exprs, points, xmin, xmax };
+      return { type: "graph", exprs, points, xmin, xmax, ...(params.length ? { params } : {}) };
     }
     case "triangle": {
       const right = /right/i.test(head);
@@ -189,9 +218,9 @@ export function graphSegments(f: (x: number) => number, xmin: number, xmax: numb
 // Supports numbers, x, + - * / ^, brackets, implicit multiplication (2x, 3(x+1), x(x-2)),
 // and sqrt, abs, sin, cos, tan (degrees, as in class 10).
 
-type Tok = { t: "num"; v: number } | { t: "x" } | { t: "op"; v: string } | { t: "fn"; v: string } | { t: "("; } | { t: ")" };
+type Tok = { t: "num"; v: number } | { t: "x" } | { t: "p"; v: string } | { t: "op"; v: string } | { t: "fn"; v: string } | { t: "("; } | { t: ")" };
 
-function tokenize(src: string): Tok[] {
+function tokenize(src: string, names: string[] = []): Tok[] {
   const s = src.replace(/\s+/g, "").replace(/[−–]/g, "-").replace(/×/g, "*").replace(/÷/g, "/").replace(/²/g, "^2").replace(/³/g, "^3");
   const out: Tok[] = [];
   let i = 0;
@@ -216,17 +245,21 @@ function tokenize(src: string): Tok[] {
       i++;
     } else {
       const m = /^(sqrt|abs|sin|cos|tan)/i.exec(s.slice(i));
-      if (!m) throw new Error(`can't draw "${src}"`);
-      out.push({ t: "fn", v: m[1].toLowerCase() });
-      i += m[1].length;
+      if (m) {
+        out.push({ t: "fn", v: m[1].toLowerCase() });
+        i += m[1].length;
+      } else if (names.includes(c.toLowerCase())) {
+        out.push({ t: "p", v: c.toLowerCase() });
+        i++;
+      } else throw new Error(`can't draw "${src}"`);
     }
   }
   // Implicit multiplication: 2x, 2(, x(, )(, )x, x2 (rare)
   const withMul: Tok[] = [];
   for (const tok of out) {
     const prev = withMul[withMul.length - 1];
-    const prevEnds = prev && (prev.t === "num" || prev.t === "x" || prev.t === ")");
-    const startsValue = tok.t === "num" || tok.t === "x" || tok.t === "(" || tok.t === "fn";
+    const prevEnds = prev && (prev.t === "num" || prev.t === "x" || prev.t === "p" || prev.t === ")");
+    const startsValue = tok.t === "num" || tok.t === "x" || tok.t === "p" || tok.t === "(" || tok.t === "fn";
     if (prevEnds && startsValue) withMul.push({ t: "op", v: "*" });
     withMul.push(tok);
   }
@@ -234,7 +267,13 @@ function tokenize(src: string): Tok[] {
 }
 
 export function compileExpr(src: string): (x: number) => number {
-  const toks = tokenize(src);
+  const f = compileGraphExpr(src, []);
+  return (x) => f(x, {});
+}
+
+/** Like compileExpr, with named numbers (a graph's sliders) read from env on each call. */
+export function compileGraphExpr(src: string, names: string[]): (x: number, env: Record<string, number>) => number {
+  const toks = tokenize(src, names);
   let p = 0;
   const peek = () => toks[p];
   const fns: Record<string, (v: number) => number> = {
@@ -244,14 +283,14 @@ export function compileExpr(src: string): (x: number) => number {
     cos: (v) => Math.cos((v * Math.PI) / 180),
     tan: (v) => Math.tan((v * Math.PI) / 180),
   };
-  type F = (x: number) => number;
+  type F = (x: number, e: Record<string, number>) => number;
   const expr = (): F => {
     let left = term();
     for (let t = peek(); t && t.t === "op" && (t.v === "+" || t.v === "-"); t = peek()) {
       p++;
       const right = term();
       const l = left;
-      left = t.v === "+" ? (x) => l(x) + right(x) : (x) => l(x) - right(x);
+      left = t.v === "+" ? (x, e) => l(x, e) + right(x, e) : (x, e) => l(x, e) - right(x, e);
     }
     return left;
   };
@@ -261,7 +300,7 @@ export function compileExpr(src: string): (x: number) => number {
       p++;
       const right = unary();
       const l = left;
-      left = t.v === "*" ? (x) => l(x) * right(x) : (x) => l(x) / right(x);
+      left = t.v === "*" ? (x, e) => l(x, e) * right(x, e) : (x, e) => l(x, e) / right(x, e);
     }
     return left;
   };
@@ -271,7 +310,7 @@ export function compileExpr(src: string): (x: number) => number {
     if (t && t.t === "op" && t.v === "-") {
       p++;
       const v = unary();
-      return (x) => -v(x);
+      return (x, e) => -v(x, e);
     }
     if (t && t.t === "op" && t.v === "+") {
       p++;
@@ -285,7 +324,7 @@ export function compileExpr(src: string): (x: number) => number {
     if (t && t.t === "op" && t.v === "^") {
       p++;
       const exp = unary(); // allows 2^-1, and 2^3^2 = 2^(3^2)
-      return (x) => Math.pow(base(x), exp(x));
+      return (x, e) => Math.pow(base(x, e), exp(x, e));
     }
     return base;
   };
@@ -294,10 +333,14 @@ export function compileExpr(src: string): (x: number) => number {
     if (!t) throw new Error(`can't draw "${src}"`);
     if (t.t === "num") return () => t.v;
     if (t.t === "x") return (x) => x;
+    if (t.t === "p") {
+      const name = t.v;
+      return (_x, e) => e[name] ?? 0;
+    }
     if (t.t === "fn") {
       const f = fns[t.v];
       const arg = atom();
-      return (x) => f(arg(x));
+      return (x, e) => f(arg(x, e));
     }
     if (t.t === "(") {
       const inner = expr();

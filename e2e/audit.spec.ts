@@ -290,6 +290,65 @@ test("Type tool: typed steps go on the board as my lines and are checked like ha
   await expect(page.locator(".submission")).toContainText("Simulated check", { timeout: 20_000 });
 });
 
+test("a graph with sliders: moving a slider redraws the curve and where it crosses the x-axis", async ({ page }) => {
+  const id = await openClass(page);
+  const r = await tool(page, "draw", { session_code: id, diagram: "graph: y = a x^2 + b x + c | params: a = 1 (-3..3), b = -1 (-6..6), c = -6 (-6..6) | x: -5..5", caption: "Move a, b and c" });
+  expect(r.ok).toBe(true);
+  const graph = page.locator(".editable-graph");
+  await expect(graph).toBeVisible({ timeout: 10_000 });
+  await expect(graph.locator(".graph-root")).toHaveCount(2);
+  await expect(graph.locator(".graph-root text")).toHaveText(["−2", "3"]);
+  // Drag c to the far right (under the ink layer, so it goes through the board).
+  const c = graph.getByRole("slider", { name: "Change c" });
+  await c.scrollIntoViewIfNeeded();
+  const box = (await c.boundingBox())!;
+  await page.mouse.move(box.x + box.width * 0.1, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width - 1, box.y + box.height / 2, { steps: 6 });
+  await page.mouse.up();
+  await expect(c).toHaveValue("6");
+  // y = x² − x + 6 never touches the x-axis.
+  await expect(graph.locator(".graph-root")).toHaveCount(0);
+  await expect(graph.locator("text").filter({ hasText: /^y = / })).toHaveText(/^y = x² [−-] x \+ 6$/);
+  await graph.getByRole("button", { name: "Reset" }).evaluate((b: HTMLButtonElement) => b.click());
+  await expect(c).toHaveValue("-6");
+});
+
+test("download notes: the whole class prints as a PDF, board only, with my ink", async ({ page }) => {
+  await page.addInitScript(() => {
+    (window as unknown as { printed: number }).printed = 0;
+    window.print = () => void ((window as unknown as { printed: number }).printed += 1);
+  });
+  await openClass(page);
+  const at = (await page.locator("canvas.board-ink").boundingBox())!;
+  await scribble(page, at.x + 80, at.y + 200, 160);
+  await page.getByRole("button", { name: "Download notes as PDF" }).click();
+  await expect.poll(() => page.evaluate(() => (window as unknown as { printed: number }).printed)).toBe(1);
+  await expect(page.locator(".print-ink")).not.toHaveCount(0);
+  await page.emulateMedia({ media: "print" });
+  await expect(page.locator(".class-dock")).toBeHidden();
+  await expect(page.locator(".print-ink").first()).toBeVisible();
+});
+
+test("session layout: start, the typing field and the mic at the bottom; the pen button hides the tools", async ({ page }) => {
+  await openClass(page);
+  const dock = page.locator(".class-dock");
+  await expect(dock.getByRole("button", { name: /^(Start|Resume)$/ })).toBeVisible();
+  await expect(dock.getByRole("textbox", { name: "Type a step" })).toBeVisible();
+  await expect(dock.getByRole("button", { name: "Start talking" })).toBeVisible();
+  await expect(page.getByRole("toolbar", { name: "Board tools" })).toBeVisible();
+  await page.getByRole("button", { name: "Hide the drawing tools" }).click();
+  await expect(page.getByRole("toolbar", { name: "Board tools" })).toBeHidden();
+  await page.getByRole("button", { name: "Show the drawing tools" }).click();
+  // One step typed in the bar goes on the board as my line.
+  await dock.getByRole("textbox", { name: "Type a step" }).fill("x = 2");
+  await page.keyboard.press("Enter");
+  await expect(page.locator("button.btn-done")).toBeEnabled();
+  // The + holds paper and books.
+  await dock.getByRole("button", { name: "Add from paper or a book" }).click();
+  await expect(page.getByRole("menuitem", { name: /Upload my book or notes/ })).toBeVisible();
+});
+
 test("guided tour: the first visit walks through the controls, once, and can be replayed", async ({ page }) => {
   const clips: string[] = [];
   page.on("request", (r) => r.url().includes("/tour/") && clips.push(r.url()));
