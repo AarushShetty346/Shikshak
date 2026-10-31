@@ -114,10 +114,11 @@ describe("Tamil and Telugu (preview)", () => {
   it("every agent language has a transcriber, a voice and the prompt; every spoken line has all four languages", () => {
     const body = buildAgentPayload({ publicUrl: "https://x.test" });
     const cfg = body.agent_config.tasks[0].tools_config;
-    const langs = cfg.multilingual_config.languages as Record<string, { transcriber: { language: string }; synthesizer: { provider_config: { language: string } }; system_prompt: string }>;
+    const langs = cfg.multilingual_config.languages as Record<string, { transcriber: { language: string; provider: string; model: string }; synthesizer: { provider_config: { language: string } }; system_prompt: string }>;
     expect(Object.keys(langs)).toEqual(["hi", "en", "ta", "te"]);
     for (const [k, v] of Object.entries(langs)) {
       expect(v.transcriber.language).toBe(k);
+      expect(v.transcriber).toMatchObject({ provider: "soniox", model: "stt-rt-v5" });
       expect(v.synthesizer.provider_config.language).toBe(k);
       expect(v.system_prompt.length).toBeGreaterThan(500);
     }
