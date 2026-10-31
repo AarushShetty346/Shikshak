@@ -9,7 +9,7 @@ export function emptySnapshot(): BoardSnapshot {
   return { v: 1, seq: 0, blocks: [], highlights: [], section: null, question: null, mark: null, correct: null };
 }
 
-const BLOCK_TYPES = new Set(["write", "draw", "steps", "problem", "plan", "page", "source", "hint"]);
+const BLOCK_TYPES = new Set(["write", "draw", "steps", "problem", "plan", "page", "source", "hint", "fix"]);
 
 export function isBlockEvent(e: BoardEvent): e is BlockEvent {
   return BLOCK_TYPES.has(e.type);

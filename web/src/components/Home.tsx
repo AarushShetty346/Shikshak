@@ -322,8 +322,8 @@ export function Home({ onOpen, onProgress, onSwitchMode }: { onOpen: (id: string
           <div>
             <h2 className="chalk">Learn maths out loud</h2>
             <p>
-              Shikshak is a voice maths tutor for classes 8 to 12. It talks you through a topic in Hinglish, Hindi or English while writing on a shared
-              chalkboard. You solve on the board, press Done, and it reads your handwritten steps and circles the one that went wrong.
+              I am Shikshak, your tutor for maths in classes 8 to 12. I talk you through a topic in Hinglish, Hindi or English while writing on a shared
+              chalkboard. You solve on the board, press Done, and I read your handwritten steps and circle the one that went wrong.
             </p>
             <p>Start with one class per chapter. Each keeps its own board, notes and progress.</p>
             <button className="btn-primary" onClick={() => setCreating(newCode())}>

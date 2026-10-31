@@ -86,7 +86,7 @@ const PHOTO_SCHEMA = {
   },
 };
 
-const PHOTO_NOTE = `This is a PHOTO of the student's working on paper (a notebook or a sheet), not the board, so the lines have no numbers. Number the lines of working yourself from the top, starting at 1, skipping crossed-out lines, and use those numbers in reading and line. Also return line_boxes: for each numbered line, in order, [top, bottom] as fractions (0 to 1) of the photo's height. Ignore anything that isn't the student's working (page edges, printed text, fingers).`;
+const PHOTO_NOTE = `This is a PHOTO of the student's working on paper (a notebook or a sheet), not the board, so the lines have no numbers. Number the lines of working yourself from the top, starting at 1, skipping crossed-out lines, and use those numbers in reading and line. Also return line_boxes: for each numbered line, in order, [top, bottom] as fractions (0 to 1) of the photo's height. Ignore anything that isn't the student's working (page edges, printed text, fingers). Bright blue strokes, if any, were drawn by the student on the board on top of the photo afterwards: their extra steps, corrections, circles, arrows or questions (e.g. "?", "fix it", "why?"). Read them together with the photo; they are part of the student's work, and a question written in blue is what the student is asking about.`;
 
 const SYSTEM = `You are a patient class 10 maths teacher in India looking at what a student just wrote or drew on a shared blackboard during a live voice lesson.
 

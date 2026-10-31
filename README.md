@@ -1,6 +1,6 @@
 # Shikshak
 
-A maths teacher that talks to you in your language, writes on a chalkboard while explaining, and checks your
+Shikshak, your tutor: it talks to you in your language, writes on a chalkboard while explaining, and checks your
 handwritten work, circling the exact step that went wrong.
 
 Built for the [Bolna Buildathon at Symphony 2026](https://www.bolna.ai/symphony/buildathon). Voice runs on

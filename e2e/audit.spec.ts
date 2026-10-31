@@ -97,7 +97,7 @@ test("BUG-06: after three hints the question is still on screen", async ({ page 
 test("BUG-07: the first screen says what Shikshak is", async ({ page }) => {
   await page.goto("/");
   const pitch = page.locator(".home-empty");
-  await expect(pitch).toContainText(/voice maths tutor/i);
+  await expect(pitch).toContainText(/I am Shikshak, your tutor/);
   await expect(pitch).toContainText(/handwritten/i);
   await expect(page.getByText(/Physics/)).toHaveCount(0);
 });
@@ -220,6 +220,74 @@ test("Paper mode: a photo of my working is pinned on the board, checked, and mar
   const [p, c] = [(await photo.boundingBox())!, (await circle.boundingBox())!];
   expect(c.y).toBeGreaterThan(p.y);
   expect(c.y).toBeLessThan(p.y + p.height);
+});
+
+test("Fix it on a photo: the slips are marked on the photo and the answer is written exam-style", async ({ page }) => {
+  await openClass(page);
+  await page.locator('input[data-paper="work"]').setInputFiles("e2e/paper-working.jpg");
+  const photo = page.locator(".photo-page");
+  await expect(photo.locator("img")).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator(".submission")).toHaveAttribute("data-state", "done", { timeout: 20_000 });
+  // The button sits under the ink layer; a tap on it presses it rather than drawing.
+  const fix = photo.getByRole("button", { name: "Fix it" });
+  await fix.scrollIntoViewIfNeeded();
+  const at = (await fix.boundingBox())!;
+  await page.mouse.click(at.x + at.width / 2, at.y + at.height / 2);
+  const block = page.locator(".fix-block");
+  await expect(block).toBeVisible({ timeout: 15_000 });
+  await expect(block).toContainText("(simulated)");
+  await expect(block.locator(".fix-band")).toHaveCount(1);
+  await expect(block.locator(".fix-photo img")).toBeVisible();
+  // Exam layout: steps with ⇒ and ∵, ending in a boxed "∴" answer.
+  await expect(block.locator(".exam-line").filter({ hasText: "⇒" }).first()).toBeVisible();
+  await expect(block.locator(".exam-line").filter({ hasText: "∵" })).toHaveCount(1);
+  await expect(block.locator(".exam-final")).toHaveText("∴ x = 2 or x = 3");
+  await expect(block).toContainText("Not checked by the maths engine");
+});
+
+test("ink drawn over a photo is sent with the photo, so the reader sees what I marked", async ({ page }) => {
+  await openClass(page);
+  await page.locator('input[data-paper="work"]').setInputFiles("e2e/paper-working.jpg");
+  const img = page.locator(".photo-page img");
+  await expect(img).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator(".submission")).toHaveAttribute("data-state", "done", { timeout: 20_000 });
+  const sent: { photoLabel?: string; png?: string; lineCount?: number }[] = [];
+  page.on("websocket", (ws) => ws.on("framesent", (f) => typeof f.payload === "string" && f.payload.includes('"capture"') && sent.push(JSON.parse(f.payload))));
+  await page.reload();
+  await expect(img).toBeVisible({ timeout: 15_000 });
+  await img.scrollIntoViewIfNeeded();
+  const box = (await img.boundingBox())!;
+  await scribble(page, box.x + box.width * 0.55, box.y + box.height * 0.4, 120);
+  await page.locator("button.btn-done").click();
+  await expect.poll(() => sent.length, { timeout: 10_000 }).toBeGreaterThan(0);
+  expect(sent[0].photoLabel).toMatch(/^B\d+$/);
+  expect(sent[0].lineCount).toBe(0);
+  expect(sent[0].png).toMatch(/^data:image\/jpeg;base64,/);
+  await expect(page.locator(".submission")).toContainText("Simulated check", { timeout: 20_000 });
+});
+
+test("Type tool: typed steps go on the board as my lines and are checked like handwriting", async ({ page }) => {
+  const id = await openClass(page);
+  await tool(page, "next_problem", { session_code: id, problem_id: "quad.fact.01" });
+  await page.getByRole("button", { name: "Type", exact: true }).click();
+  const box = page.getByRole("textbox", { name: "Your working" });
+  await box.fill("x² − 5x + 6 = 0\n(x − 2)(x − 3) = 0\n");
+  await page.getByRole("button", { name: "Insert ∴" }).click();
+  await box.press("End");
+  await box.pressSequentially(" x = 2 or x = 3");
+  await expect(page.getByText("3 lines")).toBeVisible();
+  await page.getByRole("button", { name: "Put on the board" }).click();
+  await expect(box).toHaveCount(0);
+  // They're the student's own lines now: Done sends them, numbered, like handwriting.
+  const sent: { lineCount?: number }[] = [];
+  page.on("websocket", (ws) => ws.on("framesent", (f) => typeof f.payload === "string" && f.payload.includes('"capture"') && sent.push(JSON.parse(f.payload))));
+  await page.reload();
+  await expect(page.locator("canvas.board-ink")).toBeVisible();
+  const done = page.locator("button.btn-done");
+  await expect(done).toBeEnabled();
+  await done.click();
+  await expect.poll(() => sent[0]?.lineCount, { timeout: 10_000 }).toBe(3);
+  await expect(page.locator(".submission")).toContainText("Simulated check", { timeout: 20_000 });
 });
 
 test("guided tour: the first visit walks through the controls, once, and can be replayed", async ({ page }) => {

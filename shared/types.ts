@@ -8,6 +8,10 @@ export type Point = [number, number];
 export interface Stroke {
   id: string;
   points: Point[];
+  /** A typed line (the Type tool): drawn as text; points[0] is its top-left, and the points trace its box. */
+  text?: string;
+  /** Font size of a typed line, in board units. */
+  size?: number;
 }
 
 export interface Box {
@@ -46,8 +50,23 @@ export type BlockEvent =
   | { type: "page"; id: string }
   /** A real page of the student's uploaded material, shown on the board with its source. */
   | { type: "source"; id: string; label: string; docId: string; docName: string; page: number | null; caption: string; photo?: boolean }
+  /**
+   * "Fix it" on a photo of the student's paper: the same photo with the slips marked on it (each a
+   * strip of the photo with the correction), and each question in it solved as an exam answer.
+   */
+  | { type: "fix"; id: string; label: string; photoLabel: string; docId: string; questions: FixQuestion[]; simulated?: boolean }
   /** One rung of the hint ladder for the current question (nudge, hint, one worked step). */
   | { type: "hint"; id: string; label: string; questionId: string; level: HintLevel; rung: number; of: number; text: string };
+
+/** One question found in a photo by "Fix it". */
+export interface FixQuestion {
+  question: string;
+  status: "correct" | "mistake" | "incomplete" | "unreadable";
+  /** Where the student's lines go wrong on the photo, with what they should say. */
+  marks: { top: number; bottom: number; fix: string }[];
+  /** The full solution, one exam-style line each (=, ∴, ∵, ⇒). */
+  solution: string[];
+}
 
 /**
  * Something the tutor puts on the shared board, or a change to it. These are saved in the board
@@ -159,6 +178,8 @@ export type ClientMessage =
       png: string | null;
       lineCount: number;
       lines: Box[];
+      /** The student wrote over a photo pinned on the board: png is that photo with their ink on top. */
+      photoLabel?: string | null;
     }
   /** The student interrupted (Stop button, or pressed Talk while the tutor was speaking). */
   | { kind: "interrupt"; reason: "doubt" | "speech" }
@@ -209,14 +230,14 @@ export function greetingFor(language: Language, name: string, topic: string, res
   }
   switch (language) {
     case "hi":
-      return `नमस्ते${who}! मैं आपकी मैथ्स टीचर हूँ। आज हम ${topic} पढ़ेंगे। शुरू करें?`;
+      return `नमस्ते${who}! मैं शिक्षक हूँ, आपकी ट्यूटर। आज हम ${topic} पढ़ेंगे। शुरू करें?`;
     case "en":
-      return `Hello${who}! I'm your maths teacher. Today we'll learn ${topic}. Shall we start?`;
+      return `Hello${who}! I am Shikshak, your tutor. Today we'll learn ${topic}. Shall we start?`;
     case "ta":
-      return `வணக்கம்${who}! நான் உங்கள் கணித ஆசிரியர். இன்று நாம் ${topic} படிப்போம். தொடங்கலாமா?`;
+      return `வணக்கம்${who}! நான் ஷிக்ஷக், உங்கள் ஆசிரியர். இன்று நாம் ${topic} படிப்போம். தொடங்கலாமா?`;
     case "te":
-      return `నమస్తే${who}! నేను మీ గణిత టీచర్‌ని. ఈ రోజు మనం ${topic} నేర్చుకుందాం. మొదలుపెడదామా?`;
+      return `నమస్తే${who}! నేను శిక్షక్, మీ ట్యూటర్‌ని. ఈ రోజు మనం ${topic} నేర్చుకుందాం. మొదలుపెడదామా?`;
     default:
-      return `Namaste${who}! Main aapki maths teacher hoon. Aaj hum ${topic} padhenge. Shuru karein?`;
+      return `Namaste${who}! Main Shikshak hoon, aapki tutor. Aaj hum ${topic} padhenge. Shuru karein?`;
   }
 }

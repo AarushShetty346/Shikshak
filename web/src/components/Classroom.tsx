@@ -44,6 +44,8 @@ function toBlock(e: BlockEvent & { erased?: boolean }, instant: boolean): TutorB
       return { kind: "source", id: e.id, label: e.label, docId: e.docId, docName: e.docName, page: e.page, caption: e.caption, photo: e.photo, instant };
     case "hint":
       return { kind: "hint", id: e.id, label: e.label, level: e.level, rung: e.rung, of: e.of, text: e.text, instant };
+    case "fix":
+      return { kind: "fix", id: e.id, label: e.label, photoLabel: e.photoLabel, docId: e.docId, questions: e.questions, simulated: e.simulated, instant };
   }
 }
 
@@ -157,7 +159,7 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
     (seq: number, e: BoardEvent): "ok" | "dup" | "gap" => {
       const next = applySeq(snapRef.current, seq, e);
       if (next === "dup" || next === "gap") return next;
-      if ("id" in e && (e.type === "write" || e.type === "draw" || e.type === "steps" || e.type === "problem" || e.type === "plan" || e.type === "page" || e.type === "source" || e.type === "hint")) liveIds.current.add(e.id);
+      if ("id" in e && (e.type === "write" || e.type === "draw" || e.type === "steps" || e.type === "problem" || e.type === "plan" || e.type === "page" || e.type === "source" || e.type === "hint" || e.type === "fix")) liveIds.current.add(e.id);
       if (e.type === "problem" || (e.type === "write" && e.style === "your_turn")) setStatus("idle");
       if (e.type === "mark") setStatus("idle");
       if (e.type === "correct") setStatus("correct");
@@ -426,6 +428,22 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
     }
   };
 
+  // ---------- "Fix it" on a photo ----------
+  const [fixing, setFixing] = useState<string | null>(null);
+  const fixPhoto = async (label: string, docId: string, image: string | null) => {
+    if (!serverId || fixing) return;
+    setFixing(label);
+    try {
+      const r = await apiFetch<{ note: string; questions: { status: string }[] }>(`/sessions/${serverId}/fix`, { body: { label, docId, image } });
+      const wrong = r.questions.filter((q) => q.status === "mistake").length;
+      showToast(r.note || (wrong ? "I marked the slips on your photo and wrote out the answer below it." : "Your working looks right. The full answer is below it."));
+    } catch (e) {
+      showToast(`Couldn't fix it: ${(e as Error).message}`);
+    } finally {
+      setFixing(null);
+    }
+  };
+
   // ---------- who has the floor ----------
   const teacherSpeaking = active && voice.volume > 0.03;
   const [thinkingUntil, setThinkingUntil] = useState(0);
@@ -553,6 +571,8 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
         send={send}
         onDone={onDone}
         toolbarExtra={classControls}
+        onFix={fixPhoto}
+        fixing={fixing}
       />
 
       <div className="session-menu">

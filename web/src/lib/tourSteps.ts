@@ -28,7 +28,7 @@ export const ALL_TOURS = () => [...HOME_TOUR, ...CLASS_TOUR];
 
 /** The home screen, the first time. */
 export const HOME_TOUR: TourStep[] = [
-  { title: "Namaste! I'm your maths teacher", text: "Let me show you around. It takes one minute. You can press Next, or use the arrow keys." },
+  { title: "Namaste! I am Shikshak, your tutor", text: "Let me show you around. It takes one minute. You can press Next, or use the arrow keys." },
   { target: ".mode-toggle", title: "Student or Teacher", text: "Learning? Stay on Student. Teachers switch here to see the progress students share with them." },
   { target: ".home-head-actions .btn-primary", title: "Start a class", text: "Press New session to start a class. Make one class for each chapter, like a notebook for every topic." },
   { target: ".profile-button", title: "This is you", text: "Tap your picture to see your progress, switch to another learner, or add a brother or sister." },

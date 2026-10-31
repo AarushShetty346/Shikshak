@@ -10,13 +10,14 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { diagramPieces, type Diagram } from "../../../shared/diagram";
 import { groupIntoLines, strokeBox } from "../../../shared/lines";
-import type { Box, ClientMessage, CorrectState, HighlightState, HintLevel, MarkState, PhotoBand, Place, Point, SectionInfo, Stroke, WriteStyle } from "../../../shared/types";
-import { makeSnapshot } from "../lib/snapshot";
+import type { Box, ClientMessage, FixQuestion, CorrectState, HighlightState, HintLevel, MarkState, PhotoBand, Place, Point, SectionInfo, Stroke, WriteStyle } from "../../../shared/types";
+import { makePhotoSnapshot, makeSnapshot } from "../lib/snapshot";
 import { getDoc } from "../lib/docStore";
 import { renderPdfPage } from "../lib/files";
 import { DiagramView, diagramHeight } from "./DiagramView";
 import { MathText } from "./MathText";
-import { ArrowCounterClockwise, ArrowDown, BookOpenText, Camera, Check, CheckCircle, Eraser, HandGrabbing, Lightbulb, PauseCircle, PencilSimple, SealCheck, Trash } from "@phosphor-icons/react";
+import { TypePanel } from "./TypePanel";
+import { ArrowCounterClockwise, ArrowDown, BookOpenText, Camera, Check, CheckCircle, Eraser, HandGrabbing, Lightbulb, MagicWand, PauseCircle, PencilSimple, SealCheck, TextT, Trash } from "@phosphor-icons/react";
 
 const PAD_L = 38; // room for the student's line numbers
 const PAD_R = 22;
@@ -37,6 +38,7 @@ export type TutorBlock =
   | { kind: "plan"; id: string; label?: string; title: string; items: string[]; instant: boolean }
   | { kind: "page"; id: string; instant: boolean }
   | { kind: "source"; id: string; label: string; docId: string; docName: string; page: number | null; caption: string; photo?: boolean; instant: boolean }
+  | { kind: "fix"; id: string; label: string; photoLabel: string; docId: string; questions: FixQuestion[]; simulated?: boolean; instant: boolean }
   | { kind: "hint"; id: string; label: string; level: HintLevel; rung: number; of: number; text: string; instant: boolean };
 
 /** Where the student's latest Done submission is. */
@@ -83,6 +85,10 @@ interface Props {
   onDone: (captureId: string) => void;
   /** Extra toolbar buttons (start/end class, ask doubt). */
   toolbarExtra?: ReactNode;
+  /** "Fix it" on a photo: its label and stored file, and the photo with the student's ink on top. */
+  onFix?: (label: string, docId: string, image: string | null) => void;
+  /** The photo being fixed now, if any. */
+  fixing?: string | null;
 }
 
 interface Saved {
@@ -165,6 +171,7 @@ export function Board(props: Props) {
   const [heights, setHeights] = useState<Record<string, number>>({});
   const [view, setView] = useState({ w: 0, h: 0 });
   const [tool, setTool] = useState<"pen" | "eraser" | "hand">("pen");
+  const [typing, setTyping] = useState(false);
   const [newBelow, setNewBelow] = useState(false);
   // The open question has scrolled out of view above: show it pinned at the top.
   const [questionAbove, setQuestionAbove] = useState(false);
@@ -213,7 +220,7 @@ export function Board(props: Props) {
     }
   }
   const estimate = (b: TutorBlock, width: number) =>
-    b.kind === "draw" ? diagramHeight(b.diagram, width) + 40 : b.kind === "page" ? 40 : b.kind === "source" ? (b.photo ? width * 0.75 : width * 0.9) : 60 + piecesOf(b) * 46;
+    b.kind === "draw" ? diagramHeight(b.diagram, width) + 40 : b.kind === "page" ? 40 : b.kind === "source" ? (b.photo ? width * 0.75 : width * 0.9) : b.kind === "fix" ? width * 0.75 + 90 + b.questions.reduce((n, q) => n + 60 + q.solution.length * 36, 0) : 60 + piecesOf(b) * 46;
 
   // A block that is still being written stays below any ink the student has added since it arrived,
   // so the tutor never writes over the student's work (the student can't see a block's space
@@ -477,7 +484,8 @@ export function Board(props: Props) {
     for (const s of all) {
       const b = strokeBox(s);
       if (b.y > bottom || b.y + b.h < top) continue;
-      drawStroke(ctx, s.points);
+      if (s.text) drawTyped(ctx, s);
+      else drawStroke(ctx, s.points);
     }
   }, [scale, view.h]);
 
@@ -502,6 +510,41 @@ export function Board(props: Props) {
   const questionText = !latestQuestion ? "" : latestQuestion.kind === "problem" ? latestQuestion.problem : latestQuestion.kind === "write" ? latestQuestion.lines.join(" ") : "";
 
   const frame = useRef(0);
+  // ---------- scrolling the board from the ink layer (wheel, two fingers, the hand tool) ----------
+  // The ink canvas sits over the page, so these scroll the page by hand. Each move redraws the ink
+  // in the same frame (no ink trailing the page), and a mouse wheel's big notches glide instead of
+  // jumping.
+  const glide = useRef<{ target: number | null; raf: number }>({ target: null, raf: 0 });
+  const scrollBoardTo = (y: number, animate: boolean) => {
+    const s = scrollRef.current;
+    if (!s) return;
+    const to = Math.max(0, Math.min(s.scrollHeight - s.clientHeight, y));
+    if (!animate) {
+      cancelAnimationFrame(glide.current.raf);
+      glide.current = { target: null, raf: 0 };
+      s.scrollTop = to;
+      redraw();
+      return;
+    }
+    glide.current.target = to;
+    if (glide.current.raf) return;
+    const step = () => {
+      const target = glide.current.target;
+      if (target === null) return;
+      const d = target - s.scrollTop;
+      if (Math.abs(d) < 1) {
+        s.scrollTop = target;
+        glide.current = { target: null, raf: 0 };
+      } else {
+        s.scrollTop += Math.sign(d) * Math.max(1, Math.abs(d) * 0.22);
+        glide.current.raf = requestAnimationFrame(step);
+      }
+      redraw();
+    };
+    glide.current.raf = requestAnimationFrame(step);
+  };
+  useEffect(() => () => cancelAnimationFrame(glide.current.raf), []);
+
   const onScroll = () => {
     cancelAnimationFrame(frame.current);
     frame.current = requestAnimationFrame(() => {
@@ -556,15 +599,83 @@ export function Board(props: Props) {
     scrollRef.current?.scrollTo({ top: Math.max(0, (contentBottom - view.h / scale / 2) * scale) });
   }, [view.h, blocks.length, contentBottom, scale]);
 
+  // ---------- typed working (the Type tool) ----------
+  // Typed lines go under the question (below anything already written there), one per line, as the
+  // student's own strokes: Done reads them, the eraser and undo work on them, and they're saved.
+  const addTyped = (texts: string[]) => {
+    const x = (latestQuestion && layout.pos[latestQuestion.id]?.x) || PAD_L;
+    const y0 = latestQuestion ? Math.max(regionTop + 24, inkBottom(response) + 18) : Math.max(layout.bottom, inkBottom(strokes)) + 28;
+    const now = Date.now();
+    const added = texts.map((text, i) => typedStroke(`t${now.toString(36)}${++strokeCounter}`, text, x, y0 + i * TYPED_LINE, Math.min(W - x - 20, measureTyped(text)), now + i));
+    lastDrawAt.current = 0; // not handwriting in progress: let the page follow
+    setStrokes((prev) => [...prev, ...added]);
+    const s = scrollRef.current;
+    if (s) scrollBoardTo((y0 + texts.length * TYPED_LINE) * scale - s.clientHeight * 0.6, true);
+  };
+
+  // ---------- "Fix it" on a photo ----------
+  // Sends the photo as the student sees it: with any ink they drew over it on the board.
+  const fixPhoto = (b: Extract<TutorBlock, { kind: "source" }>) => {
+    const page = pageRef.current;
+    const img = blockEls.current.get(b.label)?.querySelector("img");
+    let image: string | null = null;
+    if (page && img && scale) {
+      const pr = page.getBoundingClientRect();
+      const r = img.getBoundingClientRect();
+      const box = { x: (r.left - pr.left) / scale, y: (r.top - pr.top) / scale, w: r.width / scale, h: r.height / scale };
+      const onIt = strokes.filter((st) => {
+        const sb = strokeBox(st);
+        const cx = sb.x + sb.w / 2;
+        const cy = sb.y + sb.h / 2;
+        return cx >= box.x && cx <= box.x + box.w && cy >= box.y && cy <= box.y + box.h;
+      });
+      image = onIt.length ? makePhotoSnapshot(img, box, onIt) : null;
+    }
+    props.onFix?.(b.label, b.docId, image);
+  };
+
+  /** The photo on the board that most of these lines are written on, with where it is (board units). */
+  const photoUnder = (written: { box: Box }[]): { label: string; img: HTMLImageElement; box: Box } | null => {
+    const page = pageRef.current;
+    if (!page || !written.length || !scale) return null;
+    const pr = page.getBoundingClientRect();
+    let best: { label: string; img: HTMLImageElement; box: Box; n: number } | null = null;
+    for (const b of blocks) {
+      if (b.kind !== "source" || !b.photo) continue;
+      const img = blockEls.current.get(b.label)?.querySelector("img");
+      if (!img) continue;
+      const r = img.getBoundingClientRect();
+      const box = { x: (r.left - pr.left) / scale, y: (r.top - pr.top) / scale, w: r.width / scale, h: r.height / scale };
+      const n = written.filter(({ box: l }) => {
+        const cx = l.x + l.w / 2;
+        const cy = l.y + l.h / 2;
+        return cx >= box.x && cx <= box.x + box.w && cy >= box.y && cy <= box.y + box.h;
+      }).length;
+      if (n > 0 && (!best || n > best.n)) best = { label: b.label, img, box, n };
+    }
+    return best && best.n * 2 >= written.length ? best : null;
+  };
+
   // ---------- capture: the student's latest work as a numbered image ----------
   const capture = useCallback(
     (reason: "done" | "request", requestId: string | null = null) => {
       const id = newId();
+      // Written over a photo pinned on the board (most lines sit on it): send the photo with the ink on
+      // top, so the reader sees what the student marked, asked or added on their paper.
+      const onPhoto = photoUnder(lines);
+      if (onPhoto) {
+        const png = makePhotoSnapshot(onPhoto.img, onPhoto.box, response);
+        if (png) {
+          send({ kind: "capture", id, reason, requestId, questionId, png, lineCount: 0, lines: [], photoLabel: onPhoto.label });
+          return id;
+        }
+      }
       const boxes: Box[] = lines.map((l) => ({ x: round1(l.box.x), y: round1(l.box.y), w: round1(l.box.w), h: round1(l.box.h) }));
       send({ kind: "capture", id, reason, requestId, questionId, png: lines.length ? makeSnapshot(response, lines) : null, lineCount: lines.length, lines: boxes });
       return id;
     },
-    [lines, response, send, questionId],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [lines, response, send, questionId, blocks, scale],
   );
   useEffect(() => {
     if (captureRequest) capture("request", captureRequest.id);
@@ -623,6 +734,16 @@ export function Board(props: Props) {
 
   const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (e.button !== 0 && e.pointerType === "mouse") return;
+    // A button on a board block (e.g. "Fix it" on a photo) is under the ink layer: press it instead of drawing.
+    // (Board blocks don't take pointer events, so find it by where it is.)
+    const action = [...(pageRef.current?.querySelectorAll<HTMLButtonElement>("button[data-board-action]") ?? [])].find((b) => {
+      const r = b.getBoundingClientRect();
+      return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+    });
+    if (action) {
+      if (!action.disabled) action.click();
+      return;
+    }
     if (e.pointerType === "touch") {
       touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (touches.current.size >= 2) {
@@ -663,7 +784,7 @@ export function Board(props: Props) {
     if (e.pointerType === "touch" && touches.current.has(e.pointerId)) touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (panning.current && (touches.current.size >= 2 || (tool === "hand" && e.pointerId === activePointer.current))) {
       const y = touches.current.size >= 2 ? avgY(touches.current) : e.clientY;
-      scroller.scrollTop -= y - panning.current.y;
+      scrollBoardTo(scroller.scrollTop - (y - panning.current.y), false);
       panning.current.y = y;
       return;
     }
@@ -702,7 +823,12 @@ export function Board(props: Props) {
   };
 
   const onWheel = (e: React.WheelEvent) => {
-    scrollRef.current?.scrollBy({ top: e.deltaY });
+    const s = scrollRef.current;
+    if (!s) return;
+    const dy = e.deltaMode === 1 ? e.deltaY * 40 : e.deltaMode === 2 ? e.deltaY * s.clientHeight : e.deltaY;
+    // A mouse wheel moves in big whole notches; a trackpad sends many small ones that already feel smooth.
+    const notch = e.deltaMode !== 0 || (Math.abs(dy) >= 50 && Number.isInteger(dy));
+    scrollBoardTo((notch ? (glide.current.target ?? s.scrollTop) : s.scrollTop) + dy, notch);
   };
 
   // ---------- marks on the student's work ----------
@@ -757,7 +883,15 @@ export function Board(props: Props) {
                 data-held={held.has(b.id)}
                 style={{ top: px(p.y), left: px(p.x), width: px(p.w) }}
               >
-                <BlockBody block={b} shown={revealed[b.id] ?? (b.instant ? piecesOf(b) : 1)} width={p.w} currentSection={currentSection} sessionCode={sessionCode} />
+                <BlockBody
+                  block={b}
+                  shown={revealed[b.id] ?? (b.instant ? piecesOf(b) : 1)}
+                  width={p.w}
+                  currentSection={currentSection}
+                  sessionCode={sessionCode}
+                  onFix={props.onFix && b.kind === "source" && b.photo ? () => fixPhoto(b) : undefined}
+                  fixing={props.fixing === label}
+                />
               </div>
             );
           })}
@@ -836,6 +970,7 @@ export function Board(props: Props) {
       )}
       {sub.state !== "idle" && <SubmissionCard sub={sub} onRetry={done} canRetry={response.length > 0} />}
 
+      {typing && <TypePanel onAdd={addTyped} onClose={() => setTyping(false)} />}
       <div className="board-tools" role="toolbar" aria-label="Board tools">
         <button className={tool === "pen" ? "on" : ""} onClick={() => setTool("pen")} aria-label="Pen" title="Pen">
           <PencilSimple />
@@ -845,6 +980,9 @@ export function Board(props: Props) {
         </button>
         <button className={tool === "hand" ? "on" : ""} onClick={() => setTool("hand")} aria-label="Scroll" title="Scroll (or use two fingers)">
           <HandGrabbing />
+        </button>
+        <button className={typing ? "on" : ""} onClick={() => setTyping((t) => !t)} aria-label="Type" aria-expanded={typing} title="Type your working instead of writing">
+          <TextT />
         </button>
         <button onClick={() => setStrokes((s) => s.slice(0, -1))} disabled={!strokes.length} aria-label="Undo" title="Undo">
           <ArrowCounterClockwise />
@@ -884,7 +1022,23 @@ function RLine({ n, shown, children, as = "li" }: { n: number; shown: number; ch
   );
 }
 
-function BlockBody({ block, shown, width, currentSection, sessionCode }: { block: TutorBlock; shown: number; width: number; currentSection: number | null; sessionCode: string }) {
+function BlockBody({
+  block,
+  shown,
+  width,
+  currentSection,
+  sessionCode,
+  onFix,
+  fixing,
+}: {
+  block: TutorBlock;
+  shown: number;
+  width: number;
+  currentSection: number | null;
+  sessionCode: string;
+  onFix?: () => void;
+  fixing?: boolean;
+}) {
   switch (block.kind) {
     case "page":
       return <div className="page-rule" />;
@@ -913,7 +1067,9 @@ function BlockBody({ block, shown, width, currentSection, sessionCode }: { block
         </>
       );
     case "source":
-      return <SourcePage block={block} sessionCode={sessionCode} />;
+      return <SourcePage block={block} sessionCode={sessionCode} onFix={onFix} fixing={fixing} />;
+    case "fix":
+      return <FixView block={block} sessionCode={sessionCode} />;
     case "hint":
       return (
         <div className="hint-card" data-level={block.level}>
@@ -1066,27 +1222,38 @@ function MarkCircle({ box, index, note, scale, faded }: { box: Box; index: numbe
 }
 
 /** A real page of the student's uploaded material on the board, with its source. */
-function SourcePage({ block, sessionCode }: { block: Extract<TutorBlock, { kind: "source" }>; sessionCode: string }) {
+/** The picture of an uploaded page or photo, from this device's store. */
+function usePageSrc(sessionCode: string, docId: string, page: number | null) {
   const [src, setSrc] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const doc = await getDoc(sessionCode, block.docId).catch(() => undefined);
+      const doc = await getDoc(sessionCode, docId).catch(() => undefined);
       if (!doc) throw new Error("This file isn't on this device.");
-      const url = doc.mediaType === "application/pdf" ? await renderPdfPage(doc.data, block.page ?? 1) : `data:${doc.mediaType};base64,${doc.data}`;
+      const url = doc.mediaType === "application/pdf" ? await renderPdfPage(doc.data, page ?? 1) : `data:${doc.mediaType};base64,${doc.data}`;
       if (!cancelled) setSrc(url);
     })().catch((err) => !cancelled && setError((err as Error).message || "Couldn't open this page."));
     return () => {
       cancelled = true;
     };
-  }, [sessionCode, block.docId, block.page]);
+  }, [sessionCode, docId, page]);
+  return { src, error };
+}
+
+function SourcePage({ block, sessionCode, onFix, fixing }: { block: Extract<TutorBlock, { kind: "source" }>; sessionCode: string; onFix?: () => void; fixing?: boolean }) {
+  const { src, error } = usePageSrc(sessionCode, block.docId, block.page);
   if (block.photo)
     return (
       <figure className="photo-page" data-line={1}>
         {src ? <img className="hl-text" src={src} alt={block.docName} /> : <div className="source-wait">{error ?? "Opening the photo…"}</div>}
         <figcaption>
           <Camera weight="bold" /> {block.docName}
+          {onFix && src && (
+            <button className="fix-button" data-board-action onClick={onFix} disabled={fixing} title="Mark the slips on this photo and write each question out as an exam answer">
+              {fixing ? <span className="spin" /> : <MagicWand weight="bold" />} {fixing ? "Fixing…" : "Fix it"}
+            </button>
+          )}
         </figcaption>
       </figure>
     );
@@ -1131,6 +1298,86 @@ function SubmissionCard({ sub, onRetry, canRetry }: { sub: Submission; onRetry: 
           Try again
         </button>
       )}
+    </div>
+  );
+}
+
+// ---------- typed lines ----------
+const TYPED_SIZE = 26;
+const TYPED_LINE = 46;
+const TYPED_FONT = `${TYPED_SIZE}px Kalam, "Comic Sans MS", cursive`;
+let measureCtx: CanvasRenderingContext2D | null = null;
+
+function measureTyped(text: string): number {
+  measureCtx ??= document.createElement("canvas").getContext("2d");
+  if (!measureCtx) return text.length * TYPED_SIZE * 0.5;
+  measureCtx.font = TYPED_FONT;
+  return measureCtx.measureText(text).width;
+}
+
+/** A typed line as a stroke: points[0] is its top-left, and points along its middle let the eraser find it. */
+function typedStroke(id: string, text: string, x: number, y: number, w: number, t: number): TimedStroke {
+  const h = TYPED_SIZE * 1.15;
+  const points: Point[] = [
+    [x, y],
+    [x + w, y + h],
+  ];
+  for (let px = x + 12; px < x + w; px += 14) points.push([px, y + h / 2]);
+  return { id, points, text, size: TYPED_SIZE, t };
+}
+
+function drawTyped(ctx: CanvasRenderingContext2D, s: Stroke) {
+  const size = s.size ?? TYPED_SIZE;
+  ctx.save();
+  ctx.font = `${size}px Kalam, "Comic Sans MS", cursive`;
+  ctx.textBaseline = "alphabetic";
+  ctx.textAlign = "left";
+  ctx.fillText(s.text ?? "", s.points[0][0], s.points[0][1] + size * 0.85);
+  ctx.restore();
+}
+
+// ---------- "Fix it": the student's photo, corrected, and the exam answer ----------
+function FixView({ block, sessionCode }: { block: Extract<TutorBlock, { kind: "fix" }>; sessionCode: string }) {
+  const { src, error } = usePageSrc(sessionCode, block.docId, null);
+  const marks = block.questions.flatMap((q) => q.marks);
+  const allRight = block.questions.every((q) => q.status === "correct");
+  return (
+    <div className="fix-block">
+      <p className="fix-head">
+        <MagicWand weight="bold" /> {allRight ? "Checked: your working is right" : "Fixed: your working"}
+        {block.simulated && <span className="fix-sim"> (simulated)</span>}
+      </p>
+      <figure className="fix-photo" data-line={1}>
+        <div className="fix-photo-inner">
+          {src ? <img className="hl-text" src={src} alt="Your working, with corrections" /> : <div className="source-wait">{error ?? "Opening the photo…"}</div>}
+          {src &&
+            marks.map((m, i) => (
+              <div key={i} className="fix-band" style={{ top: `${m.top * 100}%`, height: `${(m.bottom - m.top) * 100}%` }}>
+                {m.fix && <span className="fix-note">{m.fix}</span>}
+              </div>
+            ))}
+        </div>
+      </figure>
+      {block.questions.map((q, i) => (
+        <section key={i} className="exam-answer" aria-label={`Answer ${i + 1}`}>
+          <p className="exam-q">
+            <b>{block.questions.length > 1 ? `Q${i + 1}.` : "Q."}</b> {q.question}
+          </p>
+          {q.status === "unreadable" ? (
+            <p className="exam-line">I couldn't read this one clearly. Try a closer photo.</p>
+          ) : (
+            <>
+              <p className="exam-sol">Solution:</p>
+              {q.solution.map((l, j) => (
+                <p key={j} className={`exam-line${l.startsWith("∴") && j === q.solution.length - 1 ? " exam-final" : ""}`}>
+                  {l}
+                </p>
+              ))}
+            </>
+          )}
+        </section>
+      ))}
+      <p className="fix-foot">Written by your tutor from your photo. Not checked by the maths engine, so read each step.</p>
     </div>
   );
 }
