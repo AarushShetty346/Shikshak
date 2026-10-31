@@ -5,7 +5,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import qrcode from "qrcode-generator";
-import { ArrowLeft, ChartLineUp, Copy, Export, FileText, Notebook, UserPlus, UsersThree, X } from "@phosphor-icons/react";
+import { ArrowLeft, ChartLineUp, House, Copy, Export, FileText, Notebook, UserPlus, UsersThree, X } from "@phosphor-icons/react";
 import { AddLearner, Avatar } from "./Home";
 import { BlockBody } from "./Board";
 import { toBlock } from "./Classroom";
@@ -148,6 +148,10 @@ function Shell({ title, onBack, children, actions }: { title: string; onBack: ()
           <ArrowLeft weight="bold" /> Back
         </button>
         {actions}
+        {/* Being in a group never traps you there: your own classes are one tap away. */}
+        <button className="btn-secondary btn-small group-home" onClick={() => (location.hash = "#/")}>
+          <House weight="bold" /> My classes
+        </button>
       </header>
       {title && <h1 className="chalk group-title">{title}</h1>}
       {children}

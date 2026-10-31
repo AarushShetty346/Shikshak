@@ -393,8 +393,12 @@ test("focus mode: pick a time from 30 minutes, and leaving the class gets a call
   await expect(page.getByRole("timer")).toContainText("left 1×");
   await page.getByRole("button", { name: "I'm back" }).click();
   await expect(page.getByRole("alertdialog")).toHaveCount(0);
+  // It can be ended from the timer, or from the class menu.
+  await page.getByRole("button", { name: "Session menu" }).click();
+  await expect(page.getByRole("menuitem", { name: "End focus mode" })).toBeVisible();
+  await page.keyboard.press("Escape");
   page.once("dialog", (d) => d.accept());
-  await page.getByRole("button", { name: "Stop focus mode" }).click();
+  await page.getByRole("button", { name: "End focus mode" }).click();
   await expect(page.getByRole("timer")).toHaveCount(0);
 });
 
@@ -536,6 +540,52 @@ test("no wrong screen flashes: account first on a new device, and a group page n
   await page.reload();
   await expect(page.getByRole("heading", { name: "Harsh's study group" })).toBeVisible();
   expect(await seen()).not.toContain("Study together");
+});
+
+test("the board keeps everything: an erased or replaced block stays, and new writing goes below", async ({ page }) => {
+  const id = await openClass(page);
+  const written = await tool(page, "write", { session_code: id, style: "heading", lines: ["First idea"] });
+  const label = written.label as string;
+  expect(label).toMatch(/^B\d+$/);
+  const first = page.locator(".tblock", { hasText: "First idea" });
+  await expect(first).toBeVisible();
+  await tool(page, "erase", { session_code: id, target: label });
+  await tool(page, "write", { session_code: id, style: "heading", lines: ["Second idea"], replace: label });
+  const second = page.locator(".tblock", { hasText: "Second idea" });
+  await expect(second).toBeVisible();
+  await page.waitForTimeout(1000);
+  await expect(first).toBeVisible();
+  expect(await first.evaluate((el) => getComputedStyle(el).opacity)).toBe("1");
+  const [a, b] = [(await first.boundingBox())!, (await second.boundingBox())!];
+  expect(b.y).toBeGreaterThan(a.y + a.height - 1);
+});
+
+test("study group: after joining, My classes takes you to your own classes", async ({ browser }) => {
+  const ctx = await browser.newContext();
+  await ctx.addInitScript(() => {
+    sessionStorage.setItem("shikshak.test.skipSplash", "1");
+    localStorage.setItem("shikshak.tour.home.v1", "1");
+  });
+  const host = await ctx.newPage();
+  await host.goto("/#/group");
+  await host.getByRole("button", { name: /Start a group/ }).click();
+  await host.getByLabel("Name or nickname").fill("Asha");
+  await host.getByRole("button", { name: "Create account and start" }).click();
+  await host.getByRole("button", { name: "Invite" }).click();
+  const code = (await host.locator(".group-code").innerText()).trim();
+  const other = await browser.newContext();
+  await other.addInitScript(() => localStorage.setItem("shikshak.tour.home.v1", "1"));
+  const friend = await other.newPage();
+  await friend.goto(`/#/join/${code}`);
+  await friend.getByLabel("Name or nickname").fill("Ravi");
+  await friend.getByRole("button", { name: "Create account and join" }).click();
+  await expect(friend.getByRole("heading", { name: "Asha's study group" })).toBeVisible();
+  await friend.getByRole("button", { name: "My classes" }).click();
+  await expect(friend.getByRole("heading", { name: "Ravi's classes" })).toBeVisible();
+  await expect(friend.getByRole("heading", { name: "Who's learning?" })).toHaveCount(0);
+  await expect(friend.getByRole("button", { name: /New session/ }).first()).toBeEnabled();
+  await ctx.close();
+  await other.close();
 });
 
 test("guided tour: the first visit walks through the controls, once, and can be replayed", async ({ page }) => {

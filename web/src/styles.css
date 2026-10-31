@@ -5461,3 +5461,15 @@ button.group-card {
 .home-board .tour-bubble .tour-skip {
   color: #4a5751 !important;
 }
+
+.focus-chip .focus-end {
+  width: auto;
+  padding: 0 10px 0 8px;
+  gap: 4px;
+  display: inline-flex;
+  font-weight: 700;
+}
+/* The result card sits above the hint bar (they were in the same spot and covered each other). */
+.submission {
+  bottom: calc(max(12px, env(safe-area-inset-bottom)) + 194px);
+}

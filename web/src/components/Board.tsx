@@ -262,8 +262,9 @@ export function Board(props: Props) {
       const w = b.kind === "page" ? W - PAD_L - PAD_R : box.x1 - box.x0;
       const h = heights[b.id] ?? estimate(b, w);
       // Write over a rubbed-out block's spot only if the new content fits there; otherwise go below.
-      const old = "replaces" in b && b.replaces ? byLabel[b.replaces] : undefined;
-      const reuse = old && h <= old.h + 12 ? old : undefined;
+      // Nothing is written over: everything from the start of the class stays on the board, and new
+      // writing always goes below (the board scrolls). A "replacement" is just the next block.
+      const reuse: { x: number; y: number; w: number } | undefined = undefined;
       let p: { x: number; y: number; w: number };
       if (reuse) p = reuse;
       else if (b.kind === "page") p = { x: PAD_L, y: Math.max(mainBottom, sideBottom, floor) + PAGE_GAP, w };
@@ -949,12 +950,6 @@ export function Board(props: Props) {
   const drewSinceMark = strokes.length > markBase.current.count;
   const correctAt = correct?.box ?? bandBoxes.correct;
 
-  const erasedSet = useMemo(() => {
-    const set = new Set(erased);
-    for (const b of blocks) if ("replaces" in b && b.replaces) set.add(b.replaces);
-    return set;
-  }, [erased, blocks]);
-
   const sub = props.submission;
   const busy = sub.state === "submitting" || sub.state === "reviewing";
   const canDone = response.length > 0 && responseKey !== lastDone && !busy;
@@ -982,7 +977,6 @@ export function Board(props: Props) {
                 key={b.id}
                 ref={measure(b)}
                 className={`tblock tblock-${b.kind}${b.kind === "write" ? ` tblock-${b.style}` : ""}`}
-                data-erased={label ? erasedSet.has(label) : false}
                 data-held={held.has(b.id)}
                 style={{ top: px(p.y), left: px(p.x), width: px(p.w) }}
               >

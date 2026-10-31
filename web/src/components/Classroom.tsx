@@ -446,7 +446,37 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
   };
 
   // ---------- who has the floor ----------
-  const teacherSpeaking = active && voice.volume > 0.03;
+  // Is she speaking? A clear level for a moment turns it on and a moment of quiet turns it off,
+  // so line noise and short blips don't light up the "Teacher" circle when she isn't talking.
+  const [speaking, setSpeaking] = useState(false);
+  const loudSince = useRef<number | null>(null);
+  const quietSince = useRef<number | null>(null);
+  useEffect(() => {
+    const now = Date.now();
+    if (!active) {
+      loudSince.current = quietSince.current = null;
+      if (speaking) setSpeaking(false);
+      return;
+    }
+    if (voice.volume > 0.08) {
+      quietSince.current = null;
+      loudSince.current ??= now;
+      if (!speaking && now - loudSince.current >= 200) setSpeaking(true);
+    } else if (voice.volume < 0.04) {
+      loudSince.current = null;
+      quietSince.current ??= now;
+      if (speaking) {
+        // The level may stay at 0 without new updates: switch off on a timer, not on the next update.
+        const left = 600 - (now - quietSince.current);
+        if (left <= 0) setSpeaking(false);
+        else {
+          const t = setTimeout(() => setSpeaking(false), left);
+          return () => clearTimeout(t);
+        }
+      }
+    }
+  }, [voice.volume, active, speaking]);
+  const teacherSpeaking = active && speaking;
   const [thinkingUntil, setThinkingUntil] = useState(0);
   useEffect(() => {
     if (!voice.talking && active) setThinkingUntil(Date.now() + 3500);
@@ -638,16 +668,27 @@ export function Classroom({ sessionId, onHome }: { sessionId: string; onHome: ()
             >
               <Question /> Give me a practice question
             </button>
-            <button
-              role="menuitem"
-              disabled={Boolean(focusEndsAt)}
-              onClick={() => {
-                setMenuOpen(false);
-                setFocusSetup(true);
-              }}
-            >
-              <Timer /> Focus mode
-            </button>
+            {focusEndsAt ? (
+              <button
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false);
+                  if (window.confirm("End focus mode now?")) setFocusEndsAt(null);
+                }}
+              >
+                <Timer /> End focus mode
+              </button>
+            ) : (
+              <button
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setFocusSetup(true);
+                }}
+              >
+                <Timer /> Focus mode
+              </button>
+            )}
             <button
               role="menuitem"
               onClick={() => {
