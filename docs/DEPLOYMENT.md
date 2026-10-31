@@ -29,7 +29,7 @@ steps in this order:
    npm run bolna:setup
    ```
 
-   This updates all three agents (normal, slower, faster):
+   This updates the agent:
    - the new prompt, with learner memory, hints, checked answers and practice marks;
    - the 19 tools, each sending the token;
    - Tamil and Telugu voices.

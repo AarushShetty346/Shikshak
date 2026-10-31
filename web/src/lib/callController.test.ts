@@ -67,7 +67,7 @@ function setup() {
 }
 
 const tick = () => new Promise((r) => setTimeout(r, 0));
-const opts = { speed: "normal", resuming: false, handsFree: false };
+const opts = { resuming: false, handsFree: false };
 
 describe("call lifecycle", () => {
   it("starts muted for push-to-talk once connected", async () => {

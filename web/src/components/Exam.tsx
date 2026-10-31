@@ -689,7 +689,7 @@ function Marks({ exam, onBack }: { exam: Exam; onBack: () => void }) {
       const code = newCode();
       const now = Date.now();
       saveSession({ id: code, serverId: r.session.id, learnerId, name: topic, studentName: l?.name ?? "", grade: exam.paper.grade, language: l?.language ?? "hinglish", topic, createdAt: now, updatedAt: now, archived: false, started: false });
-      saveData(code, { snapshot: emptySnapshot(), plan: null, docs: [], speed: "normal", handsFree: true });
+      saveData(code, { snapshot: emptySnapshot(), plan: null, docs: [], handsFree: true });
       location.hash = `#/s/${code}`;
     } catch (e) {
       setError((e as Error).message);

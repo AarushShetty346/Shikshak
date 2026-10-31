@@ -58,7 +58,7 @@ cannot inject text into a live call, only keypad tones (DTMF), which Bolna hands
 | 10 | Animated split panel | DEFERRED | |
 | 11 | Board awareness and conversational edits | PARTIAL | Board map with labels, highlight, erase, replace. No move/resize, no render verification |
 | 12 | Speech-board timeline | PARTIAL | Voice-activity pacing, pause on interrupt. True playback-cursor sync is BLOCKED (Bolna doesn't expose word timing) |
-| 13 | Speech speed selector | PARTIAL | Three Bolna agents at 0.95×, 1.1× (default) and 1.3×, read back from Bolna. Applies from the next Start/Resume (Bolna can't change speed mid-call). Not yet heard in a real call |
+| 13 | Speech speed selector | REMOVED | Removed on 31 Oct 2026: one Bolna agent at 1.1×. The slower and faster agents are no longer used |
 | 14 | Interruptions, doubts, orb | VERIFIED / PARTIAL | See V2 rows |
 | 15 | Done protocol with states and ack | VERIFIED (test + browser) | |
 | 16 | Source labels, privacy | PARTIAL | Pages shown with source + page label; documents kept in server memory per session and in the browser (IndexedDB), never sent to other sessions. No accounts/auth |

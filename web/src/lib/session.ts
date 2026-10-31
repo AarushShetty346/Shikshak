@@ -11,8 +11,6 @@ import { apiFetch, ApiError } from "./api";
 const ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // no 0/O, 1/I/L
 const INDEX_KEY = "shikshak.sessions";
 
-export type Speed = "slower" | "normal" | "faster";
-
 /** The parts of a lesson plan the browser may see (answers stay on the server). */
 export interface PublicPlan {
   readable: "yes" | "partly" | "no" | "no_notes";
@@ -45,7 +43,6 @@ export interface SessionData {
   snapshot: BoardSnapshot;
   plan: PublicPlan | null;
   docs: DocMeta[];
-  speed: Speed;
   handsFree: boolean;
   /** The student turned the mic off in this class (otherwise it listens). */
   micOff?: boolean;
@@ -123,7 +120,7 @@ export function updateSession(id: string, patch: Partial<SessionMeta>) {
   if (meta) saveSession({ ...meta, ...patch, updatedAt: patch.updatedAt ?? Date.now() });
 }
 
-const DEFAULT_DATA = (): SessionData => ({ snapshot: emptySnapshot(), plan: null, docs: [], speed: "normal", handsFree: true });
+const DEFAULT_DATA = (): SessionData => ({ snapshot: emptySnapshot(), plan: null, docs: [], handsFree: true });
 
 /** Older versions kept a list of events instead of a snapshot: replay them once. */
 function migrate(raw: Record<string, unknown>): SessionData {
@@ -133,7 +130,6 @@ function migrate(raw: Record<string, unknown>): SessionData {
     snapshot: (raw.snapshot as BoardSnapshot) ?? d.snapshot,
     plan: null,
     docs: Array.isArray(raw.docs) ? (raw.docs as DocMeta[]) : d.docs,
-    speed: raw.speed === "slower" || raw.speed === "faster" ? raw.speed : "normal",
     // The mic listens unless the student turned it off (older saves stored push-to-talk as the default).
     handsFree: raw.micOff !== true,
     micOff: raw.micOff === true,

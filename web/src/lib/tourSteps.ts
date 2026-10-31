@@ -46,7 +46,6 @@ export const CLASS_TOUR: TourStep[] = [
   { target: ".dock-input input", title: "Rather type?", text: "No stylus? Type a step here and press Enter. Tap T for maths symbols like therefore and implies." },
   { target: "button.btn-done", title: "Press Done", text: "When you finish, press Done. I'll read your steps and circle the first one that went wrong." },
   { target: ".dock-attach", title: "Working in your notebook?", text: "Tap plus to send me a photo of your working or a question, or to upload your book. On a photo, press Fix it and I'll mark the slips and write the answer out." },
-  { target: ".btn-speed", title: "My speed", text: "Am I too fast or too slow? Change how fast I talk." },
   { target: '[aria-label="Download notes as PDF"]', title: "Your notes", text: "Download the whole class as PDF notes, any time." },
   { target: '[aria-label="Session menu"]', title: "The menu", text: "Focus mode, your class report, a practice question and more are in here." },
   {

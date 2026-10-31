@@ -16,15 +16,3 @@ describe("toE164", () => {
     expect(toE164(undefined)).toBeNull();
   });
 });
-
-import { agentForSpeed } from "./app";
-
-describe("voice speed", () => {
-  it("picks the agent for the chosen speed, falling back to the main agent", () => {
-    process.env.BOLNA_AGENT_ID_SLOW = "slow-id";
-    delete process.env.BOLNA_AGENT_ID_FAST;
-    expect(agentForSpeed("slower")).toBe("slow-id");
-    expect(agentForSpeed("faster")).toBeUndefined();
-    expect(agentForSpeed("normal")).toBeUndefined();
-  });
-});

@@ -101,8 +101,23 @@ export function highlight(s: Session, p: Params): Reply {
   return { ok: true, note: `Marked ${block.label}${line ? ` line ${line}` : ""}. Refer to it as you speak ("yeh dekho...").` };
 }
 
+/** The student's own ink: "student" for the last thing they drew or wrote, "student all" for all of it. */
+const STUDENT_LAST = /^(student|student[ _-]?last|student'?s?|mine|my|their|last drawing)$/i;
+const STUDENT_ALL = /^(student[ _-]?all|all student|student'?s? all|all of mine)$/i;
+
 export function erase(s: Session, p: Params): Reply {
-  const raw = str(p.target);
+  const raw = str(p.target).trim();
+  if (STUDENT_LAST.test(raw) || STUDENT_ALL.test(raw)) {
+    const scope = STUDENT_ALL.test(raw) ? "all" : "last";
+    emit(s, { type: "wipe_ink", scope });
+    return {
+      ok: true,
+      note:
+        scope === "all"
+          ? "Everything the student wrote or drew is rubbed off their board now. Your own writing stays."
+          : "The last thing the student drew or wrote is rubbed off their board now. If they meant more, use 'student all'.",
+    };
+  }
   if (/^(all|everything|board|sab|poora|pura)$/i.test(raw)) {
     for (const b of s.blocks) {
       if (b.erased) continue;

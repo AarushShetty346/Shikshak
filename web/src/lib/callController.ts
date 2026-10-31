@@ -25,7 +25,7 @@ export interface ControllerDeps {
   /** Creates the SDK call object; `mint` fetches the session from our server. */
   createCall: (mint: () => Promise<{ session: unknown; callId: string | null }>) => CallLike;
   /** POST /api/sessions/:id/voice. Throws an Error with a readable message on failure. */
-  mint: (opts: { speed: string; resuming: boolean }) => Promise<{ session: unknown; callId: string | null }>;
+  mint: (opts: { resuming: boolean }) => Promise<{ session: unknown; callId: string | null }>;
   /** Tells the server the call ended. */
   reportEnd: (callId: string) => void;
   onState: (s: CallState) => void;
@@ -53,14 +53,14 @@ export class CallController {
     return this.talking;
   }
 
-  async start(opts: { speed: string; resuming: boolean; handsFree: boolean }) {
+  async start(opts: { resuming: boolean; handsFree: boolean }) {
     if (this.disposed) return;
     const token = ++this.token;
     this.teardown();
     this.handsFree = opts.handsFree;
     this.deps.onState("connecting");
     const mint = async () => {
-      const r = await this.deps.mint({ speed: opts.speed, resuming: opts.resuming });
+      const r = await this.deps.mint({ resuming: opts.resuming });
       if (token === this.token) this.callId = r.callId;
       else if (r.callId) this.deps.reportEnd(r.callId); // minted for a start that was cancelled
       return r;

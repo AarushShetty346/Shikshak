@@ -66,6 +66,7 @@ export function applyEvent(snap: BoardSnapshot, e: BoardEvent, maxBlocks = 400):
       next.mark = null;
       return next;
     case "resume":
+    case "wipe_ink": // the student's ink lives in the browser, which rubs it out when this arrives
       return next;
   }
 }

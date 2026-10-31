@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildAgentPayload, buildTools, readLlmConfig, readPrompt, rollbackLlm, switchLlm } from "./bolnaConfig";
+import { buildAgentPayload, buildTools, promptFor, readLlmConfig, readPrompt, rollbackLlm, switchLlm } from "./bolnaConfig";
 
 const TOOL_NAMES = [
   "write", "draw", "highlight", "erase", "give_problem", "look_at_board", "continue_lesson", "show_section", "read_material", "show_page", "give_practice",
@@ -125,5 +125,23 @@ describe("Tamil and Telugu (preview)", () => {
     const tc = body.agent_config.tasks[0].task_config as { check_user_online_message: Record<string, string>; call_hangup_message: Record<string, string> };
     expect(Object.keys(tc.check_user_online_message).sort()).toEqual(["en", "hi", "ta", "te"]);
     expect(Object.keys(tc.call_hangup_message).sort()).toEqual(["en", "hi", "ta", "te"]);
+  });
+
+  it("each language gets its own way of speaking; the rest of the prompt is the same", () => {
+    const { prompt } = readPrompt();
+    const body = buildAgentPayload({ publicUrl: "https://x.test" });
+    const langs = body.agent_config.tasks[0].tools_config.multilingual_config.languages as Record<string, { system_prompt: string }>;
+    expect(langs.hi.system_prompt).toBe(prompt);
+    expect(langs.hi.system_prompt).toContain("feminine first-person forms in Hindi");
+    for (const [lang, word] of [["en", "English"], ["ta", "Tamil"], ["te", "Telugu"]] as const) {
+      const p = langs[lang].system_prompt;
+      expect(p).toBe(promptFor(prompt, lang));
+      expect(p).toContain(`Speak only in ${word}`);
+      expect(p).not.toContain('"वाई"'); // Hindi-only letter spellings
+      expect(p).not.toContain("feminine first-person forms in Hindi");
+      expect(p).toContain("## Taking turns"); // the sections after it are kept
+      expect(p.split("## How you speak").length).toBe(2);
+    }
+    expect(new Set(Object.values(langs).map((l) => l.system_prompt)).size).toBe(4);
   });
 });

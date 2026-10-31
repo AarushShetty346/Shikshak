@@ -1737,8 +1737,7 @@ sub {
 
 .board-tools .btn-talk,
 .board-tools .btn-stop,
-.board-tools .btn-pause,
-.board-tools .btn-speed {
+.board-tools .btn-pause {
   width: auto;
   padding: 0 12px;
   font-weight: 700;
@@ -1770,11 +1769,6 @@ sub {
 .board-tools .btn-pause:hover:not(:disabled) {
   background: #15211c;
   color: #fff;
-}
-
-.board-tools .btn-speed {
-  color: var(--ink-soft);
-  font-variant-numeric: tabular-nums;
 }
 
 .board-tools .btn-done[data-ready="true"] {
@@ -4461,7 +4455,7 @@ body:has(.home-board) {
 }
 
 /* ---------- session layout: the board gets the screen ----------
-   Top: menu and topic (left), a small pill (report, speed, PDF), the tutor (right).
+   Top: menu and topic (left), a small pill (report, PDF), the tutor (right).
    Bottom: start/pause, the typing field with + for paper and books, and the mic.
    Drawing tools: a slim tray on the right that the pen button opens and closes. */
 .class-dock {
@@ -4691,9 +4685,6 @@ body:has(.home-board) {
 }
 .class-pill button:hover:not(:disabled) {
   background: #e7efe9;
-}
-.class-pill .btn-speed {
-  font-size: 15px;
 }
 .class-pill-sep {
   width: 1px;

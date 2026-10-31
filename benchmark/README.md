@@ -4,7 +4,7 @@ Two separate measurements. Keep them apart: model speed on its own is not what a
 
 ## 1. Real calls: `npm run bench:calls`
 
-Reads the call records Bolna already keeps for the three agents (no calls are placed). For every
+Reads the call records Bolna already keeps for the agent (no calls are placed). For every
 turn it takes speech-to-text latency, LLM time to first and last token, and voice time to first
 audio, plus interruptions and the itemised charge per call.
 
@@ -64,12 +64,12 @@ Rough size: 8 scenarios x 3 runs x 3 models is 72 requests of about 9k input tok
 
 ## Changing the live model
 
-`bolna/llm.json` holds the conversation model for all three agents, plus the previous one.
+`bolna/llm.json` holds the conversation model for the agent, plus the previous one.
 
 ```bash
 npm run bolna:model -- --set openai:gpt-5.4 --evidence benchmark/results/models-<stamp>.md
 npm run bolna:model -- --rollback
-npm run bolna:setup          # applies it to the normal, slower and faster agents
+npm run bolna:setup          # applies it to the agent
 ```
 
 Don't switch on a smoke run alone.

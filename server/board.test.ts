@@ -59,6 +59,15 @@ describe("board actions", () => {
     expect(erase(s, { target: "B9" })).toMatchObject({ ok: false });
   });
 
+  it("rubs out the student's own ink when asked: the last drawing, or all of it", () => {
+    write(s, { kind: "text", content: "keep me" });
+    expect(erase(s, { target: "student" })).toMatchObject({ ok: true });
+    expect(events().at(-1)).toEqual({ type: "wipe_ink", scope: "last" });
+    expect(erase(s, { target: "student all" })).toMatchObject({ ok: true });
+    expect(events().at(-1)).toEqual({ type: "wipe_ink", scope: "all" });
+    expect(s.blocks.every((b) => !b.erased)).toBe(true); // the tutor's writing stays
+  });
+
   it("remembers where the lesson was when the student interrupted, and resumes there", () => {
     write(s, { kind: "heading", content: "AP" });
     write(s, { kind: "steps", content: "d = a2 - a1 || d = 5 - 2 = 3" });
