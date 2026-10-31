@@ -7,6 +7,7 @@ import { isLanguage, type Language } from "../shared/types";
 import { issueTicket, redeemTicket, registerDevice, requireDevice, sameSecret } from "./auth";
 import { noteInterrupt } from "./board";
 import { config } from "./config";
+import { describeAnswer } from "./maths/answers";
 import { submitPaperWork } from "./paper";
 import { scanQuestion } from "./scan";
 import { fixPhoto } from "./fix";
@@ -30,7 +31,7 @@ import {
   type Learner,
 } from "./learners";
 import { MISCONCEPTIONS } from "./curriculum/library";
-import { afterReview, askQuestion, checkSpoken, giveHint, nextDiagnostic, noteDiagnostic, publicDiagnostic, showSolution, startDiagnostic } from "./teaching";
+import { afterReview, askQuestion, checkSpoken, giveHint, nextDiagnostic, noteDiagnostic, publicDiagnostic, showSolution, solutionFor, startDiagnostic } from "./teaching";
 import { attemptFor, recordAttempt } from "./learners";
 import { pickProblem, chapterForTopic } from "./curriculum/library";
 import { hasModel, modelName } from "./llm";
@@ -674,14 +675,47 @@ export function createApp(opts: { devTools?: boolean; phoneProvider?: PhoneProvi
   });
 
   // ---------- the student's own controls in class (work without the voice tutor too) ----------
-  api.post("/sessions/:id/hint", (req, res) => {
+  // A question the student added (a photo, their own) may have no worked solution yet: make one
+  // first, so Hint and Show answer work for it too. The messages here are for the student.
+  const prepared = async (s: Session): Promise<string | null> => {
+    const q = s.problem;
+    if (!q) return "There's no question on the board yet.";
+    if (s.solutions.some((x) => x.id === q.solutionId)) return null;
+    const sol = await solutionFor(s, q.text, q.problemId ?? null).catch(() => null);
+    if (!sol || s.problem?.id !== q.id) return "I can't prepare step-by-step hints for this question. Ask me out loud and I'll help you with it.";
+    s.solutions = [...s.solutions.filter((x) => x.id !== sol.id), sol].slice(-20);
+    q.solutionId = sol.id;
+    if (sol.answer && sol.verified !== "unverified" && !q.answerSpec) {
+      q.answerSpec = sol.answer;
+      q.answer = describeAnswer(sol.answer);
+    }
+    return null;
+  };
+
+  api.post("/sessions/:id/hint", async (req, res) => {
     const s = ownSession(req, res);
-    if (s) res.json(giveHint(s));
+    if (!s) return;
+    try {
+      const problem = await prepared(s);
+      if (problem) return void res.json({ ok: false, error: problem });
+      res.json(giveHint(s));
+    } catch (err) {
+      if (sendLimitError(res, err) !== false) return;
+      res.json({ ok: false, error: "Couldn't get a hint just now. Try again in a moment." });
+    }
   });
 
-  api.post("/sessions/:id/solution", (req, res) => {
+  api.post("/sessions/:id/solution", async (req, res) => {
     const s = ownSession(req, res);
-    if (s) res.json(showSolution(s, true));
+    if (!s) return;
+    try {
+      const problem = await prepared(s);
+      if (problem) return void res.json({ ok: false, error: problem });
+      res.json(showSolution(s, true));
+    } catch (err) {
+      if (sendLimitError(res, err) !== false) return;
+      res.json({ ok: false, error: "Couldn't show the answer just now. Try again in a moment." });
+    }
   });
 
   api.post("/sessions/:id/practice", small, (req, res) => {

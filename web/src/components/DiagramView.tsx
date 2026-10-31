@@ -165,15 +165,24 @@ function Body({ d, w, h, shown, values }: { d: Diagram; w: number; h: number; sh
       const sx = (x: number) => pad + ((x - d.xmin) / (d.xmax - d.xmin)) * (w - pad * 2);
       const sy = (y: number) => h - pad - ((y - ymin) / (ymax - ymin)) * (h - pad * 2);
       const colors = [YELLOW, "#9fd3ff", "#ffb4a8"];
+      // Where labels go, so none sits on another or on an axis letter: the equations in a top corner
+      // away from the y-axis, "y" left of its axis, points beside their dot (flipped near the edges).
+      const yAxisX = sx(Math.min(Math.max(0, d.xmin), d.xmax));
+      const legendRight = yAxisX < w / 2;
+      const halo = { stroke: "#1f3329", strokeWidth: 6, paintOrder: "stroke" as const, strokeLinejoin: "round" as const };
+      const pointLabel = (px: number, py: number) => {
+        const right = px + 90 < w;
+        return { x: right ? px + 12 : px - 12, y: py - 18, textAnchor: right ? ("start" as const) : ("end" as const) };
+      };
       return (
         <>
           <Piece on={shown > 0}>
             <Line x1={sx(d.xmin)} y1={sy(0)} x2={sx(d.xmax)} y2={sy(0)} />
             <Line x1={sx(Math.min(Math.max(0, d.xmin), d.xmax))} y1={sy(ymin)} x2={sx(Math.min(Math.max(0, d.xmin), d.xmax))} y2={sy(ymax)} />
-            <Text x={sx(d.xmax) - 6} y={sy(0) + 20} fontSize={20}>
+            <Text x={sx(d.xmax) + 2} y={sy(0) + 20} fontSize={20} textAnchor="end" {...halo}>
               x
             </Text>
-            <Text x={sx(Math.min(Math.max(0, d.xmin), d.xmax)) + 16} y={sy(ymax) + 10} fontSize={20}>
+            <Text x={yAxisX - 12} y={sy(ymax) + 8} fontSize={20} textAnchor="end" {...halo}>
               y
             </Text>
           </Piece>
@@ -187,7 +196,14 @@ function Body({ d, w, h, shown, values }: { d: Diagram; w: number; h: number; sh
                   <polyline key={j} points={seg.map(([x, y]) => `${sx(x).toFixed(1)},${sy(y).toFixed(1)}`).join(" ")} fill="none" stroke={colors[i % 3]} strokeWidth={3} pathLength={1} className="dline" />
                 ))}
                 {last && (
-                  <Text x={Math.min(sx(last[0]), sx(d.xmax) - 70)} y={sy(last[1]) - 18} fill={colors[i % 3]} fontSize={20}>
+                  <Text
+                    x={legendRight ? w - 8 : 8}
+                    y={20 + i * 24}
+                    textAnchor={legendRight ? "end" : "start"}
+                    fill={colors[i % 3]}
+                    fontSize={20}
+                    {...halo}
+                  >
                     {`y = ${prettify(shownExpr(d.exprs[i]))}`}
                   </Text>
                 )}
@@ -195,9 +211,9 @@ function Body({ d, w, h, shown, values }: { d: Diagram; w: number; h: number; sh
             );
           })}
           {roots.map((r, i) => (
-            <g key={`r${i}`} className="graph-root">
+            <g key={`r${i}`} className="graph-root" style={{ opacity: shown > 1 ? 1 : 0, transition: "opacity 0.4s" }}>
               <circle cx={sx(r)} cy={sy(0)} r={7} fill="#7ee0a3" />
-              <Text x={sx(r)} y={sy(0) + (i % 2 ? -18 : 30)} fontSize={18} fill="#7ee0a3">
+              <Text x={sx(r)} y={sy(0) + (i % 2 ? -18 : 30)} fontSize={18} fill="#7ee0a3" {...halo}>
                 {fmt(r)}
               </Text>
             </g>
@@ -205,7 +221,7 @@ function Body({ d, w, h, shown, values }: { d: Diagram; w: number; h: number; sh
           {d.points.map((p, i) => (
             <Piece key={`p${i}`} on={shown > 1 + fns.length + i}>
               <circle cx={sx(p.x)} cy={sy(p.y)} r={7} fill={CHALK} />
-              <Text x={sx(p.x)} y={sy(p.y) - 20} fontSize={19}>
+              <Text {...pointLabel(sx(p.x), sy(p.y))} fontSize={19} {...halo}>
                 {`(${p.x}, ${p.y})`}
               </Text>
             </Piece>

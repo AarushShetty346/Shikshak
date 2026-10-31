@@ -153,13 +153,14 @@ export function FocusMode({ endsAt, onEnd }: { endsAt: number; onEnd: () => void
         <Timer weight="bold" /> {mm}:{String(ss).padStart(2, "0")}
         {strays > 0 && <span className="focus-strays">· left {strays}×</span>}
         <button
+          className="focus-end"
           onClick={() => {
-            if (window.confirm("Stop focus mode early?")) onEnd();
+            if (window.confirm("End focus mode now?")) onEnd();
           }}
-          aria-label="Stop focus mode"
-          title="Stop focus mode"
+          aria-label="End focus mode"
+          title="End focus mode"
         >
-          <X weight="bold" />
+          <X weight="bold" /> End
         </button>
       </div>
       {(away || callBack) && (

@@ -116,13 +116,13 @@ export function Home({
 
   // The first time the home screen shows (not the profile picker), a short guided tour.
   // No account yet: the account form is the screen straight away (not a frame of "Your classes" first).
-  const pickerShown = learners !== null && (adding || (learnersLoaded && learners.length === 0) || (learners.length > 0 && (picking || !current)));
+  // "Who's learning?" only when there's a real choice (two or more profiles); with one, it's you.
+  const pickerShown = learners !== null && (adding || (learnersLoaded && learners.length === 0) || (learners.length > 1 && (picking || !current)));
   // Only when coming from the start screen: otherwise the picker just adds a learner.
   // No account on this device: making one comes first, always.
   const newAccount = learners !== null && learnersLoaded && learners.length === 0;
-  useEffect(() => {
-    if (newAccount) setAdding(true);
-  }, [newAccount]);
+  // (The account form shows whenever there's no account: no extra "adding" state that could stay
+  // open once an account exists, e.g. one made on a join link.)
   const [touring, setTouring] = useState(false);
   useEffect(() => {
     if (learners === null || pickerShown || creating || !tourDue("home")) return;

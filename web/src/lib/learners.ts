@@ -98,7 +98,11 @@ export const listLearners = () =>
 /** Remember a learner just made (until the next list arrives). */
 export const rememberLearner = (l: Learner) => (known = [...(known ?? []).filter((x) => x.id !== l.id), l]);
 export const createLearner = (input: { name: string; grade: string; language: Language }) =>
-  apiFetch<{ learner: Learner }>("/learners", { body: { ...input, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone } }).then((r) => r.learner);
+  apiFetch<{ learner: Learner }>("/learners", { body: { ...input, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone } }).then((r) => {
+    // Wherever an account is made (home, a join link, a new group), home knows about it at once.
+    rememberLearner(r.learner);
+    return r.learner;
+  });
 export const updateLearner = (id: string, patch: Partial<Pick<Learner, "name" | "grade" | "language" | "timezone">>) =>
   apiFetch<{ learner: Learner }>(`/learners/${id}`, { method: "PATCH", body: patch }).then((r) => r.learner);
 export const deleteLearner = (id: string) => apiFetch(`/learners/${id}`, { method: "DELETE" });
