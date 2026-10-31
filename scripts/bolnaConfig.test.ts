@@ -118,7 +118,7 @@ describe("Tamil and Telugu (preview)", () => {
     expect(Object.keys(langs)).toEqual(["hi", "en", "ta", "te"]);
     for (const [k, v] of Object.entries(langs)) {
       expect(v.transcriber.language).toBe(k);
-      expect(v.transcriber).toMatchObject({ provider: "soniox", model: "stt-rt-v5" });
+      expect(v.transcriber).toMatchObject({ provider: "sarvam", model: "saaras:v4" });
       expect(v.synthesizer.provider_config.language).toBe(k);
       expect(v.system_prompt.length).toBeGreaterThan(500);
     }
