@@ -4,7 +4,7 @@
 // live in each row's menu. Several learners can share a device; each sees only their own classes.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Archive, ArrowCounterClockwise, ArrowsLeftRight, BookOpenText, ChartLineUp, DotsThree, PencilSimpleLine, Plus, Signpost, Trash, UserPlus, UsersThree } from "@phosphor-icons/react";
+import { Archive, ArrowCounterClockwise, ArrowsLeftRight, BookOpenText, ChartLineUp, DotsThree, PencilSimpleLine, Plus, Signpost, Trash, UserPlus, UsersThree, Exam } from "@phosphor-icons/react";
 import { emptySnapshot } from "../../../shared/boardState";
 import { LANGUAGE_NAMES, LANGUAGE_STATUS, type Language } from "../../../shared/types";
 import { cachedLearners, createLearner, listLearners, rememberLearner, selectedLearner, selectLearner, type Learner } from "../lib/learners";
@@ -265,6 +265,9 @@ export function Home({
           </button>
           <button className="btn-secondary group-entry" onClick={() => (location.hash = "#/group")} title="Study with friends">
             <UsersThree weight="bold" /> <span className="group-entry-label">Study group</span>
+          </button>
+          <button className="btn-secondary group-entry exam-entry" onClick={() => (location.hash = "#/exam")} title="Practice exams, marked like a board exam">
+            <Exam weight="bold" /> <span className="group-entry-label">Exam</span>
           </button>
           {learner ? (
             <div className="profile-menu" ref={profileRef}>

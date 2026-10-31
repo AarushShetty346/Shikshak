@@ -8,9 +8,10 @@ import { issueTicket, redeemTicket, registerDevice, requireDevice, sameSecret } 
 import { noteInterrupt } from "./board";
 import { config } from "./config";
 import { describeAnswer } from "./maths/answers";
-import { submitPaperWork } from "./paper";
+import { isPhoto, submitPaperWork } from "./paper";
 import { scanQuestion } from "./scan";
 import { fixPhoto } from "./fix";
+import { createExam, evaluateExam, ExamError, examsFor, getExam, logEvents, publicExam, reviewInto, startExam } from "./exams";
 import { canSee, createGroup, endGroup, getGroup, GroupError, groupByCode, groupsForDevice, joinGroup, leaveAllFor, leaveGroup, publicGroup } from "./groups";
 import { allow, BusyError, chargeModelCall, QuotaError, withModelSlot } from "./limits";
 import {
@@ -36,7 +37,7 @@ import { attemptFor, recordAttempt } from "./learners";
 import { pickProblem, chapterForTopic } from "./curriculum/library";
 import { hasModel, modelName } from "./llm";
 import { reviewSubmission } from "./look";
-import { addDocs, checkFile, removeDoc } from "./material";
+import { addDocs, checkFile, removeDoc, type UploadedFile } from "./material";
 import { makePlan, publicPlan, type StudyPlan } from "./plan";
 import { saveSample } from "./samples";
 import {
@@ -596,6 +597,80 @@ export function createApp(opts: { devTools?: boolean; phoneProvider?: PhoneProvi
     const s = getSession(String(req.params.sid));
     if (!l || !s || s.learnerId !== l.id || !canSee(g, req.device!.id, l.id)) return void res.status(404).json({ error: "Those notes aren't shared with you." });
     res.json({ topic: s.topic || s.label, lastActive: s.lastActive, learner: { name: l.name }, board: s.board });
+  });
+
+  // ---------- exams ----------
+  const examErr = (res: Response, err: unknown) => {
+    if (err instanceof ExamError) return void res.status(400).json({ error: err.message });
+    if (sendLimitError(res, err) !== false) return;
+    console.error("[exam] failed", (err as Error).message);
+    res.status(502).json({ error: "That didn't work just now. Try again in a moment." });
+  };
+  const ownExam = (req: Request, res: Response) => {
+    const e = getExam(req.params.id, req.device!.id);
+    if (!e) res.status(404).json({ error: "No such exam on this device." });
+    return e;
+  };
+
+  api.get("/exams", (req, res) => {
+    const l = learnerForDevice(req.query.learnerId, req.device!.id);
+    if (!l) return void res.json({ exams: [] });
+    res.json({ exams: examsFor(req.device!.id, l.id).map(publicExam) });
+  });
+
+  api.post("/exams", big, async (req, res) => {
+    const l = learnerForDevice(req.body?.learnerId, req.device!.id);
+    if (!l) return void res.status(400).json({ error: "Make your account first." });
+    try {
+      const notes = (Array.isArray(req.body?.notes) ? req.body.notes : []).filter((f: UploadedFile) => isPhoto(f) || f?.mediaType === "application/pdf");
+      const e = await createExam({ deviceId: req.device!.id, learner: l, topic: req.body?.topic, questions: req.body?.questions, minutes: req.body?.minutes, mode: req.body?.mode, level: req.body?.level, notes });
+      res.status(201).json({ exam: publicExam(e) });
+    } catch (err) {
+      examErr(res, err);
+    }
+  });
+
+  api.get("/exams/:id", (req, res) => {
+    const e = ownExam(req, res);
+    if (e) res.json({ exam: publicExam(e) });
+  });
+
+  api.post("/exams/:id/start", (req, res) => {
+    const e = ownExam(req, res);
+    if (!e) return;
+    try {
+      res.json({ exam: publicExam(startExam(e)) });
+    } catch (err) {
+      examErr(res, err);
+    }
+  });
+
+  api.post("/exams/:id/events", small, rateLimit((req) => `exev:${req.device!.id}`, 120, 40), (req, res) => {
+    const e = ownExam(req, res);
+    if (e) res.json({ ok: true, added: logEvents(e, req.body?.events) });
+  });
+
+  api.post("/exams/:id/submit", big, async (req, res) => {
+    const e = ownExam(req, res);
+    if (!e) return;
+    try {
+      res.json({ exam: publicExam({ ...e, evaluation: await evaluateExam(e, req.body?.photos) }) });
+    } catch (err) {
+      examErr(res, err);
+    }
+  });
+
+  // Learn from it: the weakest question goes on a class's board for the tutor.
+  api.post("/exams/:id/review", small, (req, res) => {
+    const e = ownExam(req, res);
+    if (!e) return;
+    const s = getSession(String(req.body?.sessionId ?? ""));
+    if (!s || s.deviceId !== req.device!.id) return void res.status(404).json({ error: "No such class." });
+    try {
+      res.json(reviewInto(e, s));
+    } catch (err) {
+      examErr(res, err);
+    }
   });
 
   // ---------- pilot (facilitator's device only) ----------
