@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, Camera, CheckCircle, DownloadSimple, Exam as ExamIcon, House, Monitor, Timer, UploadSimple, Warning } from "@phosphor-icons/react";
 import { createExam, DURATIONS, EVENT_LABEL, getExam, listExams, logExamEvents, QUESTION_COUNTS, reviewExam, startExam, submitExam, type Exam, type ExamMode } from "../lib/exams";
 import { cachedLearners, listLearners, selectedLearner, type Learner } from "../lib/learners";
+import { clipName, INVIGILATOR_LINES } from "../lib/tourSteps";
 import { prepareFile } from "../lib/files";
 import { apiFetch } from "../lib/api";
 import { newCode, saveData, saveSession } from "../lib/session";
@@ -400,15 +401,30 @@ function Invigilator({ exam, onReady, onCancel }: { exam: Exam; onReady: (e: Exa
   );
 }
 
+type CallOut = "left" | "window" | "fullscreen" | "share" | "camera";
+
 function Sitting({ exam, onEnd }: { exam: Exam; onEnd: () => void }) {
   const [now, setNow] = useState(Date.now());
-  const [warning, setWarning] = useState<string | null>(null);
+  // The invigilator calls the student out, out loud and on screen, every time they leave the paper.
+  const [callOut, setCallOut] = useState<{ kind: CallOut; count: number } | null>(null);
+  const [away, setAway] = useState(false);
+  const count = useRef(0);
+  const voice = useRef<HTMLAudioElement | null>(null);
   const cam = useRef<HTMLVideoElement>(null);
   const ended = useRef(false);
-  const note = useCallback(
-    (kind: string, say?: string) => {
-      void logExamEvents(exam.id, [{ kind }]);
-      if (say) setWarning(say);
+  const say = (kind: CallOut, n: number) => {
+    voice.current?.pause();
+    const line = n >= 3 && (kind === "left" || kind === "window" || kind === "fullscreen") ? INVIGILATOR_LINES.again : INVIGILATOR_LINES[kind];
+    voice.current = new Audio(`/tour/${clipName(line)}`);
+    voice.current.play().catch(() => {});
+  };
+  const callOutFor = useCallback(
+    (kind: CallOut, logKind: string) => {
+      if (ended.current) return;
+      void logExamEvents(exam.id, [{ kind: logKind }]);
+      count.current += 1;
+      say(kind, count.current);
+      setCallOut({ kind, count: count.current });
     },
     [exam.id],
   );
@@ -416,6 +432,7 @@ function Sitting({ exam, onEnd }: { exam: Exam; onEnd: () => void }) {
     (kind: "ended" | "time-up") => {
       if (ended.current) return;
       ended.current = true;
+      voice.current?.pause();
       void logExamEvents(exam.id, [{ kind }]);
       stopAll();
       if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
@@ -423,24 +440,35 @@ function Sitting({ exam, onEnd }: { exam: Exam; onEnd: () => void }) {
     },
     [exam.id, onEnd],
   );
+  // Keep the camera and screen tracks watched, including after they're turned on again.
+  const watchTracks = useCallback(() => {
+    const cameraTrack = media.camera?.getVideoTracks()[0];
+    const screenTrack = media.screen?.getVideoTracks()[0];
+    if (screenTrack) screenTrack.onended = () => callOutFor("share", "screen-share-ended");
+    if (cameraTrack) cameraTrack.onended = () => callOutFor("camera", "camera-off");
+    if (cam.current && media.camera) cam.current.srcObject = media.camera;
+  }, [callOutFor]);
 
   useEffect(() => {
-    if (cam.current && media.camera) cam.current.srcObject = media.camera;
+    watchTracks();
     const t = setInterval(() => setNow(Date.now()), 1000);
-    const onVis = () => (document.hidden ? note("tab-hidden", "You left the exam page. This is in the report.") : note("returned"));
+    const onVis = () => {
+      if (document.hidden) {
+        setAway(true);
+        callOutFor("left", "tab-hidden"); // she says it even while they're on the other screen
+      } else {
+        setAway(false);
+        void logExamEvents(exam.id, [{ kind: "returned" }]);
+      }
+    };
     let clickedAt = 0;
     const onDown = () => (clickedAt = Date.now());
-    const onBlur = () => Date.now() - clickedAt > 1500 && !document.hidden && note("window-left", "You switched to another window. This is in the report.");
-    const onFull = () => !document.fullscreenElement && !ended.current && note("fullscreen-exit", "You left fullscreen. This is in the report.");
+    const onBlur = () => Date.now() - clickedAt > 1500 && !document.hidden && callOutFor("window", "window-left");
+    const onFull = () => !document.fullscreenElement && callOutFor("fullscreen", "fullscreen-exit");
     document.addEventListener("visibilitychange", onVis);
     window.addEventListener("pointerdown", onDown, true);
     window.addEventListener("blur", onBlur);
     document.addEventListener("fullscreenchange", onFull);
-    const tracks: [MediaStreamTrack | undefined, string, string][] = [
-      [media.screen?.getVideoTracks()[0], "screen-share-ended", "Screen sharing stopped. This is in the report."],
-      [media.camera?.getVideoTracks()[0], "camera-off", "The camera turned off. This is in the report."],
-    ];
-    for (const [track, kind, say] of tracks) if (track) track.onended = () => !ended.current && note(kind, say);
     return () => {
       clearInterval(t);
       document.removeEventListener("visibilitychange", onVis);
@@ -448,7 +476,7 @@ function Sitting({ exam, onEnd }: { exam: Exam; onEnd: () => void }) {
       window.removeEventListener("blur", onBlur);
       document.removeEventListener("fullscreenchange", onFull);
     };
-  }, [note]);
+  }, [callOutFor, watchTracks, exam.id]);
 
   const left = Math.max(0, (exam.endsAt ?? now) - now);
   useEffect(() => {
@@ -458,6 +486,47 @@ function Sitting({ exam, onEnd }: { exam: Exam; onEnd: () => void }) {
   const mm = Math.floor((left % 3_600_000) / 60_000);
   const ss = Math.floor((left % 60_000) / 1000);
 
+  // Putting things right from the warning itself.
+  const [fixError, setFixError] = useState<string | null>(null);
+  const backToPaper = async () => {
+    setFixError(null);
+    try {
+      if (!document.fullscreenElement) await document.documentElement.requestFullscreen?.();
+    } catch {
+      // phones may not allow fullscreen
+    }
+    voice.current?.pause();
+    setCallOut(null);
+  };
+  const shareAgain = async () => {
+    setFixError(null);
+    try {
+      const s = await navigator.mediaDevices.getDisplayMedia({ video: { displaySurface: "monitor" } as MediaTrackConstraints, audio: false });
+      const surface = s.getVideoTracks()[0]?.getSettings().displaySurface;
+      if (surface && surface !== "monitor") {
+        s.getTracks().forEach((t) => t.stop());
+        return setFixError("Share your entire screen, not a window or a tab.");
+      }
+      media.screen?.getTracks().forEach((t) => t.stop());
+      media.screen = s;
+      watchTracks();
+      await backToPaper();
+    } catch {
+      setFixError("Choose \"Entire screen\" when the browser asks.");
+    }
+  };
+  const cameraAgain = async () => {
+    setFixError(null);
+    try {
+      media.camera = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+      watchTracks();
+      await backToPaper();
+    } catch {
+      setFixError("Allow the camera in the browser, then try again.");
+    }
+  };
+  const line = callOut ? (callOut.count >= 3 && ["left", "window", "fullscreen"].includes(callOut.kind) ? INVIGILATOR_LINES.again : INVIGILATOR_LINES[callOut.kind]) : null;
+
   return (
     <main className="home home-board exam-page exam-sitting">
       <div className="exam-bar" role="status">
@@ -466,7 +535,7 @@ function Sitting({ exam, onEnd }: { exam: Exam; onEnd: () => void }) {
           <Timer weight="bold" /> {hh ? `${hh}:` : ""}
           {String(mm).padStart(2, "0")}:{String(ss).padStart(2, "0")}
         </span>
-        <span className="exam-live">Invigilator on</span>
+        <span className="exam-live">{count.current ? `Invigilator on · ${count.current} warning${count.current > 1 ? "s" : ""}` : "Invigilator on"}</span>
         <button
           className="btn-primary btn-small"
           onClick={() => {
@@ -476,15 +545,35 @@ function Sitting({ exam, onEnd }: { exam: Exam; onEnd: () => void }) {
           I've finished
         </button>
       </div>
-      {warning && (
-        <p className="exam-warning" role="alert">
-          <Warning weight="bold" /> {warning}
-          <button className="link-button" onClick={() => setWarning(null)}>
-            OK
-          </button>
-        </p>
-      )}
       <PaperSheet exam={exam} />
+      {callOut && line && !away && (
+        <div className="gate-backdrop exam-callout">
+          <div className="gate-card exam-callout-card" role="alertdialog" aria-modal="true" aria-labelledby="callout-title">
+            <span className="gate-icon" aria-hidden="true">
+              <Warning weight="bold" />
+            </span>
+            <p className="exam-callout-count">Warning {callOut.count}</p>
+            <h2 id="callout-title">{line.title}</h2>
+            <p>{line.text}</p>
+            {fixError && <p className="gate-error">{fixError}</p>}
+            <div className="gate-actions">
+              {callOut.kind === "share" ? (
+                <button className="btn-primary" onClick={() => void shareAgain()}>
+                  <Monitor weight="bold" /> Share screen again
+                </button>
+              ) : callOut.kind === "camera" ? (
+                <button className="btn-primary" onClick={() => void cameraAgain()}>
+                  <Camera weight="bold" /> Turn camera on
+                </button>
+              ) : (
+                <button className="btn-primary" autoFocus onClick={() => void backToPaper()}>
+                  {callOut.kind === "fullscreen" ? "Back to fullscreen" : "Back to my paper"}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

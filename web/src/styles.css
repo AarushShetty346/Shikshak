@@ -5975,3 +5975,28 @@ button.group-card {
     background: #fff !important;
   }
 }
+
+/* The invigilator calling the student out: over everything, until they go back to the paper. */
+.exam-callout {
+  z-index: 90;
+  background: rgb(60 10 6 / 0.72);
+}
+.exam-callout-card {
+  border-color: #c0392b !important;
+}
+.exam-callout-card h2 {
+  font-family: var(--font-hand);
+  font-size: 30px;
+}
+.exam-callout-card .gate-icon {
+  background: rgb(192 57 43 / 0.25);
+  color: #ffb4a8;
+}
+.exam-callout-count {
+  margin: 0;
+  color: #ffb4a8 !important;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 13px;
+}

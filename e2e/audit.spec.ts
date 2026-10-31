@@ -668,18 +668,33 @@ test("exam with an invigilator: questions hidden until start, camera and whole s
   await expect(page.getByRole("timer", { name: "Time left" })).toBeVisible();
   await expect(page.getByRole("article", { name: "Question paper" })).toContainText("SECTION A");
   await expect(page.getByText("The questions appear when you start the exam.")).toHaveCount(0);
-  // Leaving the tab, and stopping the screen share, are noticed.
-  await page.evaluate(() => {
-    Object.defineProperty(document, "hidden", { configurable: true, get: () => true });
-    document.dispatchEvent(new Event("visibilitychange"));
-  });
-  await expect(page.getByRole("alert")).toContainText("left the exam page");
+  // Leaving the screen: the invigilator calls it out, out loud (her recorded voice) and on screen.
+  const clips: string[] = [];
+  page.on("request", (r) => r.url().includes("/tour/") && clips.push(r.url()));
+  const hide = (hidden: boolean) =>
+    page.evaluate((h) => {
+      Object.defineProperty(document, "hidden", { configurable: true, get: () => h });
+      document.dispatchEvent(new Event("visibilitychange"));
+    }, hidden);
+  await hide(true);
+  await expect.poll(() => clips.length).toBeGreaterThan(0);
+  await hide(false);
+  const warning = page.getByRole("alertdialog");
+  await expect(warning).toContainText("Warning 1");
+  await expect(warning).toContainText("Eyes on your paper");
+  await expect(warning).toContainText("Switching screens isn't allowed");
+  await page.getByRole("button", { name: "Back to my paper" }).click();
+  await expect(warning).toHaveCount(0);
+  await expect(page.getByText("Invigilator on · 1 warning")).toBeVisible();
+  // Stopping the screen share: called out, and it can be shared again from the warning.
   await page.evaluate(() => {
     const share = (window as unknown as { tracks: MediaStreamTrack[] }).tracks[1];
     share.stop();
-    share.dispatchEvent(new Event("ended"));
     share.onended?.(new Event("ended"));
   });
+  await expect(warning).toContainText("Screen sharing stopped");
+  await page.getByRole("button", { name: "Share screen again" }).click();
+  await expect(warning).toHaveCount(0);
   page.once("dialog", (d) => d.accept());
   await page.getByRole("button", { name: "I've finished" }).click();
   await page.locator('input[data-exam="answers"]').setInputFiles(SHEET);
