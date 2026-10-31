@@ -1,31 +1,44 @@
 # Shikshak
 
-Shikshak, your own tutor: a voice maths tutor for Indian students (classes 8 to 12). It talks with you in Hinglish,
-Hindi or English, writes on a shared chalkboard while it explains, and checks your handwritten working, circling the
-exact step that went wrong.
+**Shikshak, your own tutor.** A voice maths tutor for school students in India (classes 8 to 12).
 
-Built for the [Bolna Buildathon at Symphony 2026](https://www.bolna.ai/symphony/buildathon). Voice runs on
-[Bolna](https://www.bolna.ai) (web call SDK + custom function calls). Gemini (free tier) or Claude reads the
-student's handwriting.
+**Live demo: [shikshak-o0l8.onrender.com](https://shikshak-o0l8.onrender.com)**
 
-## Try it
+Shikshak teaches the way a good tutor sitting next to you would. You talk to it in Hinglish, Hindi or English, and it
+explains a topic out loud while writing on a shared chalkboard: headings, worked steps, graphs and diagrams, timed
+with its voice. Then it's your turn. You solve the problem on the same board, with a finger, stylus or mouse (or by
+typing, or by sending a photo of your notebook), and press Done. Shikshak reads your handwriting, checks every line
+with an exact maths engine, and circles the first step that went wrong, then helps you fix it with hints rather than
+the answer.
 
-**Live: https://shikshak-o0l8.onrender.com** (no keys or sign-in needed; allow the microphone).
+It remembers what you've practised and where you slip, gives you a report after each class, and lets you study
+alongside friends, each with your own tutor.
 
-1. **Start Shiksha**, make your account (name, class, language), then **New session** and pick a topic.
-2. Press **▶ Play**: the tutor starts talking and writes on the board. Hold the **mic** (or Space / Caps Lock) to
-   talk back; **Stop** cuts her off for a doubt.
-3. Solve on the board with the pen (or type steps in the bar at the bottom) and press **Done**: she reads your
-   steps and circles the first wrong one.
-4. **+** sends a photo of your notebook working; **Fix it** on the photo marks the slips on it and writes the answer
-   out exam-style.
-5. Also try: the class menu (**Focus mode**, report, practice question), **Download notes as PDF**, and
-   **Study group** on the home screen (open the invite link on a second device).
+Built for the [Bolna Buildathon at Symphony 2026](https://www.bolna.ai/symphony/buildathon). The voice runs on
+[Bolna](https://www.bolna.ai) (web call SDK and custom function calls); Gemini (free tier) or Claude reads the
+handwriting.
 
-Teacher mode (top-left switch) asks for an access code: **123456**. The first visit has a guided tour, read by the
-tutor's own voice. Free hosting sleeps when idle, so the first load can take about a minute.
+## Using it
 
-## What's in it
+Open the [live demo](https://shikshak-o0l8.onrender.com) in a browser on a phone, tablet or computer. There's
+nothing to install and no sign-up. Allow the microphone when asked.
+
+Your account lives on the device and browser you made it on, like a profile: a friend opening the site on their
+own device starts their own account and doesn't see yours. Several people can have profiles on one shared device.
+To see each other's notes and progress, start a **study group** and invite them.
+
+1. Press **Start Shiksha** and make your account (name, class, language).
+2. Press **New session**, pick a topic, and optionally add your textbook or notes.
+3. Press **▶ Play**. The tutor starts talking and writing. Hold the **mic** button (or Space / Caps Lock) to talk
+   back; press **Stop** to interrupt with a doubt.
+4. When it's your turn, write your steps on the board, one per line, and press **Done**.
+5. Working on paper? Tap **+** to send a photo of it, then **Fix it** to see the slips marked on your photo and the
+   answer written out exam-style.
+
+The first visit has a short guided tour, read in the tutor's own voice. The free hosting sleeps when nobody is using
+it, so the first load can take about a minute.
+
+## Features
 
 | | |
 | --- | --- |
@@ -36,7 +49,7 @@ tutor's own voice. Free hosting sleeps when idle, so the first load can take abo
 | **Graphs** | The tutor draws graphs, number lines, triangles and tables; graphs can have sliders (a, b, c) the student drags to see the curve and its roots change |
 | **Notes** | Upload a book or notes (PDF or photos) and she teaches from your pages; download the whole class as PDF notes |
 | **Memory** | Progress per skill, recurring mistakes and next exercise, only from recorded attempts; end-of-class report |
-| **Together** | Study groups: invite by link, QR or code; each studies with their own tutor and can open the others' notes, reports and progress. Teachers see students who share a code with them |
+| **Together** | Study groups: invite by link, QR or code; each studies with their own tutor and can open the others' notes, reports and progress. Teachers see students who share a code with them (teacher mode asks for an access code, `123456` by default, set with `TEACHER_ACCESS_CODE`) |
 | **Focus** | Focus mode (30 min to 2 h): leave the class and the tutor calls you back; hide the controls for just the board |
 | **Languages** | Hinglish, Hindi, English; Tamil and Telugu on the board (voice needs the agent set up for them) |
 
