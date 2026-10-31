@@ -32,20 +32,20 @@ test("a learner can be added and a class created and opened, with no horizontal 
   expect(overflow).toBeLessThanOrEqual(1);
 });
 
-test("the progress page is honest with no evidence and shows phone revision as off", async ({ page }) => {
+test("the progress page is honest with no evidence, with no phone or teacher panels", async ({ page }) => {
   await addLearner(page, "Ravi");
   await page.getByRole("button", { name: "My progress" }).click();
-  await expect(page.getByRole("heading", { name: "Phone revision" })).toBeVisible();
-  await expect(page.getByText("Phone calls are switched off on this server")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Privacy" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Phone revision" })).toHaveCount(0);
+  await expect(page.getByText(/Share with a teacher/)).toHaveCount(0);
   await expect(page.getByText(/mastered|excellent/i)).toHaveCount(0);
 });
 
-test("teacher view asks for a code; pilot tools require consent", async ({ page }) => {
+test("there is no teacher mode; pilot tools require consent", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("switch", { name: "Teacher mode" })).toHaveCount(0);
   await page.goto("/#/teacher");
-  await page.getByLabel("Access code").fill("123456");
-  await page.getByRole("button", { name: "Unlock" }).click();
-  await expect(page.getByRole("heading", { name: "Teacher view" })).toBeVisible();
-  await expect(page.getByText(/code/i).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Teacher view" })).toHaveCount(0);
   await page.goto("/#/pilot");
   await expect(page.getByText(/consent/i).first()).toBeVisible();
 });

@@ -58,7 +58,6 @@ import {
 } from "./sessions";
 import { reportFor } from "./report";
 import { answerItem, createParticipant, deleteParticipant, exportCsv, listParticipants, noteIssue, participantFor, PilotError, publicForm, saveFeedback, startForm, summary, type FormId } from "./pilot";
-import { claimShareCode, createShareCode, grantsFor, revokeAllFor, revokeGrant, ShareError, teacherGrant } from "./shares";
 import { toolsRouter } from "./tools";
 import { checkProviders } from "./health";
 import { adminPhoneList, bolnaPhoneProvider, enrolPhone, optOut, PhoneError, placeRevisionCall, publicPhone, removePhone, type PhoneProvider } from "./phone";
@@ -191,13 +190,6 @@ export function createApp(opts: { devTools?: boolean; phoneProvider?: PhoneProvi
   // Whether each provider accepts its key right now (free metadata requests, cached 10 minutes).
   app.get("/api/health/providers", rateLimit((req) => `health:${ipOf(req)}`, 6, 6), async (_req, res) => {
     res.json(await checkProviders());
-  });
-
-  // ---------- teacher mode access code ----------
-  app.post("/api/teacher/unlock", rateLimit((req) => `unlock:${ipOf(req)}`, 20, 20), express.json({ limit: "1kb" }), (req, res) => {
-    const code = typeof req.body?.code === "string" ? req.body.code.trim() : undefined;
-    if (!sameSecret(code, config.teacherAccessCode())) return void res.status(401).json({ error: "That code isn't right." });
-    res.json({ ok: true });
   });
 
   // ---------- operator (ADMIN_TOKEN) ----------
@@ -468,7 +460,6 @@ export function createApp(opts: { devTools?: boolean; phoneProvider?: PhoneProvi
   api.delete("/learners/:id", (req, res) => {
     const l = ownLearner(req, res);
     if (!l) return;
-    revokeAllFor(l.id);
     leaveAllFor(l.id);
     removePhone(l.id);
     deleteLearner(l, (sid) => {
@@ -518,78 +509,11 @@ export function createApp(opts: { devTools?: boolean; phoneProvider?: PhoneProvi
     res.json({ ok: true });
   });
 
-  // ---------- sharing with a teacher ----------
-  api.post("/learners/:id/shares", (req, res) => {
-    const l = ownLearner(req, res);
-    if (!l) return;
-    const c = createShareCode(l);
-    res.status(201).json({ code: c.code, expiresAt: c.expiresAt });
-  });
-
-  api.get("/learners/:id/shares", (req, res) => {
-    const l = ownLearner(req, res);
-    if (!l) return;
-    res.json({ grants: grantsFor({ learnerId: l.id }).map((g) => ({ id: g.id, teacher: g.teacherLabel, createdAt: g.createdAt })) });
-  });
-
-  api.delete("/learners/:id/shares/:gid", (req, res) => {
-    const l = ownLearner(req, res);
-    if (!l) return;
-    if (!revokeGrant(String(req.params.gid), req.device!.id)) return void res.status(404).json({ error: "No such share" });
-    res.status(204).end();
-  });
-
-  api.post("/teacher/claim", small, rateLimit((req) => `claim:${req.device!.id}`, 5, 5), (req, res) => {
-    try {
-      const g = claimShareCode(String(req.body?.code ?? ""), req.device!.id, String(req.body?.label ?? "Teacher"));
-      res.status(201).json({ ok: true, learnerId: g.learnerId });
-    } catch (err) {
-      if (err instanceof ShareError) return void res.status(400).json({ error: err.message });
-      throw err;
-    }
-  });
-
+  // ---------- study groups ----------
   const sessionSummary = (id: string) => {
     const s = getSession(id);
     return s ? { id: s.id, topic: s.topic || s.label, lastActive: s.lastActive } : null;
   };
-
-  /** Only learners explicitly shared with this device. */
-  api.get("/teacher/learners", (req, res) => {
-    const out = grantsFor({ teacherDeviceId: req.device!.id })
-      .map((g) => {
-        const l = getLearnerSafe(g.learnerId);
-        if (!l) return null;
-        const m = memoryOf(l, sessionSummary);
-        return {
-          learner: { id: l.id, name: l.name, grade: l.grade },
-          sharedAt: g.createdAt,
-          evidence: m.evidenceCount,
-          lastAt: m.topics[0]?.lastAt ?? null,
-          topics: m.topics.map((t) => t.name),
-          skills: m.progress.map((p) => ({ name: p.name, status: p.status })),
-          recurring: m.mistakes.filter((x) => !x.resolved && x.count >= 1).map((x) => ({ name: x.name, count: x.count, confidence: x.confidence })),
-        };
-      })
-      .filter(Boolean);
-    res.json({ learners: out });
-  });
-
-  api.get("/teacher/learners/:learnerId", (req, res) => {
-    const g = teacherGrant(req.device!.id, String(req.params.learnerId));
-    const l = g ? getLearnerSafe(g.learnerId) : null;
-    if (!g || !l) return void res.status(404).json({ error: "This learner hasn't been shared with you." });
-    const m = memoryOf(l, sessionSummary);
-    const reports = l.sessions
-      .map((sid) => getSession(sid))
-      .filter((s): s is Session => Boolean(s))
-      .sort((a, b) => b.lastActive - a.lastActive)
-      .slice(0, 20)
-      .map((s) => reportFor(s));
-    res.json({ learner: { id: l.id, name: l.name, grade: l.grade }, memory: m, reports });
-  });
-
-  // ---------- study groups ----------
   const groupErr = (res: Response, err: unknown) => {
     if (err instanceof GroupError) return void res.status(400).json({ error: err.message });
     throw err;

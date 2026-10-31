@@ -10,7 +10,6 @@ import { LANGUAGE_NAMES, LANGUAGE_STATUS, type Language } from "../../../shared/
 import { apiFetch } from "../lib/api";
 import { createLearner, listLearners, selectedLearner, selectLearner, type Learner } from "../lib/learners";
 import { deleteSession, listSessions, loadData, newCode, saveData, saveSession, updateSession, type SessionMeta } from "../lib/session";
-import { ModeToggle, type Mode } from "./ModeToggle";
 import { HOME_TOUR, Tour, tourDue } from "./Tour";
 import { Setup } from "./Setup";
 
@@ -32,12 +31,11 @@ function initial(s: SessionMeta): string {
 export function Home({
   onOpen,
   onProgress,
-  onSwitchMode,
   createAccount = false,
 }: {
-  onOpen: (id: string) => void;
+  /** fresh: a session just made here (the board is wiped clean before it opens). */
+  onOpen: (id: string, fresh?: boolean) => void;
   onProgress: (learnerId: string) => void;
-  onSwitchMode: (to: Mode) => void;
   /** Coming from the start screen on a new device: making your account comes first. */
   createAccount?: boolean;
 }) {
@@ -134,6 +132,10 @@ export function Home({
   };
   const indexOf = (id: string) => Math.max(0, learners?.findIndex((l) => l.id === id) ?? 0);
 
+  // Until the profiles have loaded, just the board: otherwise "Your classes" (nobody picked) shows for a moment
+  // before switching to this learner's classes.
+  if (learners === null) return <main className="home home-board" aria-busy="true" />;
+
   if (creating) {
     return (
       <Setup
@@ -158,7 +160,7 @@ export function Home({
           };
           saveSession(meta);
           saveData(creating, { snapshot: emptySnapshot(), plan: s.plan, docs: s.docs, speed: "normal", handsFree: false });
-          onOpen(creating);
+          onOpen(creating, true);
         }}
       />
     );
@@ -245,7 +247,6 @@ export function Home({
             </span>
             <span className="chalk">Shikshak</span>
           </a>
-          <ModeToggle mode="student" onSwitch={onSwitchMode} />
         </div>
         <div className="home-head-actions">
           <button className="btn-primary" onClick={() => setCreating(newCode())} disabled={Boolean(learners?.length) && !current}>
@@ -438,7 +439,8 @@ export function Home({
       )}
       {learner && unlinked.length > 0 && (
         <section className="panel panel-quiet">
-          <h2>Not linked to anyone yet</h2>
+          <h2>Classes not in anyone's list yet</h2>
+          <p className="muted-line">Made on this device before a profile was picked. Add one to {learner.name}'s classes so it counts in their progress and reports.</p>
           <ul className="grant-list">
             {unlinked.map((s) => (
               <li key={s.id}>
@@ -455,7 +457,7 @@ export function Home({
                     }
                   }}
                 >
-                  Link to {learner.name}
+                  Add to {learner.name}'s classes
                 </button>
               </li>
             ))}
@@ -467,7 +469,7 @@ export function Home({
   );
 }
 
-function AddLearner({ onDone, submitLabel = "Add", required = false }: { onDone: (l: Learner | null) => void; submitLabel?: string; required?: boolean }) {
+export function AddLearner({ onDone, submitLabel = "Add", required = false }: { onDone: (l: Learner | null) => void; submitLabel?: string; required?: boolean }) {
   const [name, setName] = useState("");
   const [grade, setGrade] = useState("10");
   const [language, setLanguage] = useState<Language>("hinglish");

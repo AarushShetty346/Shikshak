@@ -6,11 +6,11 @@
 import { useEffect, useMemo, useState } from "react";
 import qrcode from "qrcode-generator";
 import { ArrowLeft, ChartLineUp, Copy, Export, FileText, Notebook, UserPlus, UsersThree, X } from "@phosphor-icons/react";
-import { Avatar } from "./Home";
+import { AddLearner, Avatar } from "./Home";
 import { BlockBody } from "./Board";
 import { toBlock } from "./Classroom";
 import { endGroup, joinGroup, joinLink, leaveGroup, memberNotes, memberView, myGroups, previewGroup, startGroup, type MemberView, type StudyGroup } from "../lib/groups";
-import { selectedLearner, STATUS_LABEL } from "../lib/learners";
+import { listLearners, selectedLearner, selectLearner, STATUS_LABEL, type Learner } from "../lib/learners";
 import { isBlockEvent } from "../../../shared/boardState";
 import type { BlockEvent } from "../../../shared/types";
 
@@ -30,6 +30,7 @@ export function StudyGroups({ groupId, onBack, onOpenGroup }: { groupId: string 
   const [groups, setGroups] = useState<StudyGroup[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [needAccount, setNeedAccount] = useState(false);
   const learnerId = selectedLearner();
   const reload = () =>
     myGroups()
@@ -41,11 +42,19 @@ export function StudyGroups({ groupId, onBack, onOpenGroup }: { groupId: string 
   if (groupId && groups && !group) return <Shell onBack={() => onOpenGroup(null)} title="Study group"><p className="group-note">You're not in this group any more.</p></Shell>;
   if (group) return <GroupPage group={group} learnerId={learnerId} onBack={() => onOpenGroup(null)} onChanged={reload} onGone={() => onOpenGroup(null)} />;
 
-  const start = async () => {
-    if (!learnerId) return setError("Make your account first (on the home screen), then start a group.");
+  const start = async (who: string | null = learnerId) => {
+    setError(null);
+    if (!who) {
+      // Nobody picked on this device: use the only profile, or make the account here.
+      const list = await listLearners().catch(() => [] as Learner[]);
+      if (list.length === 1) who = list[0].id;
+      else if (list.length === 0) return setNeedAccount(true);
+      else return setError("Pick who you are on the home screen first, then start a group.");
+      selectLearner(who);
+    }
     setBusy(true);
     try {
-      const g = await startGroup(learnerId);
+      const g = await startGroup(who);
       onOpenGroup(g.id);
     } catch (e) {
       setError((e as Error).message);
@@ -72,9 +81,24 @@ export function StudyGroups({ groupId, onBack, onOpenGroup }: { groupId: string 
         <h1 className="chalk">Study together</h1>
         <p className="group-sub">Because maths is easier with friends.</p>
         <p className="group-blurb">Each of you learns with your own tutor. Friends in your group can open your notes, class reports and progress, and you can open theirs.</p>
-        <button className="btn-primary group-cta" onClick={start} disabled={busy}>
-          <UserPlus weight="bold" /> Start a group
-        </button>
+        {needAccount ? (
+          <div className="join-account">
+            <p>Make your account first. It stays on this device.</p>
+            <AddLearner
+              submitLabel="Create account and start"
+              required
+              onDone={(l) => {
+                if (!l) return;
+                selectLearner(l.id);
+                void start(l.id);
+              }}
+            />
+          </div>
+        ) : (
+          <button className="btn-primary group-cta" onClick={() => void start()} disabled={busy}>
+            <UserPlus weight="bold" /> Start a group
+          </button>
+        )}
         <JoinByCode />
         {error && <p className="form-error">{error}</p>}
         <p className="group-fine">{FINE_PRINT}</p>
@@ -244,17 +268,31 @@ export function JoinGroup({ code, onJoined, onNotNow }: { code: string; onJoined
   const [group, setGroup] = useState<StudyGroup | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const learnerId = selectedLearner();
+  // Who is joining: the profile picked on this device; a new device makes its account right here.
+  const [learnerId, setLearnerId] = useState(selectedLearner);
+  const [profiles, setProfiles] = useState<Learner[] | null>(null);
   useEffect(() => {
     previewGroup(code)
       .then(setGroup)
       .catch((e) => setError((e as Error).message));
+    listLearners()
+      .then((list) => {
+        setProfiles(list);
+        if (list.length === 1 && !list.some((l) => l.id === learnerId)) {
+          selectLearner(list[0].id);
+          setLearnerId(list[0].id);
+        }
+      })
+      .catch(() => setProfiles([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code]);
-  const join = async () => {
-    if (!learnerId) return setError("Make your account first (on the home screen), then open the link again.");
+  const known = Boolean(learnerId && profiles?.some((l) => l.id === learnerId));
+  const join = async (id = learnerId) => {
+    if (!id) return;
     setBusy(true);
+    setError(null);
     try {
-      const g = await joinGroup(code, learnerId);
+      const g = await joinGroup(code, id);
       onJoined(g.id);
     } catch (e) {
       setError((e as Error).message);
@@ -278,10 +316,43 @@ export function JoinGroup({ code, onJoined, onNotNow }: { code: string; onJoined
                 <button className="btn-primary sheet-cta" onClick={() => onJoined(group.id)}>
                   Open the group
                 </button>
-              ) : (
+              ) : profiles === null ? null : known ? (
                 <button className="btn-primary sheet-cta" onClick={() => void join()} disabled={busy}>
-                  Join
+                  Join as {profiles.find((l) => l.id === learnerId)?.name}
                 </button>
+              ) : profiles.length > 0 ? (
+                <div className="join-pick" role="group" aria-label="Who is joining?">
+                  <p>Who is joining?</p>
+                  {profiles.map((l) => (
+                    <button
+                      key={l.id}
+                      className="btn-secondary"
+                      disabled={busy}
+                      onClick={() => {
+                        selectLearner(l.id);
+                        setLearnerId(l.id);
+                        void join(l.id);
+                      }}
+                    >
+                      {l.name}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="join-account">
+                  <p>Make your account to join. It stays on this device.</p>
+                  <AddLearner
+                    submitLabel="Create account and join"
+                    required
+                    onDone={(l) => {
+                      if (!l) return;
+                      selectLearner(l.id);
+                      setLearnerId(l.id);
+                      setProfiles([l]);
+                      void join(l.id);
+                    }}
+                  />
+                </div>
               )}
             </>
           ) : (

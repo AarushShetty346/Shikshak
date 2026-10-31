@@ -4,8 +4,7 @@ import { Home } from "./components/Home";
 import { Pilot } from "./components/Pilot";
 import { Progress } from "./components/Progress";
 import { ChalkFilter } from "./components/Chalk";
-import { DusterWipe, TeacherGate, teacherUnlocked, type Mode } from "./components/ModeToggle";
-import { TeacherView } from "./components/Teacher";
+import { DusterWipe } from "./components/Duster";
 import { Splash, splashDue } from "./components/Splash";
 import { JoinGroup, StudyGroups } from "./components/StudyGroup";
 import { getSession, sessionFromHash } from "./lib/session";
@@ -14,7 +13,6 @@ type Route =
   | { page: "home" }
   | { page: "class"; id: string }
   | { page: "progress"; learnerId: string }
-  | { page: "teacher" }
   | { page: "pilot" }
   | { page: "groups"; groupId: string | null }
   | { page: "join"; code: string };
@@ -24,7 +22,6 @@ function readRoute(): Route {
   if (id && getSession(id)) return { page: "class", id };
   const l = /^#\/learner\/(l_[A-Za-z0-9_-]{8,30})$/.exec(location.hash);
   if (l) return { page: "progress", learnerId: l[1] };
-  if (location.hash === "#/teacher") return { page: "teacher" };
   const grp = /^#\/group(?:\/(grp_[A-Za-z0-9_-]{10,30}))?$/.exec(location.hash);
   if (grp) return { page: "groups", groupId: grp[1] ?? null };
   const join = /^#\/join\/([A-Za-z0-9]{6})$/.exec(location.hash);
@@ -34,7 +31,7 @@ function readRoute(): Route {
 }
 
 /**
- * Pages live in the URL (#/s/ABC123, #/learner/l_..., #/teacher), so refresh and the back button
+ * Pages live in the URL (#/s/ABC123, #/learner/l_..., #/group), so refresh and the back button
  * work. Classroom is keyed by session id: switching sessions unmounts the old one completely (its
  * call, socket and board state) before the new one mounts.
  */
@@ -55,33 +52,10 @@ export function App() {
     setRoute(readRoute());
   };
 
-  // Switching between student and teacher mode: the duster rubs the board clean, then the other
-  // mode is written underneath.
-  // Teacher mode asks for the access code first (once per tab), including when #/teacher is opened
-  // directly.
-  const [wipeTo, setWipeTo] = useState<Mode | null>(null);
-  const [unlocked, setUnlocked] = useState(teacherUnlocked);
-  const [asking, setAsking] = useState(false);
-  const switchMode = (to: Mode) => {
-    if (wipeTo) return; // one wipe at a time
-    if (to === "teacher" && !unlocked) setAsking(true);
-    else setWipeTo(to);
-  };
-  const wipe = wipeTo && <DusterWipe onCovered={() => go(wipeTo === "teacher" ? "#/teacher" : "#/")} onDone={() => setWipeTo(null)} />;
-  const locked = route.page === "teacher" && !unlocked;
-  const gate = (asking || locked) && (
-    <TeacherGate
-      onUnlock={() => {
-        setUnlocked(true);
-        setAsking(false);
-        if (!locked) setWipeTo("teacher");
-      }}
-      onCancel={() => {
-        setAsking(false);
-        if (locked) go("#/");
-      }}
-    />
-  );
+  // A new session: the duster rubs the board clean, then the new class is written underneath.
+  const [wipeTo, setWipeTo] = useState<string | null>(null);
+  const wipe = wipeTo && <DusterWipe onCovered={() => go(wipeTo)} onDone={() => setWipeTo(null)} />;
+  const open = (id: string, fresh?: boolean) => (fresh ? setWipeTo(`#/s/${id}`) : go(`#/s/${id}`));
 
   if (splash && route.page === "home")
     return (
@@ -101,7 +75,6 @@ export function App() {
       <ChalkFilter />
       {page()}
       {wipe}
-      {gate}
     </>
   );
 
@@ -111,9 +84,6 @@ export function App() {
       return <Classroom key={route.id} sessionId={route.id} onHome={() => go("#/")} />;
     case "progress":
       return <Progress key={route.learnerId} learnerId={route.learnerId} onBack={() => go("#/")} />;
-    case "teacher":
-      if (locked) return <Home onOpen={(id) => go(`#/s/${id}`)} onProgress={(lid) => go(`#/learner/${lid}`)} onSwitchMode={switchMode} />;
-      return <TeacherView onBack={() => go("#/")} onSwitchMode={switchMode} />;
     case "groups":
       return <StudyGroups groupId={route.groupId} onBack={() => go("#/")} onOpenGroup={(id) => go(id ? `#/group/${id}` : "#/group")} />;
     case "join":
@@ -121,7 +91,7 @@ export function App() {
     case "pilot":
       return <Pilot onBack={() => go("#/")} />;
     default:
-      return <Home onOpen={(id) => go(`#/s/${id}`)} onProgress={(lid) => go(`#/learner/${lid}`)} onSwitchMode={switchMode} createAccount={fromSplash} />;
+      return <Home onOpen={open} onProgress={(lid) => go(`#/learner/${lid}`)} createAccount={fromSplash} />;
   }
   }
 }

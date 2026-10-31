@@ -3651,66 +3651,6 @@ body:has(.home-board) {
   }
 }
 
-/* ---------- Student / Teacher mode switch ---------- */
-
-.home-head-left {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 12px clamp(14px, 2vw, 28px);
-}
-
-.mode-toggle {
-  position: relative;
-  display: inline-grid;
-  grid-template-columns: 1fr 1fr;
-  align-items: center;
-  padding: 4px;
-  border: 2px solid rgb(241 239 230 / 0.4);
-  border-radius: 18px 14px 19px 13px / 13px 19px 14px 18px;
-  background: rgb(0 0 0 / 0.18);
-  cursor: pointer;
-  font-family: var(--font-hand);
-  font-size: clamp(15px, 1.1vw, 17px);
-  font-weight: 700;
-}
-
-.mode-option {
-  position: relative;
-  z-index: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 5px 14px;
-  color: var(--ink-soft);
-  transition: color 0.25s ease;
-}
-
-.mode-option[data-on="true"] {
-  color: #1b2a23;
-}
-
-.mode-knob {
-  position: absolute;
-  top: 4px;
-  bottom: 4px;
-  left: 4px;
-  width: calc(50% - 4px);
-  border-radius: 14px 11px 15px 10px / 10px 15px 11px 14px;
-  background: var(--chalk-yellow);
-  box-shadow: 0 2px 0 rgb(0 0 0 / 0.25);
-  transition: transform 0.35s var(--ease-out);
-}
-
-.mode-toggle[data-mode="teacher"] .mode-knob {
-  transform: translateX(100%);
-}
-
-.mode-toggle:hover {
-  border-color: var(--chalk-yellow);
-}
-
 /* ---------- The board duster ---------- */
 
 .duster-wipe {
@@ -3795,10 +3735,6 @@ body:has(.home-board) {
 
   .home-board .home-head-left {
     display: contents;
-  }
-
-  .home-board .home-head .mode-toggle {
-    order: 3;
   }
 
   .home-board .home-head-actions {
@@ -4835,6 +4771,8 @@ body:has(.home-board) {
   }
   .board-page {
     position: relative !important;
+    width: var(--print-w, 100%) !important;
+    zoom: var(--print-zoom, 1);
     background: #000 !important; /* inverted: white paper */
     filter: invert(1) hue-rotate(180deg);
     -webkit-print-color-adjust: exact;
@@ -4844,7 +4782,6 @@ body:has(.home-board) {
     display: block;
     position: absolute;
     left: 0;
-    width: 100%;
   }
   .photo-page,
   .source-page,
@@ -5459,4 +5396,43 @@ button.group-card {
 .moment-chip {
   background: #1d3329 !important;
   box-shadow: 0 4px 12px rgb(8 20 15 / 0.45);
+}
+
+/* Study groups: a new device makes its account (or picks who it is) right on the join sheet. */
+.join-account,
+.join-pick {
+  width: 100%;
+  display: grid;
+  gap: 10px;
+  text-align: left;
+}
+.join-pick {
+  justify-items: center;
+  text-align: center;
+}
+.join-pick p,
+.join-account p {
+  margin: 0;
+  text-align: center;
+}
+.join-account .add-learner {
+  grid-template-columns: 1fr;
+  background: rgb(255 255 255 / 0.06);
+}
+.join-account .add-learner .actions {
+  justify-content: stretch;
+}
+.join-account .add-learner .btn-primary {
+  flex: 1;
+  background: #f6d77a;
+  color: #1b2a23;
+}
+/* The avatars next to Invite: no outline around them. */
+.group-stack {
+  border: 0;
+  padding: 0;
+}
+/* The "Study together" art: rounded squares, the same shape as the profile pictures. */
+.group-dot {
+  border-radius: 24%;
 }
