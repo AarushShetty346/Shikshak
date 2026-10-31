@@ -1,27 +1,22 @@
 // The start screen: Shikshak in chalk in the middle of the board, and one button to begin.
-// Shown once per visit (each new tab), before the rest of the app.
+// Shown every time the site is opened or reloaded on the home page; going back to home from inside
+// the app doesn't show it again.
 
 import { ArrowRight } from "@phosphor-icons/react";
 
-const SEEN = "shikshak.splashSeen";
+/** Set by the browser tests to skip the start screen. */
+const SKIP = "shikshak.splashSeen";
 
 export function splashDue(): boolean {
   try {
-    return sessionStorage.getItem(SEEN) !== "1";
+    return sessionStorage.getItem(SKIP) !== "1";
   } catch {
-    return false;
+    return true;
   }
 }
 
 export function Splash({ onStart }: { onStart: () => void }) {
-  const start = () => {
-    try {
-      sessionStorage.setItem(SEEN, "1");
-    } catch {
-      // private mode: the start screen may show again next time
-    }
-    onStart();
-  };
+  const start = () => onStart();
   return (
     <main className="home home-board splash">
       <div className="splash-centre">

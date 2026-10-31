@@ -338,8 +338,10 @@ test("start screen: Shikshak in the middle, Start Shiksha, then a new device mak
   await page.getByLabel("Name or nickname").fill("Meera");
   await page.getByRole("button", { name: "Create account" }).click();
   await expect(page.getByRole("heading", { name: "Meera's classes" })).toBeVisible();
-  // Once per visit: a reload goes straight on.
+  // Every time the site is opened or reloaded, the start screen comes first; Start goes to the classes.
   await page.reload();
+  await expect(page.getByRole("button", { name: /Start Shiksha/ })).toBeVisible();
+  await page.getByRole("button", { name: /Start Shiksha/ }).click();
   await expect(page.getByRole("heading", { name: "Meera's classes" })).toBeVisible();
 });
 
