@@ -378,3 +378,26 @@ export function describeMarking(m: Marking): string {
   if (m.answer.how === "correct" && m.points.length && m.points.every((x) => x.how === "missing")) parts.push("The answer is right, but in the exam the steps carry marks too: show them.");
   return parts.join(" ");
 }
+
+/**
+ * Plain arithmetic in the tutor's own board lines that doesn't hold ("7 - 3 = 5"), checked before
+ * the lines are written, so a slip is fixed instead of taught. Only pure numbers are checked:
+ * trigonometry, logs, angles, units, approximations, and lines that show a mistake on purpose
+ * ("✗", "wrong", "galat") are left alone, and a rounded decimal counts as right.
+ */
+export function arithmeticSlips(lines: string[]): { line: number; note: string }[] {
+  const skip = /sin|cos|tan|cot|sec|log|ln\b|θ|theta|°|%|≈|~|approx|✗|✘|❌|wrong|galat|गलत|\bnot\b|nahi|नहीं|\?/i;
+  const out: { line: number; note: string }[] = [];
+  for (const s of analyse(lines)) {
+    if (s.holds !== false || s.unreadable || skip.test(s.text)) continue;
+    const computed = s.values.find((x) => hasOp(x.part)) ?? s.values[0];
+    const wrong = s.values.find((x) => !x.v.eq(computed.v));
+    if (!wrong) continue;
+    const want = computed.v.toNumber();
+    const got = wrong.v.toNumber();
+    const rounded = /\.\d/.test(wrong.part) && Math.abs(got - want) <= Math.max(0.006, Math.abs(want) * 0.005);
+    if (rounded) continue;
+    if (!out.some((o) => o.line === s.line)) out.push({ line: s.line, note: `${computed.part} is ${computed.v.toString()}, not ${wrong.part}` });
+  }
+  return out;
+}

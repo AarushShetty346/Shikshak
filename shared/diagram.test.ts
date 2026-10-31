@@ -19,6 +19,24 @@ describe("diagram language", () => {
     expect(parseDiagram("table: n, a_n ; 1, 2 ; 2, 5")).toEqual({ type: "table", header: ["n", "a_n"], rows: [["1", "2"], ["2", "5"]] });
   });
 
+  it("puts a right angle opposite the longest side, and refuses triangles that can't exist", () => {
+    // The student's 3-4-5 triangle with BC = 5: the right angle is at A, not at the second corner.
+    expect(parseDiagram("triangle: right | vertices: A, B, C | AB = 4, BC = 5, AC = 3 | angle: theta at B")).toMatchObject({ rightAt: "A" });
+    expect(parseDiagram("triangle: right | vertices: P, Q, R | PQ = 3, QR = 4, PR = 5")).toMatchObject({ rightAt: "Q" });
+    expect(parseDiagram("triangle: right at C | vertices: A, B, C | AB = 5")).toMatchObject({ rightAt: "C" });
+    expect(() => parseDiagram("triangle: vertices: A, B, C | AB = 1, BC = 2, AC = 3")).toThrow(/can't make a triangle/);
+    expect(() => parseDiagram("triangle: right | vertices: A, B, C | AB = 3, BC = 4, AC = 6")).toThrow(/don't make a right triangle/);
+    expect(() => parseDiagram("triangle: right | vertices: A, B, C | AB = 4, BC = 5, AC = 3 | angle: theta at A")).toThrow(/A is the right angle/);
+    expect(() => parseDiagram("triangle: right at B | vertices: A, B, C | AB = 4, BC = 5, AC = 3")).toThrow(/opposite the longest side/);
+    expect(parseDiagram("triangle: vertices: A, B, C | AB = 4, BC = 5, AC = 6")).not.toHaveProperty("rightAt");
+  });
+
+  it("reads a triangle without 'right', two graphs separated by a comma, and refuses an angle at a missing corner", () => {
+    expect(parseDiagram("triangle: vertices: X, Y, Z | XY = 6, YZ = 7, XZ = 8 | angle: 60° at Y")).toMatchObject({ labels: ["X", "Y", "Z"], sides: { AB: "6", BC: "7", CA: "8" }, angle: { at: "Y" } });
+    expect(parseDiagram("graph: y = 2x + 1, y = -x + 4 | x: -2..4")).toMatchObject({ exprs: ["2x + 1", "-x + 4"] });
+    expect(() => parseDiagram("triangle: right | vertices: A, B, C | AB = 3, BC = 4, AC = 5 | angle: theta at D")).toThrow(/corners are A, B, C/);
+  });
+
   it("explains what's wrong with a bad diagram", () => {
     expect(() => parseDiagram("pie chart: 1, 2")).toThrow(/Unknown diagram/);
     expect(() => parseDiagram("ap: 5")).toThrow(/at least 2 terms/);

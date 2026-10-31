@@ -7,6 +7,7 @@ import { DIAGRAM_EXAMPLES, parseDiagram } from "../shared/diagram";
 import { splitSteps } from "../shared/mathText";
 import type { MarkStyle, Place, WriteStyle } from "../shared/types";
 import { randomId } from "./auth";
+import { arithmeticSlips } from "./marking";
 import { revealsAnswer } from "./teaching";
 import { boardMap, emit, findBlock, nextLabel, recordBlock, type Session } from "./sessions";
 
@@ -47,6 +48,10 @@ export function write(s: Session, p: Params): Reply {
   // Don't let an ordinary board write hand over the answer to the current question.
   if (style !== "your_turn" && revealsAnswer(s, lines))
     return { ok: false, error: `That would give away the answer to the question they're working on. Use give_hint (${s.problem?.rung ?? 0} of 3 shown so far), or show_solution if they asked to see it.` };
+  if (style !== "your_turn") {
+    const slips = arithmeticSlips(lines);
+    if (slips.length) return { ok: false, error: wrongSums(slips) };
+  }
   const rep = replaced(s, p.replace);
   if (rep.error) return { ok: false, error: rep.error };
   const label = nextLabel(s);
@@ -155,4 +160,9 @@ export function lessonState(s: Session): string {
   const section = s.study && s.study.section > 0 ? `Plan section ${s.study.section} of ${s.study.plan.sections.length} ("${s.study.plan.sections[s.study.section - 1].title}") was the last one taught. ` : "";
   const at = s.interrupt?.label ? `The student had interrupted while you explained ${s.interrupt.label}. ` : "";
   return `This class was paused and is now resuming; the board is still on their screen. ${section}${at}Board so far: ${boardMap(s, 10)}`;
+}
+
+/** Tells the tutor which of her lines don't add up, so she fixes them before the student sees them. */
+export function wrongSums(slips: { line: number; note: string }[]): string {
+  return `Not written: ${slips.map((x) => `line ${x.line}: ${x.note}`).join("; ")}. Recheck the working and write it again. The student hasn't seen it, so don't mention it.`;
 }

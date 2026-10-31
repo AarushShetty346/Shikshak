@@ -52,6 +52,23 @@ describe("board tools", () => {
     t.ws.close();
   });
 
+  it("checks the tutor's sums and figures before they reach the board", async () => {
+    const id = await session();
+    const t = await tab(id);
+    const bad = await post("write", { session_code: id, kind: "steps", content: "2x + 3 = 7 || 2x = 7 - 3 = 5" });
+    expect(bad.ok).toBe(false);
+    expect(String(bad.error)).toContain("7 - 3 is 4, not 5");
+    const steps = await post("show_steps", { session_code: id, steps: "12 / 4 = 4" });
+    expect(steps.ok).toBe(false);
+    const tri = await post("draw", { session_code: id, diagram: "triangle: right | vertices: A, B, C | AB = 4, BC = 5, AC = 3 | angle: theta at A" });
+    expect(tri.ok).toBe(false);
+    expect(String(tri.error)).toContain("A is the right angle");
+    const good = await post("write", { session_code: id, kind: "steps", content: "2x + 3 = 7 || 2x = 7 - 3 = 4 || x = 2" });
+    expect(good.ok).toBe(true);
+    await vi.waitFor(() => expect(t.events()).toHaveLength(1)); // only the right one was written
+    t.ws.close();
+  });
+
   it("never routes a tool call to another session (no fallback for a wrong id)", async () => {
     const maths = await session();
     const t = await tab(maths);

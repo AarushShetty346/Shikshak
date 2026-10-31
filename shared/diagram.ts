@@ -6,7 +6,7 @@ export type Diagram =
   | { type: "ap"; terms: string[]; d: string | null }
   | { type: "numberline"; from: number; to: number; points: { x: number; label: string }[] }
   | { type: "graph"; exprs: string[]; points: { x: number; y: number; label: string }[]; xmin: number; xmax: number; params?: GraphParam[] }
-  | { type: "triangle"; labels: [string, string, string]; sides: { AB?: string; BC?: string; CA?: string }; angle: { at: string; label: string } | null; right: boolean }
+  | { type: "triangle"; labels: [string, string, string]; sides: { AB?: string; BC?: string; CA?: string }; angle: { at: string; label: string } | null; right: boolean; rightAt?: string }
   | { type: "table"; header: string[]; rows: string[][] };
 
 /** A number in a graph's equation the student can change with a slider (e.g. a in y = ax² + bx + c). */
@@ -111,7 +111,7 @@ export function parseDiagram(raw: string): Diagram {
     }
     case "graph": {
       const exprs = head
-        .split(";")
+        .split(/;|,\s*(?=y\s*=)/i)
         .map((e) => e.trim().replace(/^y\s*=\s*/i, ""))
         .filter(Boolean)
         .slice(0, 3);
@@ -126,7 +126,8 @@ export function parseDiagram(raw: string): Diagram {
     }
     case "triangle": {
       const right = /right/i.test(head);
-      const v = list(rest.get("vertices"));
+      // "triangle: vertices: X, Y, Z | ..." (no "right") puts the vertices in the head.
+      const v = list(rest.get("vertices") ?? /vertices\s*:\s*(.+)$/i.exec(head)?.[1]);
       const labels: [string, string, string] = [v[0] || "A", v[1] || "B", v[2] || "C"];
       const sides: { AB?: string; BC?: string; CA?: string } = {};
       for (const seg of [...extra, ...[...rest.entries()].filter(([k]) => /^[a-z]{2}$/i.test(k)).map(([k, val]) => `${k}=${val}`)]) {
@@ -142,7 +143,9 @@ export function parseDiagram(raw: string): Diagram {
         }
       }
       const am = /^(.+?)\s+at\s+([A-Za-z])$/i.exec(rest.get("angle") ?? "");
-      return { type: "triangle", labels, sides, angle: am ? { label: am[1].trim(), at: am[2].toUpperCase() } : null, right };
+      const angle = am ? { label: am[1].trim(), at: am[2].toUpperCase() } : null;
+      if (angle && !labels.some((l) => l.toUpperCase() === angle.at)) throw new Error(`The angle is at ${angle.at}, but the corners are ${labels.join(", ")}`);
+      return { type: "triangle", labels, sides, angle, right, ...checkTriangle(labels, sides, angle, right, /right\s+(?:angle\s+)?at\s+([A-Za-z])/i.exec(head)?.[1]) };
     }
     case "table": {
       const rows = head.split(";").map((r) => list(r)).filter((r) => r.length);
@@ -352,4 +355,49 @@ export function compileGraphExpr(src: string, names: string[]): (x: number, env:
   const fn = expr();
   if (p !== toks.length) throw new Error(`can't draw "${src}"`);
   return fn;
+}
+
+/**
+ * A triangle must be one that can exist, and match what its numbers say: the sides obey the
+ * triangle inequality, a right triangle's sides obey Pythagoras, and the right angle sits opposite
+ * the longest side (so a 3-4-5 triangle is drawn with its right angle where it really is). Throws a
+ * message the tutor can act on, so a wrong figure is fixed before it reaches the board.
+ */
+function checkTriangle(
+  labels: [string, string, string],
+  sides: { AB?: string; BC?: string; CA?: string },
+  angle: { at: string; label: string } | null,
+  right: boolean,
+  named?: string,
+): { rightAt?: string } {
+  const [a, b, c] = labels.map((l) => l.toUpperCase());
+  const n = (v?: string) => (v && /^\s*\d+(\.\d+)?\s*$/.test(v) ? Number(v) : null);
+  // Each side, and the corner opposite it.
+  const all = [
+    { name: `${a}${b}`, len: n(sides.AB), opposite: c },
+    { name: `${b}${c}`, len: n(sides.BC), opposite: a },
+    { name: `${c}${a}`, len: n(sides.CA), opposite: b },
+  ];
+  const known = all.every((x) => x.len !== null);
+  let rightAt = named?.toUpperCase();
+  if (rightAt && ![a, b, c].includes(rightAt)) throw new Error(`The right angle is at ${rightAt}, but the corners are ${labels.join(", ")}`);
+  if (known) {
+    const sorted = [...all].sort((x, y) => x.len! - y.len!);
+    const [p, q, h] = sorted.map((x) => x.len!);
+    if (p + q <= h)
+      throw new Error(`Sides ${p}, ${q} and ${h} can't make a triangle: the two shorter sides must add up to more than the longest. Check the numbers before drawing`);
+    if (right) {
+      if (Math.abs(p * p + q * q - h * h) > 0.02 * h * h)
+        throw new Error(`${p}, ${q} and ${h} don't make a right triangle (${p}² + ${q}² ≠ ${h}²). Fix the sides, or leave out "right"`);
+      const longest = sorted[2];
+      if (rightAt && rightAt !== longest.opposite)
+        throw new Error(`The right angle must be opposite the longest side ${longest.name} (= ${longest.len}), so it is at ${longest.opposite}, not ${rightAt}`);
+      rightAt = longest.opposite;
+    }
+  }
+  if (!right) return {};
+  rightAt ??= b;
+  if (angle && angle.at === rightAt && !angle.label.startsWith("90"))
+    throw new Error(`${angle.at} is the right angle (90°), so ${angle.label} can't be there: put ${angle.label} at one of the other corners`);
+  return { rightAt };
 }

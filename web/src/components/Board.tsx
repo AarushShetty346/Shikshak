@@ -967,6 +967,14 @@ export function Board(props: Props) {
   const correctAt = correct?.box ?? bandBoxes.correct;
 
   const sub = props.submission;
+  // The teacher's verdict card fades after a few seconds (the mark stays on the board, and she says it).
+  const cardKey = `${sub.captureId}:${sub.state}`;
+  const [cardGone, setCardGone] = useState<string | null>(null);
+  useEffect(() => {
+    if (sub.state !== "done" && sub.state !== "stale") return;
+    const t = setTimeout(() => setCardGone(cardKey), 5000);
+    return () => clearTimeout(t);
+  }, [cardKey, sub.state]);
   const busy = sub.state === "submitting" || sub.state === "reviewing";
   const canDone = response.length > 0 && responseKey !== lastDone && !busy;
   const doneLabel =
@@ -1085,7 +1093,7 @@ export function Board(props: Props) {
           New on the board <ArrowDown />
         </button>
       )}
-      {sub.state !== "idle" && <SubmissionCard sub={sub} onRetry={done} canRetry={response.length > 0} />}
+      {sub.state !== "idle" && cardGone !== cardKey && <SubmissionCard sub={sub} onRetry={done} canRetry={response.length > 0} />}
 
       {typing && <TypePanel onAdd={addTyped} onClose={() => setTyping(false)} />}
       <div className="board-tray" data-open={trayOpen} role="toolbar" aria-label="Board tools">
