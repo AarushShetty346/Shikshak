@@ -504,13 +504,14 @@ export function buildAgentPayload(opts: { publicUrl: string; toolsToken?: string
               llm_config: {
                 provider: v.llm.provider,
                 model: v.llm.model,
-                // Tool calls carry several board lines, so leave room beyond the 100-token default.
-                max_tokens: 400,
+                // Tool calls carry several board lines, and medium reasoning's thinking counts against
+                // this limit too, so leave plenty of room (the prompt keeps spoken turns short).
+                max_tokens: 1200,
                 temperature: 1,
-                // Quick, short replies: a voice turn can't wait for long thinking, and thinking
-                // counts against max_tokens.
-                reasoning_effort: "low",
-                verbosity: "low",
+                // Medium (team choice, 31 Oct 2026): more careful answers, at the cost of a longer
+                // pause before she speaks. Not yet timed in a real class.
+                reasoning_effort: "medium",
+                verbosity: "medium",
               },
             },
             synthesizer: { ...synthesizerFor(base), stream: true, buffer_size: 250, audio_format: "wav" },
