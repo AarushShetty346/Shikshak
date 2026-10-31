@@ -4,7 +4,7 @@
 // live in each row's menu. Several learners can share a device; each sees only their own classes.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Archive, ArrowCounterClockwise, ArrowsLeftRight, BookOpenText, ChartLineUp, DotsThree, PencilSimpleLine, Plus, Signpost, Trash, UserPlus } from "@phosphor-icons/react";
+import { Archive, ArrowCounterClockwise, ArrowsLeftRight, BookOpenText, ChartLineUp, DotsThree, PencilSimpleLine, Plus, Signpost, Trash, UserPlus, UsersThree } from "@phosphor-icons/react";
 import { emptySnapshot } from "../../../shared/boardState";
 import { LANGUAGE_NAMES, LANGUAGE_STATUS, type Language } from "../../../shared/types";
 import { apiFetch } from "../lib/api";
@@ -250,6 +250,9 @@ export function Home({
         <div className="home-head-actions">
           <button className="btn-primary" onClick={() => setCreating(newCode())} disabled={Boolean(learners?.length) && !current}>
             <Plus weight="bold" /> New session
+          </button>
+          <button className="btn-secondary group-entry" onClick={() => (location.hash = "#/group")} title="Study with friends">
+            <UsersThree weight="bold" /> Study group
           </button>
           {learner ? (
             <div className="profile-menu" ref={profileRef}>
@@ -544,7 +547,7 @@ function writeFlag(key: string) {
 const AVATAR_COLOURS = ["#6fa8dc", "#e07a68", "#e3bb55", "#6dbb8e", "#cf86b3", "#9c8fdb"];
 
 /** A learner's profile picture: a coloured chalk square with a chalk face (a few different faces). */
-function Avatar({ index, small, tiny }: { index: number; small?: boolean; tiny?: boolean }) {
+export function Avatar({ index, small, tiny }: { index: number; small?: boolean; tiny?: boolean }) {
   const face = index % 3;
   return (
     <span className={`avatar${small ? " avatar-small" : ""}${tiny ? " avatar-tiny" : ""}`} style={{ ["--avatar" as string]: AVATAR_COLOURS[index % AVATAR_COLOURS.length] }} aria-hidden="true">

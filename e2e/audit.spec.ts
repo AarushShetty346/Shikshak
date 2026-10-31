@@ -401,6 +401,62 @@ test("focus mode: pick a time from 30 minutes, and leaving the class gets a call
   await expect(page.getByRole("timer")).toHaveCount(0);
 });
 
+test("study group: start one, a friend joins with the link, and opens my notes, reports and progress", async ({ browser }) => {
+  const device = async (name: string) => {
+    const ctx = await browser.newContext();
+    await ctx.addInitScript(() => {
+      sessionStorage.setItem("shikshak.splashSeen", "1");
+      localStorage.setItem("shikshak.tour.home.v1", "1");
+      localStorage.setItem("shikshak.tour.class.v1", "1");
+    });
+    const page = await ctx.newPage();
+    await page.goto("/");
+    await page.getByRole("button", { name: "Add learner" }).click();
+    await page.getByPlaceholder("Asha").fill(name);
+    await page.getByRole("button", { name: "Add", exact: true }).click();
+    await expect(page.getByRole("button", { name: `Profile: ${name}` })).toBeVisible();
+    return { ctx, page };
+  };
+  const asha = await device("Asha");
+  // Asha has a class with something on the board.
+  const id = await openClass(asha.page, "Quadratic equations");
+  await tool(asha.page, "write", { session_code: id, style: "heading", lines: ["Roots of a quadratic"] });
+  await asha.page.goto("/");
+  await asha.page.getByRole("button", { name: /Study group/ }).click();
+  await expect(asha.page.getByRole("heading", { name: "Study together" })).toBeVisible();
+  await asha.page.getByRole("button", { name: /Start a group/ }).click();
+  await expect(asha.page.getByRole("heading", { name: "Asha's study group" })).toBeVisible();
+  await asha.page.getByRole("button", { name: "Invite" }).click();
+  await expect(asha.page.getByRole("img", { name: "QR code to join" })).toBeVisible();
+  const code = (await asha.page.locator(".group-code").innerText()).trim();
+  expect(code).toMatch(/^[A-Z2-9]{6}$/);
+
+  const ravi = await device("Ravi");
+  await ravi.page.goto(`/#/join/${code}`);
+  await expect(ravi.page.getByRole("heading", { name: "Join Asha's study group?" })).toBeVisible();
+  await expect(ravi.page.getByText(/see your name.*notes.*reports.*progress/)).toBeVisible();
+  await ravi.page.getByRole("button", { name: "Join", exact: true }).click();
+  await expect(ravi.page.getByRole("heading", { name: "Asha's study group" })).toBeVisible();
+  await expect(ravi.page.locator(".group-member")).toHaveCount(2);
+  await ravi.page.locator(".group-member", { hasText: "Asha" }).click();
+  await expect(ravi.page.getByRole("heading", { name: "Asha's study" })).toBeVisible();
+  await ravi.page.getByRole("button", { name: /Quadratic equations/ }).click();
+  await expect(ravi.page.getByText("Roots of a quadratic")).toBeVisible();
+  await ravi.page.getByRole("button", { name: /Back$/ }).first().click();
+  await ravi.page.getByRole("tab", { name: /Reports/ }).click();
+  await expect(ravi.page.locator(".group-report")).toHaveCount(1);
+  await ravi.page.getByRole("tab", { name: /Progress/ }).click();
+  await expect(ravi.page.getByText(/Nothing recorded yet/)).toBeVisible();
+
+  // Ravi leaves; Asha's page shows just her.
+  await ravi.page.getByRole("button", { name: /Back$/ }).first().click();
+  ravi.page.once("dialog", (d) => d.accept());
+  await ravi.page.getByRole("button", { name: "Leave" }).click();
+  await expect(ravi.page.getByRole("heading", { name: "Study together" })).toBeVisible();
+  await asha.ctx.close();
+  await ravi.ctx.close();
+});
+
 test("guided tour: the first visit walks through the controls, once, and can be replayed", async ({ page }) => {
   const clips: string[] = [];
   page.on("request", (r) => r.url().includes("/tour/") && clips.push(r.url()));

@@ -10,6 +10,7 @@ import { config } from "./config";
 import { submitPaperWork } from "./paper";
 import { scanQuestion } from "./scan";
 import { fixPhoto } from "./fix";
+import { canSee, createGroup, endGroup, getGroup, GroupError, groupByCode, groupsForDevice, joinGroup, leaveAllFor, leaveGroup, publicGroup } from "./groups";
 import { allow, BusyError, chargeModelCall, QuotaError, withModelSlot } from "./limits";
 import {
   getLearner as getLearnerSafe,
@@ -468,6 +469,7 @@ export function createApp(opts: { devTools?: boolean; phoneProvider?: PhoneProvi
     const l = ownLearner(req, res);
     if (!l) return;
     revokeAllFor(l.id);
+    leaveAllFor(l.id);
     removePhone(l.id);
     deleteLearner(l, (sid) => {
       const s = getSession(sid);
@@ -585,6 +587,90 @@ export function createApp(opts: { devTools?: boolean; phoneProvider?: PhoneProvi
       .slice(0, 20)
       .map((s) => reportFor(s));
     res.json({ learner: { id: l.id, name: l.name, grade: l.grade }, memory: m, reports });
+  });
+
+  // ---------- study groups ----------
+  const groupErr = (res: Response, err: unknown) => {
+    if (err instanceof GroupError) return void res.status(400).json({ error: err.message });
+    throw err;
+  };
+  const learnerOf = (req: Request, res: Response) => {
+    const l = learnerForDevice(req.body?.learnerId, req.device!.id);
+    if (!l) res.status(400).json({ error: "Pick which learner is joining." });
+    return l;
+  };
+
+  api.get("/groups", (req, res) => {
+    res.json({ groups: groupsForDevice(req.device!.id).map((g) => publicGroup(g, req.device!.id)) });
+  });
+
+  api.post("/groups", small, (req, res) => {
+    const l = learnerOf(req, res);
+    if (!l) return;
+    try {
+      res.status(201).json({ group: publicGroup(createGroup(l, req.body?.name), req.device!.id) });
+    } catch (err) {
+      groupErr(res, err);
+    }
+  });
+
+  // Who's in a group, before joining it (the join screen). Codes are rate limited against guessing.
+  api.get("/groups/join/:code", rateLimit((req) => `gjoin:${req.device!.id}`, 20, 10), (req, res) => {
+    const g = groupByCode(req.params.code);
+    if (!g) return void res.status(404).json({ error: "No study group has that code. Check it, or ask for a new link." });
+    res.json({ group: { ...publicGroup(g, req.device!.id), code: undefined } });
+  });
+
+  api.post("/groups/join/:code", small, rateLimit((req) => `gjoin:${req.device!.id}`, 20, 10), (req, res) => {
+    const g = groupByCode(req.params.code);
+    if (!g) return void res.status(404).json({ error: "No study group has that code. Check it, or ask for a new link." });
+    const l = learnerOf(req, res);
+    if (!l) return;
+    try {
+      res.json({ group: publicGroup(joinGroup(g, l), req.device!.id) });
+    } catch (err) {
+      groupErr(res, err);
+    }
+  });
+
+  api.post("/groups/:id/leave", small, (req, res) => {
+    const g = getGroup(req.params.id);
+    const l = learnerForDevice(req.body?.learnerId, req.device!.id);
+    if (!g || !l || !leaveGroup(g, req.device!.id, l.id)) return void res.status(404).json({ error: "You're not in that group." });
+    res.json({ ok: true });
+  });
+
+  api.post("/groups/:id/end", (req, res) => {
+    const g = getGroup(req.params.id);
+    if (!g || !endGroup(g, req.device!.id)) return void res.status(404).json({ error: "Only the person who started the group can end it." });
+    res.json({ ok: true });
+  });
+
+  /** A group member's progress, classes and reports: only for others in the same live group. */
+  api.get("/groups/:id/members/:learnerId", (req, res) => {
+    const g = getGroup(req.params.id);
+    const l = getLearnerSafe(req.params.learnerId);
+    if (!l || !canSee(g, req.device!.id, l.id)) return void res.status(404).json({ error: "That isn't someone in your study group." });
+    const sessions = l.sessions
+      .map((sid) => getSession(sid))
+      .filter((s): s is Session => Boolean(s))
+      .sort((a, b) => b.lastActive - a.lastActive)
+      .slice(0, 30);
+    res.json({
+      learner: { id: l.id, name: l.name, grade: l.grade },
+      memory: memoryOf(l, sessionSummary),
+      sessions: sessions.map((s) => ({ id: s.id, topic: s.topic || s.label, lastActive: s.lastActive, blocks: s.board.blocks.length })),
+      reports: sessions.slice(0, 20).map((s) => reportFor(s)),
+    });
+  });
+
+  /** A group member's notes for one class: the board as the tutor left it (read only). */
+  api.get("/groups/:id/members/:learnerId/sessions/:sid", (req, res) => {
+    const g = getGroup(req.params.id);
+    const l = getLearnerSafe(req.params.learnerId);
+    const s = getSession(String(req.params.sid));
+    if (!l || !s || s.learnerId !== l.id || !canSee(g, req.device!.id, l.id)) return void res.status(404).json({ error: "Those notes aren't shared with you." });
+    res.json({ topic: s.topic || s.label, lastActive: s.lastActive, learner: { name: l.name }, board: s.board });
   });
 
   // ---------- pilot (facilitator's device only) ----------

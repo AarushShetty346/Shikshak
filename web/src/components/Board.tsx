@@ -1121,7 +1121,7 @@ function RLine({ n, shown, children, as = "li" }: { n: number; shown: number; ch
   );
 }
 
-function BlockBody({
+export function BlockBody({
   block,
   shown,
   width,

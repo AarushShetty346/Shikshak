@@ -7,9 +7,17 @@ import { ChalkFilter } from "./components/Chalk";
 import { DusterWipe, TeacherGate, teacherUnlocked, type Mode } from "./components/ModeToggle";
 import { TeacherView } from "./components/Teacher";
 import { Splash, splashDue } from "./components/Splash";
+import { JoinGroup, StudyGroups } from "./components/StudyGroup";
 import { getSession, sessionFromHash } from "./lib/session";
 
-type Route = { page: "home" } | { page: "class"; id: string } | { page: "progress"; learnerId: string } | { page: "teacher" } | { page: "pilot" };
+type Route =
+  | { page: "home" }
+  | { page: "class"; id: string }
+  | { page: "progress"; learnerId: string }
+  | { page: "teacher" }
+  | { page: "pilot" }
+  | { page: "groups"; groupId: string | null }
+  | { page: "join"; code: string };
 
 function readRoute(): Route {
   const id = sessionFromHash();
@@ -17,6 +25,10 @@ function readRoute(): Route {
   const l = /^#\/learner\/(l_[A-Za-z0-9_-]{8,30})$/.exec(location.hash);
   if (l) return { page: "progress", learnerId: l[1] };
   if (location.hash === "#/teacher") return { page: "teacher" };
+  const grp = /^#\/group(?:\/(grp_[A-Za-z0-9_-]{10,30}))?$/.exec(location.hash);
+  if (grp) return { page: "groups", groupId: grp[1] ?? null };
+  const join = /^#\/join\/([A-Za-z0-9]{6})$/.exec(location.hash);
+  if (join) return { page: "join", code: join[1].toUpperCase() };
   if (location.hash === "#/pilot") return { page: "pilot" };
   return { page: "home" };
 }
@@ -102,6 +114,10 @@ export function App() {
     case "teacher":
       if (locked) return <Home onOpen={(id) => go(`#/s/${id}`)} onProgress={(lid) => go(`#/learner/${lid}`)} onSwitchMode={switchMode} />;
       return <TeacherView onBack={() => go("#/")} onSwitchMode={switchMode} />;
+    case "groups":
+      return <StudyGroups groupId={route.groupId} onBack={() => go("#/")} onOpenGroup={(id) => go(id ? `#/group/${id}` : "#/group")} />;
+    case "join":
+      return <JoinGroup code={route.code} onJoined={(id) => go(`#/group/${id}`)} onNotNow={() => go("#/")} />;
     case "pilot":
       return <Pilot onBack={() => go("#/")} />;
     default:

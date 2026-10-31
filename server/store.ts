@@ -14,7 +14,7 @@ import { config } from "./config";
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,80}$/;
 
-export type Collection = "devices" | "tokens" | "learners" | "sessions" | "attempts" | "reports" | "phone" | "shares" | "pilot" | "usage";
+export type Collection = "devices" | "tokens" | "learners" | "sessions" | "attempts" | "reports" | "phone" | "shares" | "pilot" | "usage" | "groups";
 
 class Store {
   private mem = new Map<string, Map<string, unknown>>();
