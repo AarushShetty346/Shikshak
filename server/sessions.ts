@@ -229,7 +229,7 @@ export function createSession(deviceId: string, opts: NewSession = {}): Session 
     learnerId: opts.learnerId ?? null,
     createdAt: now,
     lastActive: now,
-    language: opts.language ?? "hinglish",
+    language: opts.language ?? "hi",
     grade: opts.grade ?? "10",
     topic: (opts.topic ?? "").slice(0, 120),
     studentName: (opts.studentName ?? "").slice(0, 40),

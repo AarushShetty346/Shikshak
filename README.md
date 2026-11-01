@@ -4,7 +4,7 @@
 
 **Live demo: [shikshak-o0l8.onrender.com](https://shikshak-o0l8.onrender.com)**
 
-Shikshak teaches the way a good tutor sitting next to you would. You talk to it in Hinglish, Hindi or English, and it
+Shikshak teaches the way a good tutor sitting next to you would. You talk to it in Hindi or English, and it
 explains a topic out loud while writing on a shared chalkboard: headings, worked steps, graphs and diagrams, timed
 with its voice. Then it's your turn. You solve the problem on the same board, with a finger, stylus or mouse (or by
 typing, or by sending a photo of your notebook), and press Done. Shikshak reads your handwriting, checks every line
@@ -56,7 +56,7 @@ it, so the first load can take about a minute.
 | **Together** | Study groups: invite by link, QR or code; each studies with their own tutor and can open the others' notes, reports and progress. |
 | **Exams** | Practice papers in the CBSE board pattern (sections A to E: MCQs and assertion-reason, short and long answers, case studies, internal choices), 5 to 30 questions, 30 min to 3 hours; class 10 Maths Standard or Basic. Mock (the paper, also as a PDF) or Exam: the questions stay hidden until it starts, the camera and the whole screen are shared, fullscreen; switching screens is called out by the invigilator out loud and on screen and goes in a report. Answer sheets are marked like a board examiner: step marks, presentation (neatness, handwriting, steps, final answers) and what to improve; then a class on the weakest question |
 | **Focus** | Focus mode (30 min to 2 h): leave the class and the tutor calls you back; hide the controls for just the board |
-| **Languages** | Hinglish, Hindi, English, Tamil and Telugu (Tamil and Telugu voice needs the agents set up with them and `BOLNA_AGENT_LANGUAGES=hi,en,ta,te`) |
+| **Languages** | Hindi, English, Tamil and Telugu (Tamil and Telugu voice needs the agents set up with them and `BOLNA_AGENT_LANGUAGES=hi,en,ta,te`) |
 
 Tests: 363 unit tests and 71 browser tests (phone and desktop) run with `npm run check` and `npm run test:e2e`.
 Not yet measured: handwriting-reading accuracy on real students' writing, and learning gains. Fix it's written
@@ -124,7 +124,7 @@ Browser                                Server (Node, one process)               
 - **Reports.** An end-of-class report card (shareable image) and a progress page.
 - **Phone revision (server only, off by default, no screen in the app).** Short keypad revision calls for basic phones, with guardian consent, an
   operator allowlist, call windows and opt-out. Tested only against a mock; no real calls have been placed.
-- **Languages.** Hindi, Hinglish and English. Tamil and Telugu work on the board; their voice needs the agents set up
+- **Languages.** Hindi and English. Tamil and Telugu work on the board; their voice needs the agents set up
   with those languages (`BOLNA_AGENT_LANGUAGES`), and no fluent speaker has reviewed the experience yet.
 - **Pilot tools.** Pseudonymous participants, consent, equivalent quiz forms and an anonymised export
   ([docs/PILOT.md](docs/PILOT.md)). No pilot has been run yet.

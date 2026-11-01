@@ -684,11 +684,11 @@ function Marks({ exam, onBack }: { exam: Exam; onBack: () => void }) {
       const learnerId = selectedLearner();
       const l = cachedLearners()?.find((x) => x.id === learnerId);
       const topic = `Exam review: ${exam.topic}`;
-      const r = await apiFetch<{ session: { id: string } }>("/sessions", { body: { label: topic, language: l?.language ?? "hinglish", grade: exam.paper.grade, topic, studentName: l?.name ?? "", learnerId } });
+      const r = await apiFetch<{ session: { id: string } }>("/sessions", { body: { label: topic, language: l?.language ?? "hi", grade: exam.paper.grade, topic, studentName: l?.name ?? "", learnerId } });
       await reviewExam(exam.id, r.session.id);
       const code = newCode();
       const now = Date.now();
-      saveSession({ id: code, serverId: r.session.id, learnerId, name: topic, studentName: l?.name ?? "", grade: exam.paper.grade, language: l?.language ?? "hinglish", topic, createdAt: now, updatedAt: now, archived: false, started: false });
+      saveSession({ id: code, serverId: r.session.id, learnerId, name: topic, studentName: l?.name ?? "", grade: exam.paper.grade, language: l?.language ?? "hi", topic, createdAt: now, updatedAt: now, archived: false, started: false });
       saveData(code, { snapshot: emptySnapshot(), plan: null, docs: [], handsFree: true });
       location.hash = `#/s/${code}`;
     } catch (e) {
