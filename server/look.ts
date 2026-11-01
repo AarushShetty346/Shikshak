@@ -117,6 +117,8 @@ export async function lookAtWork(input: {
   problem: string | null;
   answer?: string;
   boardContext: string[];
+  /** Lines of the tutor's writing the student's ink is on (the image doesn't show the tutor's writing). */
+  marked?: { label: string; line: number; text: string }[];
   studentSaid?: string;
   language: string;
   misconceptions?: { id: string; name: string }[];
@@ -133,6 +135,9 @@ export async function lookAtWork(input: {
       input.problem ? `Current problem: ${input.problem}` : "No problem was set; the student may be asking something.",
       input.answer ? `Expected final answer: ${input.answer}` : "",
       input.boardContext.length ? `Tutor's recent board lines: ${input.boardContext.join(" | ")}` : "",
+      input.marked?.length
+        ? `The student's ink is on or right beside these lines of the TUTOR's board writing, which the image doesn't show (it shows only the student's ink): ${input.marked.map((m) => `${m.label} line ${m.line}: "${m.text}"`).join("; ")}. Read circles, underlines, ticks, crosses, arrows and "?" as being about those lines, and words or working the student wrote as a note on them. If it's a question or a mark rather than working, it's "not_checked": say what they're asking about.`
+        : "",
       input.studentSaid ? `The student said: "${input.studentSaid}"` : "",
       input.photo ? "Count the lines in the photo yourself." : `The student has written ${input.lineCount} line(s).`,
       input.misconceptions?.length ? `Known misconceptions for this topic (id: description): ${input.misconceptions.map((m) => `${m.id}: ${m.name}`).join("; ")}` : "No misconception list for this topic: use \"none\".",
@@ -206,6 +211,7 @@ export function analysisKey(s: Session, capture: Capture, studentSaid?: string):
     s.language,
     String(capture.lineCount),
     (studentSaid ?? "").trim().toLowerCase().replace(/\s+/g, " "),
+    JSON.stringify(capture.marked ?? []),
   ];
   return createHash("sha1").update(parts.join("\u241f")).digest("hex");
 }
@@ -317,6 +323,7 @@ export function analyze(s: Session, capture: Capture, studentSaid?: string): Pro
         problem: problem?.text ?? null,
         answer,
         boardContext: s.recentBoard,
+        marked: capture.marked,
         studentSaid,
         language: s.language,
         misconceptions,

@@ -753,6 +753,43 @@ export function Board(props: Props) {
     return best && best.n * 2 >= written.length ? best : null;
   };
 
+  /**
+   * Lines of the tutor's own writing that the student's ink is on or right beside (a circle round a
+   * step, a "?" next to it, an underline). The snapshot shows only the student's ink, so the text of
+   * those lines goes with it and the reader knows what was marked.
+   */
+  const markedLines = (written: { box: Box }[]): { label: string; line: number; text: string }[] => {
+    const page = pageRef.current;
+    if (!page || !written.length || !scale) return [];
+    const pr = page.getBoundingClientRect();
+    // On the line (a circle, underline or crossing out), or on the same row just beside it (a "?").
+    // Working written under a question is the answer, not a mark on the question.
+    const SIDE = 40;
+    const ROW = 4;
+    const out: { label: string; line: number; text: string; d: number }[] = [];
+    for (const [label, el] of blockEls.current) {
+      const parts = [...el.querySelectorAll<HTMLElement>("[data-line]")];
+      for (const part of parts.length ? parts : [el]) {
+        const text = (part.textContent ?? "").replace(/\s+/g, " ").trim();
+        if (!text) continue;
+        const r = part.getBoundingClientRect();
+        const box = { x: (r.left - pr.left) / scale, y: (r.top - pr.top) / scale, w: r.width / scale, h: r.height / scale };
+        for (const { box: l } of written) {
+          const sameRow = l.y < box.y + box.h - ROW && box.y + ROW < l.y + l.h;
+          const hits = sameRow && l.x < box.x + box.w + SIDE && box.x - SIDE < l.x + l.w;
+          if (!hits) continue;
+          const d = Math.abs(l.y + l.h / 2 - (box.y + box.h / 2));
+          out.push({ label, line: Number(part.dataset.line) || 1, text: text.slice(0, 200), d });
+          break;
+        }
+      }
+    }
+    return out
+      .sort((a, b) => a.d - b.d)
+      .slice(0, 8)
+      .map(({ d: _d, ...m }) => m);
+  };
+
   // ---------- capture: the student's latest work as a numbered image ----------
   const capture = useCallback(
     (reason: "done" | "request", requestId: string | null = null) => {
@@ -768,7 +805,8 @@ export function Board(props: Props) {
         }
       }
       const boxes: Box[] = lines.map((l) => ({ x: round1(l.box.x), y: round1(l.box.y), w: round1(l.box.w), h: round1(l.box.h) }));
-      send({ kind: "capture", id, reason, requestId, questionId, png: lines.length ? makeSnapshot(response, lines) : null, lineCount: lines.length, lines: boxes });
+      const marked = markedLines(lines);
+      send({ kind: "capture", id, reason, requestId, questionId, png: lines.length ? makeSnapshot(response, lines) : null, lineCount: lines.length, lines: boxes, ...(marked.length ? { marked } : {}) });
       return id;
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps

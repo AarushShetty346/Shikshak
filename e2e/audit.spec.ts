@@ -758,3 +758,27 @@ test("guided tour: the first visit walks through the controls, once, and can be 
   await page.getByRole("menuitem", { name: "Show me around" }).click();
   await expect(bubble).toBeVisible();
 });
+
+test("ink on the tutor's own line: Done sends which line was marked, so the reader knows what was circled", async ({ page }) => {
+  await page.addInitScript(() => {
+    const sent: string[] = [];
+    (window as unknown as { __sent: string[] }).__sent = sent;
+    const orig = WebSocket.prototype.send;
+    WebSocket.prototype.send = function (data) {
+      if (typeof data === "string") sent.push(data);
+      return orig.call(this, data);
+    };
+  });
+  const id = await openClass(page, "Trigonometry");
+  await tool(page, "write", { session_code: id, kind: "steps", content: "sin A = BC/AC || cos A = AB/AC" });
+  const line = page.locator(".tblock [data-line='2']", { hasText: "cos A = AB/AC" });
+  await expect(line).toHaveClass(/chalk-write/, { timeout: 15_000 });
+  const b = (await line.boundingBox())!;
+  await scribble(page, b.x + 4, b.y + b.height / 2, Math.min(160, b.width - 8));
+  await page.getByRole("button", { name: "Done" }).click();
+  await expect
+    .poll(async () => page.evaluate(() => (window as unknown as { __sent: string[] }).__sent.filter((m) => m.includes('"capture"') && m.includes('"done"'))))
+    .toHaveLength(1);
+  const msg = JSON.parse(await page.evaluate(() => (window as unknown as { __sent: string[] }).__sent.find((m) => m.includes('"capture"') && m.includes('"done"'))!));
+  expect(msg.marked).toEqual([expect.objectContaining({ line: 2, text: expect.stringContaining("cos A") })]);
+});

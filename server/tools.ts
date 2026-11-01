@@ -115,10 +115,12 @@ async function lookAtBoard(req: Request, res: Response) {
     const key = `${capture.hash}|${capture.questionId}|${capture.photo?.label ?? ""}`;
     const told = s.lastLook?.key === key && Date.now() - s.lastLook.at < 30_000 && !studentSaid;
     s.lastLook = { key, at: Date.now() };
+    // What they marked up on your own writing, so you can talk about it ("B3 ki line 2 pe circle kiya hai").
+    const marked = capture.marked?.length ? { student_marked: capture.marked.map((m) => `${m.label} line ${m.line}: ${m.text}`) } : {};
     res.json(
       told
-        ? { ...result, already_told: true, note: "You told the student about this exact work a few seconds ago. Don't repeat it: at most one short line, then wait for them to change it or ask." }
-        : result,
+        ? { ...result, ...marked, already_told: true, note: "You told the student about this exact work a few seconds ago. Don't repeat it: at most one short line, then wait for them to change it or ask." }
+        : { ...result, ...marked },
     );
   } catch (err) {
     const e = err as Error;

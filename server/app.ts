@@ -955,6 +955,8 @@ export function createApp(opts: { devTools?: boolean; phoneProvider?: PhoneProvi
               ...(msg.photoLabel && findBlock(s, msg.photoLabel)?.kind === "photo" ? { photo: { label: findBlock(s, msg.photoLabel)!.label } } : {}),
             };
             if (msg.photoLabel && !capture.photo) return fail("no such photo");
+            const marked = (msg.marked ?? []).filter((m) => findBlock(s, m.label)).map((m) => ({ label: m.label, line: m.line, text: m.text.replace(/\s+/g, " ").trim() }));
+            if (marked.length) Object.assign(capture, { marked });
             storeCapture(s, capture);
             if (capture.reason === "done") {
               reviewSubmission(s, capture, (result) => afterReview(s, capture, result)).catch((err) => console.error("[ws] review crashed", (err as Error).message));

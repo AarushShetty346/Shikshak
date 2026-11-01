@@ -60,7 +60,7 @@ export async function newSession(base: string, token: string, body: Record<strin
   return (r.json.session as { id: string }).id;
 }
 
-export type Drawing = { png: string; lineCount: number; lines?: Box[] };
+export type Drawing = { png: string; lineCount: number; lines?: Box[]; marked?: { label: string; line: number; text: string }[] };
 export const PNG = (seed: string) => `data:image/png;base64,${Buffer.from(`png-${seed}`).toString("base64")}`;
 const boxes = (n: number): Box[] => Array.from({ length: n }, (_, i) => ({ x: 40, y: 200 + i * 50, w: 300, h: 40 }));
 
@@ -115,6 +115,7 @@ function capture(id: string, reason: "done" | "request", d: Drawing | null, ques
     png: lineCount ? d!.png : null,
     lineCount,
     lines: lineCount ? (d!.lines ?? boxes(lineCount)) : [],
+    ...(d?.marked ? { marked: d.marked } : {}),
   };
 }
 
