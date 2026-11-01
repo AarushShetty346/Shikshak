@@ -782,3 +782,44 @@ test("ink on the tutor's own line: Done sends which line was marked, so the read
   const msg = JSON.parse(await page.evaluate(() => (window as unknown as { __sent: string[] }).__sent.find((m) => m.includes('"capture"') && m.includes('"done"'))!));
   expect(msg.marked).toEqual([expect.objectContaining({ line: 2, text: expect.stringContaining("cos A") })]);
 });
+
+for (const [name, w, h] of [["iPad portrait", 820, 1050], ["iPad landscape", 1180, 700], ["iPad mini", 744, 1000], ["iPad Pro 13", 1024, 1250]] as const) {
+  test(`${name}: every main screen fits the width (no sideways scroll)`, async ({ browser }, info) => {
+    test.skip(info.project.name !== "desktop");
+    const ctx = await browser.newContext({ viewport: { width: w, height: h }, hasTouch: true, deviceScaleFactor: 2 });
+    await ctx.addInitScript(() => {
+      sessionStorage.setItem("shikshak.test.skipSplash", "1");
+      for (const k of ["shikshak.tour.home.v1", "shikshak.tour.class.v1"]) localStorage.setItem(k, "1");
+    });
+    const page = await ctx.newPage();
+    const fits = async (where: string) => {
+      const { sw, cw } = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
+      expect(sw, where).toBeLessThanOrEqual(cw);
+    };
+    await openClass(page, "Trigonometry");
+    await fits("class");
+    for (const hash of ["", "#/exam", "#/progress", "#/group"]) {
+      await page.goto(`/${hash}`);
+      await page.waitForTimeout(500);
+      await fits(hash || "home");
+    }
+    await ctx.close();
+  });
+}
+
+test("a flick with the scroll tool keeps the board gliding after you let go, like an iPad page", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop");
+  const id = await openClass(page);
+  for (let i = 0; i < 6; i++) await tool(page, "write", { session_code: id, kind: "steps", content: "line one || line two || line three || line four" });
+  await page.getByRole("button", { name: "Scroll" }).click();
+  const scroller = page.locator(".board-scroll");
+  const box = (await page.locator("canvas.board-ink").boundingBox())!;
+  const x = box.x + box.width / 2;
+  await page.mouse.move(x, box.y + box.height * 0.8);
+  await page.mouse.down();
+  for (let i = 1; i <= 6; i++) await page.mouse.move(x, box.y + box.height * 0.8 - i * 40);
+  await page.mouse.up();
+  const atRelease = await scroller.evaluate((el) => el.scrollTop);
+  await page.waitForTimeout(400);
+  expect(await scroller.evaluate((el) => el.scrollTop)).toBeGreaterThan(atRelease + 20);
+});
