@@ -244,7 +244,7 @@ export function createApp(opts: { devTools?: boolean; phoneProvider?: PhoneProvi
     const b = req.body ?? {};
     const draft = typeof b.draftId === "string" ? drafts.get(b.draftId) : undefined;
     if (b.draftId && (!draft || draft.deviceId !== req.device!.id)) return void res.status(409).json({ error: "That lesson plan has expired. Make it again." });
-    const language = isLanguage(b.language) ? b.language : "hinglish";
+    const language = isLanguage(b.language) ? b.language : "hi";
     if (draft && draft.language !== language) return void res.status(409).json({ error: "The plan was made for a different language. Make it again." });
     const learner = b.learnerId ? learnerForDevice(b.learnerId, req.device!.id) : null;
     if (b.learnerId && !learner) return void res.status(404).json({ error: "That learner doesn't exist on this device." });
@@ -373,7 +373,7 @@ export function createApp(opts: { devTools?: boolean; phoneProvider?: PhoneProvi
   api.post("/plans", big, async (req, res) => {
     if (!hasModel()) return void res.status(503).json({ error: "Planner is not set up (no GEMINI_API_KEY or ANTHROPIC_API_KEY)." });
     const b = req.body ?? {};
-    const language = isLanguage(b.language) ? b.language : "hinglish";
+    const language = isLanguage(b.language) ? b.language : "hi";
     try {
       chargeModelCall(req.device!.id, "plan");
       const files = Array.isArray(b.files) ? b.files.slice(0, 6) : [];

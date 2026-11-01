@@ -19,7 +19,6 @@ export interface StudentSetup {
 }
 
 const LANGS: { id: Language; label: string; preview?: boolean }[] = [
-  { id: "hinglish", label: "Hinglish" },
   { id: "hi", label: "हिन्दी" },
   { id: "en", label: "English" },
   { id: "ta", label: "தமிழ்" },
@@ -49,7 +48,7 @@ export function Setup({
 }) {
   const [name, setName] = useState(learner?.name ?? "");
   const [grade, setGrade] = useState(learner?.grade ?? "10");
-  const [language, setLanguage] = useState<Language>(learner?.language ?? "hinglish");
+  const [language, setLanguage] = useState<Language>(learner?.language && learner.language !== "hinglish" ? learner.language : "hi");
   const [topic, setTopic] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [plan, setPlan] = useState<{ draftId: string; plan: PublicPlan } | null>(null);

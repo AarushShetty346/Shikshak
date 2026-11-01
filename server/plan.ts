@@ -142,7 +142,7 @@ export function outlineFor(plan: StudyPlan): string {
 }
 
 export async function makePlan(req: PlanRequest): Promise<StudyPlan> {
-  const language = (isLanguage(req.language) ? req.language : "hinglish") as Language;
+  const language = (isLanguage(req.language) ? req.language : "hi") as Language;
   const files = [...(req.files ?? []), ...(req.notes ? [req.notes] : [])].slice(0, 6);
   const plan = await askJson<StudyPlan>({
     system: SYSTEM.replaceAll("{SCRIPT}", SCRIPT[language]).replace("{GRADE}", req.grade || "10"),

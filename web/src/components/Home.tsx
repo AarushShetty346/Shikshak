@@ -359,7 +359,7 @@ export function Home({
           <div>
             <h2 className="chalk">Learn maths out loud</h2>
             <p>
-              I am Shikshak, your tutor for maths in classes 8 to 12. I talk you through a topic in Hinglish, Hindi or English while writing on a shared
+              I am Shikshak, your tutor for maths in classes 8 to 12. I talk you through a topic in Hindi or English while writing on a shared
               chalkboard. You solve on the board, press Done, and I read your handwritten steps and circle the one that went wrong.
             </p>
             <p>Start with one class per chapter. Each keeps its own board, notes and progress.</p>
@@ -459,7 +459,7 @@ export function Home({
 export function AddLearner({ onDone, submitLabel = "Add", required = false }: { onDone: (l: Learner | null) => void; submitLabel?: string; required?: boolean }) {
   const [name, setName] = useState("");
   const [grade, setGrade] = useState("10");
-  const [language, setLanguage] = useState<Language>("hinglish");
+  const [language, setLanguage] = useState<Language>("hi");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   return (
@@ -493,7 +493,6 @@ export function AddLearner({ onDone, submitLabel = "Add", required = false }: { 
       <label className="field field-small">
         <span>Language</span>
         <select value={language} onChange={(e) => setLanguage(e.target.value as Language)}>
-          <option value="hinglish">Hinglish</option>
           <option value="hi">हिन्दी</option>
           <option value="en">English</option>
           <option value="ta">தமிழ்</option>

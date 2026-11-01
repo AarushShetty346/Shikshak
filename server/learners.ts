@@ -61,7 +61,7 @@ export function createLearner(deviceId: string, input: { name?: unknown; grade?:
     deviceId,
     name,
     grade: /^(8|9|10|11|12)$/.test(String(input.grade)) ? String(input.grade) : "10",
-    language: isLanguage(input.language) ? input.language : "hinglish",
+    language: isLanguage(input.language) ? input.language : "hi",
     timezone: validTz(input.timezone),
     createdAt: Date.now(),
     updatedAt: Date.now(),
