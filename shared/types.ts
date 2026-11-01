@@ -182,6 +182,8 @@ export type ClientMessage =
       lines: Box[];
       /** The student wrote over a photo pinned on the board: png is that photo with their ink on top. */
       photoLabel?: string | null;
+      /** Lines of the tutor's writing the student's ink is on (circled, underlined, a "?" beside it). */
+      marked?: { label: string; line: number; text: string }[];
     }
   /** The student interrupted (Stop button, or pressed Talk while the tutor was speaking). */
   | { kind: "interrupt"; reason: "doubt" | "speech" }
