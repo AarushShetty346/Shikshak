@@ -33,6 +33,8 @@ export interface Capture {
   hash: string;
   /** A photo of working on paper (not the board): the board block it's pinned as. Its lines are found by the reader. */
   photo?: { label: string };
+  /** Lines of the tutor's own writing the student's ink is on (circled, underlined, a "?" beside it). */
+  marked?: { label: string; line: number; text: string }[];
 }
 
 /** The question the student is answering, with what only the teacher knows. */

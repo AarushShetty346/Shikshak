@@ -162,6 +162,20 @@ describe("board tools", () => {
     t.ws.close();
   });
 
+  it("ink on the tutor's own writing: the reader and the tutor are told which lines were marked", async () => {
+    const id = await session();
+    const t = await tab(id);
+    const w = await post("write", { session_code: id, kind: "steps", content: "sin A = BC/AC || cos A = AB/AC" });
+    t.draw({ png: PNG("circle"), lineCount: 1, marked: [{ label: w.label, line: 2, text: "cos A = AB/AC" }, { label: "B99", line: 1, text: "made up" }] });
+    askJson.mockResolvedValue({ ...CORRECT, kind: "question", status: "not_checked", reading: "a circle and ?" });
+    const res = await post("look_at_board", { session_code: id });
+    const req = askJson.mock.calls[0][0] as { text: string };
+    expect(req.text).toContain(`${w.label} line 2: "cos A = AB/AC"`);
+    expect(req.text).not.toContain("made up"); // a block that isn't on the board is dropped
+    expect(res.student_marked).toEqual([`${w.label} line 2: cos A = AB/AC`]);
+    t.ws.close();
+  });
+
   it("an empty board says so without calling the model", async () => {
     const id = await session();
     const t = await tab(id, { png: "", lineCount: 0 });

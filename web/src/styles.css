@@ -80,6 +80,18 @@ body,
   height: 100%;
 }
 
+html {
+  /* iPad and iPhone Safari enlarge text by themselves in landscape; keep the sizes we set. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+html,
+body {
+  /* No rubber-band bounce dragging the whole app around on iPad (the board scrolls inside). */
+  overscroll-behavior: none;
+}
+
 body {
   margin: 0;
   /* Every page is on the blackboard: the page behind it is board green too (no light flash). */
@@ -1651,12 +1663,12 @@ sub {
   border: 0;
   border-radius: 999px;
   padding: 7px 14px 7px 10px;
-  background: rgb(0 0 0 / 0.24);
+  /* A solid tint, no backdrop blur: Safari recomputes a blur every frame while the board scrolls under it. */
+  background: rgb(18 30 24 / 0.72);
   color: rgba(244, 241, 232, 0.88);
   font-weight: 600;
   font-size: 15px;
   white-space: nowrap;
-  backdrop-filter: blur(6px);
   transition: background 0.15s ease;
 }
 
@@ -6002,4 +6014,12 @@ button.group-card {
   height: 1px;
   opacity: 0;
   pointer-events: none;
+}
+
+/* iPad Safari repaints SVG-filtered text (the chalk texture) whenever the page scrolls. On their own
+   layer they're painted once and only moved. */
+.home-board .home-title,
+.avatar-face {
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }

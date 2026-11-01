@@ -209,6 +209,9 @@ export function Board(props: Props) {
   const activePointer = useRef<number | null>(null);
   const touches = useRef(new Map<number, { x: number; y: number }>());
   const panning = useRef<{ y: number } | null>(null);
+  // Recent pan positions, so a flick keeps gliding after the fingers lift (as a normal iPad page does).
+  const panTrail = useRef<{ y: number; t: number }[]>([]);
+  const fling = useRef(0);
   const lastPenAt = useRef(0);
   const lastDrawAt = useRef(0);
   const blockEls = useRef(new Map<string, HTMLElement>());
@@ -518,7 +521,7 @@ export function Board(props: Props) {
     const bottom = top + view.h / scale + 40;
     const all = drawing.current && drawing.current.id !== "eraser" ? [...strokesRef.current, drawing.current] : strokesRef.current;
     for (const s of all) {
-      const b = strokeBox(s);
+      const b = s === drawing.current ? strokeBox(s) : boxOf(s);
       if (b.y > bottom || b.y + b.h < top) continue;
       if (s.text) drawTyped(ctx, s);
       else drawStroke(ctx, s.points);
@@ -580,6 +583,33 @@ export function Board(props: Props) {
     glide.current.raf = requestAnimationFrame(step);
   };
   useEffect(() => () => cancelAnimationFrame(glide.current.raf), []);
+
+  /** After a flick: keep scrolling at the finger's speed, slowing down smoothly (iOS-like). */
+  const glideFrom = (trail: { y: number; t: number }[]) => {
+    const now = performance.now();
+    const recent = trail.filter((p) => now - p.t < 120);
+    if (recent.length < 2) return;
+    const first = recent[0];
+    const last = recent[recent.length - 1];
+    const dt = last.t - first.t;
+    if (dt <= 0) return;
+    let v = -(last.y - first.y) / dt; // px per ms, in scroll direction
+    if (Math.abs(v) < 0.15) return;
+    v = Math.max(-6, Math.min(6, v));
+    let prev = now;
+    const step = (t: number) => {
+      const s = scrollRef.current;
+      if (!s) return;
+      const ms = Math.min(48, t - prev);
+      prev = t;
+      const before = s.scrollTop;
+      scrollBoardTo(before + v * ms, false);
+      v *= Math.pow(0.95, ms / 16);
+      if (Math.abs(v) > 0.02 && s.scrollTop !== before) fling.current = requestAnimationFrame(step);
+    };
+    fling.current = requestAnimationFrame(step);
+  };
+  useEffect(() => () => cancelAnimationFrame(fling.current), []);
 
   const onScroll = () => {
     cancelAnimationFrame(frame.current);
@@ -753,6 +783,43 @@ export function Board(props: Props) {
     return best && best.n * 2 >= written.length ? best : null;
   };
 
+  /**
+   * Lines of the tutor's own writing that the student's ink is on or right beside (a circle round a
+   * step, a "?" next to it, an underline). The snapshot shows only the student's ink, so the text of
+   * those lines goes with it and the reader knows what was marked.
+   */
+  const markedLines = (written: { box: Box }[]): { label: string; line: number; text: string }[] => {
+    const page = pageRef.current;
+    if (!page || !written.length || !scale) return [];
+    const pr = page.getBoundingClientRect();
+    // On the line (a circle, underline or crossing out), or on the same row just beside it (a "?").
+    // Working written under a question is the answer, not a mark on the question.
+    const SIDE = 40;
+    const ROW = 4;
+    const out: { label: string; line: number; text: string; d: number }[] = [];
+    for (const [label, el] of blockEls.current) {
+      const parts = [...el.querySelectorAll<HTMLElement>("[data-line]")];
+      for (const part of parts.length ? parts : [el]) {
+        const text = (part.textContent ?? "").replace(/\s+/g, " ").trim();
+        if (!text) continue;
+        const r = part.getBoundingClientRect();
+        const box = { x: (r.left - pr.left) / scale, y: (r.top - pr.top) / scale, w: r.width / scale, h: r.height / scale };
+        for (const { box: l } of written) {
+          const sameRow = l.y < box.y + box.h - ROW && box.y + ROW < l.y + l.h;
+          const hits = sameRow && l.x < box.x + box.w + SIDE && box.x - SIDE < l.x + l.w;
+          if (!hits) continue;
+          const d = Math.abs(l.y + l.h / 2 - (box.y + box.h / 2));
+          out.push({ label, line: Number(part.dataset.line) || 1, text: text.slice(0, 200), d });
+          break;
+        }
+      }
+    }
+    return out
+      .sort((a, b) => a.d - b.d)
+      .slice(0, 8)
+      .map(({ d: _d, ...m }) => m);
+  };
+
   // ---------- capture: the student's latest work as a numbered image ----------
   const capture = useCallback(
     (reason: "done" | "request", requestId: string | null = null) => {
@@ -768,7 +835,8 @@ export function Board(props: Props) {
         }
       }
       const boxes: Box[] = lines.map((l) => ({ x: round1(l.box.x), y: round1(l.box.y), w: round1(l.box.w), h: round1(l.box.h) }));
-      send({ kind: "capture", id, reason, requestId, questionId, png: lines.length ? makeSnapshot(response, lines) : null, lineCount: lines.length, lines: boxes });
+      const marked = markedLines(lines);
+      send({ kind: "capture", id, reason, requestId, questionId, png: lines.length ? makeSnapshot(response, lines) : null, lineCount: lines.length, lines: boxes, ...(marked.length ? { marked } : {}) });
       return id;
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -831,6 +899,7 @@ export function Board(props: Props) {
 
   const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (e.button !== 0 && e.pointerType === "mouse") return;
+    cancelAnimationFrame(fling.current); // a touch stops a glide, as on any iPad page
     // A button on a board block (e.g. "Fix it" on a photo) is under the ink layer: press it instead of drawing.
     // (Board blocks don't take pointer events, so find it by where it is.)
     const action = [...(pageRef.current?.querySelectorAll<HTMLButtonElement>("button[data-board-action]") ?? [])].find((b) => {
@@ -863,6 +932,7 @@ export function Board(props: Props) {
         // Two fingers: scroll the page. Drop the half-drawn stroke the first finger started.
         finishStroke(false);
         panning.current = { y: avgY(touches.current) };
+        panTrail.current = [{ y: panning.current.y, t: performance.now() }];
         return;
       }
     }
@@ -870,6 +940,7 @@ export function Board(props: Props) {
     if (e.pointerType === "touch" && Date.now() - lastPenAt.current < 1500) return; // palm while using a stylus
     if (tool === "hand") {
       panning.current = { y: e.clientY };
+      panTrail.current = [{ y: e.clientY, t: performance.now() }];
       activePointer.current = e.pointerId;
       return;
     }
@@ -900,6 +971,8 @@ export function Board(props: Props) {
       const y = touches.current.size >= 2 ? avgY(touches.current) : e.clientY;
       scrollBoardTo(scroller.scrollTop - (y - panning.current.y), false);
       panning.current.y = y;
+      const now = performance.now();
+      panTrail.current = [...panTrail.current.filter((p) => now - p.t < 120), { y, t: now }];
       return;
     }
     const stroke = drawing.current;
@@ -929,12 +1002,18 @@ export function Board(props: Props) {
       return;
     }
     if (panning.current) {
+      let ended = false;
       if (tool === "hand") {
         if (e.pointerId === activePointer.current) {
           panning.current = null;
           activePointer.current = null;
+          ended = true;
         }
-      } else if (touches.current.size < 2) panning.current = null;
+      } else if (touches.current.size < 2) {
+        panning.current = null;
+        ended = true;
+      }
+      if (ended) glideFrom(panTrail.current);
       return;
     }
     if (e.pointerId !== activePointer.current) return;
@@ -1145,6 +1224,17 @@ export function Board(props: Props) {
       </div>
     </div>
   );
+}
+
+/** A finished stroke's box, measured once (redraw runs every scroll frame; strokes don't change). */
+const boxCache = new WeakMap<object, Box>();
+function boxOf(s: { points: Point[] }): Box {
+  let b = boxCache.get(s);
+  if (!b) {
+    b = strokeBox(s as Parameters<typeof strokeBox>[0]);
+    boxCache.set(s, b);
+  }
+  return b;
 }
 
 function avgY(points: Map<number, { x: number; y: number }>): number {

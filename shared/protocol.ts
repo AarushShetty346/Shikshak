@@ -30,6 +30,11 @@ const CaptureSchema = z
     lines: z.array(BoxSchema).max(MAX_LINES),
     /** The student wrote over a photo on the board: the image is that photo with their ink on top. */
     photoLabel: z.string().regex(/^[A-Z]\d{1,4}$/).nullish(),
+    /** Lines of the tutor's writing the student's ink is on or right next to (circled, ticked, "?"). */
+    marked: z
+      .array(z.object({ label: z.string().regex(/^[A-Z]\d{1,4}$/), line: z.number().int().min(1).max(60), text: z.string().max(200) }).strict())
+      .max(8)
+      .optional(),
   })
   .strict()
   .refine((c) => c.lines.length === c.lineCount, { message: "lines must match lineCount" })
